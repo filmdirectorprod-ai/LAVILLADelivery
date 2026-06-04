@@ -35,6 +35,7 @@
 
 # --- Never commit, even within allow-listed paths ---
 node_modules/
+supabase/.verify-pgdata/
 .next/
 .env
 .env.local
