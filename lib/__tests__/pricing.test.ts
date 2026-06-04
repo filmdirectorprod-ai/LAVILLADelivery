@@ -106,3 +106,40 @@ describe('computeOrder', () => {
     expect(r.pointsEarned).toBe(0);
   });
 });
+
+// These lock the rounding semantics that MUST agree with the server-side
+// place_order RPC (supabase/migrations/0004_place_order.sql). The client only
+// displays the bill, but if its rounding drifts from the SQL the user would be
+// shown a different total than they are charged.
+describe('computeOrder ↔ place_order parity (rounding)', () => {
+  it('handles fractional unit prices from cake-size multipliers and floors earned pts', () => {
+    // 165 DH × 0.25 (individuel) = 41.25 ; 11 DH × 1.6 (8–10 pers.) = 17.6
+    const r = computeOrder({
+      items: [
+        { price: 41.25, qty: 1 },
+        { price: 17.6, qty: 1 },
+      ],
+      mode: 'livraison',
+      zoneFee: 18,
+      promo: false,
+      pointsBalance: 0,
+    });
+    expect(r.subtotal).toBe(58.85);
+    expect(r.total).toBe(76.85); // 58.85 + 18
+    expect(r.pointsEarned).toBe(76); // floor, not round
+  });
+
+  it('rounds the 15% promo half-up, matching Postgres round(x, 0)', () => {
+    // subtotal 110 → 110 × 0.15 = 16.5 ; JS Math.round and Postgres round both
+    // resolve the .5 away from zero → 17. retrait isolates the discount.
+    const r = computeOrder({
+      items: [{ price: 110, qty: 1 }],
+      mode: 'retrait',
+      promo: true,
+      pointsBalance: 0,
+    });
+    expect(r.discount).toBe(17);
+    expect(r.total).toBe(93); // 110 - 17
+    expect(r.pointsEarned).toBe(93);
+  });
+});
