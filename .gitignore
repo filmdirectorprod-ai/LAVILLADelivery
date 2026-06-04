@@ -1,0 +1,37 @@
+# This git repo lives in the user's home directory (/Users/pro) by explicit request.
+# To protect unrelated home files, ignore EVERYTHING at the repo root by default,
+# then allow-list only La Villa project paths below.
+
+/*
+
+# --- Allow-listed project paths ---
+!/.gitignore
+!/docs/
+
+# Next.js app (added as the project is scaffolded)
+!/app/
+!/components/
+!/lib/
+!/supabase/
+!/styles/
+!/package.json
+!/package-lock.json
+!/tsconfig.json
+!/next.config.mjs
+!/next.config.js
+!/tailwind.config.ts
+!/tailwind.config.js
+!/postcss.config.mjs
+!/postcss.config.js
+!/.env.example
+!/middleware.ts
+!/next-env.d.ts
+
+# --- Never commit, even within allow-listed paths ---
+node_modules/
+.next/
+.env
+.env.local
+.env*.local
+*.log
+.DS_Store
