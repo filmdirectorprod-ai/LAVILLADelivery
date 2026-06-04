@@ -1,7 +1,7 @@
 -- La Villa — transactional, server-authoritative review submission.
 -- Validates the order is owned by the caller and delivered, inserts the review
 -- (one per order, enforced by the unique constraint), awards a fixed loyalty
--- bonus via the ledger, recomputes balance + tier, and bumps reviews_count.
+-- bonus via the ledger, and recomputes balance + tier.
 --
 -- Returns the new loyalty balance so the client can reflect it immediately.
 
@@ -60,8 +60,7 @@ begin
 
   update profiles
     set loyalty_points = loyalty_points + v_award,
-        loyalty_tier = v_tier,
-        reviews_count = reviews_count + 1
+        loyalty_tier = v_tier
     where id = p_user
     returning loyalty_points into v_balance;
 

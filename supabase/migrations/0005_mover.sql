@@ -57,6 +57,10 @@ $$;
 create extension if not exists pg_cron;
 select cron.schedule('lv_mover', '30 seconds', $$ select public.advance_deliveries(); $$);
 
--- Enable Realtime broadcasts on the tables the client subscribes to.
+-- Enable Realtime broadcasts on the tables the client subscribes to:
+--   order_tracking — live marker + timeline (TrackingScreen)
+--   notifications  — live bell feed (NotificationsScreen)
+--   chat_messages  — live driver↔customer messages (ChatScreen)
 alter publication supabase_realtime add table order_tracking;
 alter publication supabase_realtime add table notifications;
+alter publication supabase_realtime add table chat_messages;
