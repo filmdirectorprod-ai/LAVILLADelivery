@@ -15,9 +15,18 @@ function isPublic(pathname: string): boolean {
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  // When Supabase isn't configured (e.g. CI / a fresh checkout without
+  // .env.local), there's no session to refresh and no way to gate routes —
+  // pass through so the statically-prerendered public pages still render.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !anonKey) {
+    return response;
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    anonKey,
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
