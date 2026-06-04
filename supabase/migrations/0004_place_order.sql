@@ -51,6 +51,14 @@ declare
   v_qty int;
   v_mult numeric;
 begin
+  -- Bind to the authenticated caller. This RPC is SECURITY DEFINER and granted
+  -- to `authenticated`, so it is reachable directly from the browser client —
+  -- never trust the client-supplied p_user, or one user could place orders and
+  -- spend another user's loyalty points. auth.uid() comes from the request JWT.
+  if auth.uid() is null or p_user is distinct from auth.uid() then
+    raise exception 'forbidden';
+  end if;
+
   if p_mode not in ('livraison','retrait') then
     raise exception 'invalid mode %', p_mode;
   end if;

@@ -19,10 +19,21 @@ create policy drivers_read on drivers for select using (true);
 alter table rewards enable row level security;
 create policy rewards_read on rewards for select using (true);
 
--- ── Profiles (owner read/write) ──────────────────────────────────────────────
+-- ── Profiles ─────────────────────────────────────────────────────────────────
+-- Owner may read their row and update only presentation fields. loyalty_points
+-- and loyalty_tier are server-owned: they are mutated solely by the
+-- SECURITY DEFINER RPCs (place_order, submit_review), which run as the function
+-- owner and therefore bypass the column grant below. Without this restriction a
+-- signed-in user could run `update profiles set loyalty_points = 999999` on
+-- their own row and defeat the server-authoritative loyalty system.
 alter table profiles enable row level security;
-create policy profiles_rw on profiles for all
+create policy profiles_owner_read on profiles for select
+  using (auth.uid() = id);
+create policy profiles_owner_update on profiles for update
   using (auth.uid() = id) with check (auth.uid() = id);
+
+revoke update on profiles from authenticated;
+grant update (full_name, phone, avatar_url) on profiles to authenticated;
 
 -- ── Carts (owner read/write) ─────────────────────────────────────────────────
 alter table carts enable row level security;

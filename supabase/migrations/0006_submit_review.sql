@@ -26,6 +26,13 @@ declare
   v_tier text := 'Gourmand';
   v_balance int := 0;
 begin
+  -- Bind to the authenticated caller (SECURITY DEFINER + granted to
+  -- `authenticated` means this is callable directly from the browser client).
+  -- Never trust the client-supplied p_user.
+  if auth.uid() is null or p_user is distinct from auth.uid() then
+    raise exception 'forbidden';
+  end if;
+
   if p_rating is null or p_rating < 1 or p_rating > 5 then
     raise exception 'invalid rating %', p_rating;
   end if;
