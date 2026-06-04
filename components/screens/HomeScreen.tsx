@@ -3,7 +3,7 @@
 // adapted to real fetched data + Next routing + the cart/favorites stores.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Category, Product, Profile, Zone } from '@/lib/types';
+import type { Category, Product, Zone } from '@/lib/types';
 import type { CategoryUniverse, OrderMode } from '@/lib/types';
 import { formatDH } from '@/lib/format';
 import { useCart } from '@/lib/cart-store';

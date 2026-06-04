@@ -361,7 +361,7 @@ export function CheckoutScreen({ products, zone, profile }: CheckoutScreenProps)
                 <Icon name="tag" size={18} color="var(--gold)" />
               </div>
               <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>
-                À régler sous 24 h dans n'importe quelle agence Cash Plus.
+                À régler sous 24 h dans n&apos;importe quelle agence Cash Plus.
               </div>
             </div>
           )}

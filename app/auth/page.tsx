@@ -2,7 +2,7 @@
 // Authentication — real Supabase email/password + Google OAuth.
 // Visual layout ported from the prototype (screens-home.jsx); the mock
 // phone-OTP flow is replaced by real auth. Apple stays a visual mock.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/lib/toast-store';
@@ -40,7 +40,10 @@ const labelStyle: React.CSSProperties = {
 
 export default function AuthPage() {
   const router = useRouter();
-  const supabase = createClient();
+  // Lazily create the browser client only on first use (in a handler) so static
+  // prerender never instantiates it (which would require env vars at build time).
+  const supabaseRef = useRef<ReturnType<typeof createClient>>();
+  const getSupabase = () => (supabaseRef.current ??= createClient());
   const toast = useToast((s) => s.show);
 
   const [mode, setMode] = useState<Mode>('signin');
@@ -59,7 +62,7 @@ export default function AuthPage() {
     setBusy(true);
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
+        const { error } = await getSupabase().auth.signUp({
           email,
           password,
           options: { data: { full_name: fullName } },
@@ -67,7 +70,7 @@ export default function AuthPage() {
         if (error) throw error;
         toast('Compte créé — bienvenue !');
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await getSupabase().auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
       router.replace('/');
@@ -81,7 +84,7 @@ export default function AuthPage() {
 
   async function google() {
     setBusy(true);
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { error } = await getSupabase().auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
