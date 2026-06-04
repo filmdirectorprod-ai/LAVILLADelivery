@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins, Playfair_Display } from "next/font/google";
 import "./globals.css";
+import { ToastViewport } from "@/components/Toast";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -26,7 +27,12 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="fr" className={`${poppins.variable} ${playfair.variable}`}>
-      <body>{children}</body>
+      <body>
+        <div className="lv-frame">
+          {children}
+          <ToastViewport />
+        </div>
+      </body>
     </html>
   );
 }

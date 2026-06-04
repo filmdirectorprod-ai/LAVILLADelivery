@@ -18,6 +18,28 @@ body {
   padding: 0;
 }
 
+/* Centered mobile viewport — the app runs inside this frame. Screens that use
+   position:absolute/inset:0 anchor to it. On desktop it floats with a shadow. */
+.lv-frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 430px;
+  height: 100dvh;
+  margin: 0 auto;
+  background: #fff;
+  overflow: hidden;
+}
+@media (min-width: 480px) {
+  .lv-frame {
+    height: min(920px, 100dvh);
+    margin: max(0px, calc((100dvh - 920px) / 2)) auto;
+    border-radius: 28px;
+    box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.45);
+  }
+}
+
 body {
   min-height: 100vh;
   font-family: var(--ui-font), "Poppins", system-ui, sans-serif;
