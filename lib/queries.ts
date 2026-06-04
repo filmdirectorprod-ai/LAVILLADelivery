@@ -6,10 +6,12 @@ import type {
   Category,
   Product,
   Zone,
+  Driver,
   Profile,
   Order,
   OrderItem,
   OrderTracking,
+  ChatMessage,
   Reward,
   Notification,
   LoyaltyLedgerEntry,
@@ -70,6 +72,24 @@ export async function getMyOrders(): Promise<Order[]> {
   return data ?? [];
 }
 
+export interface OrderWithItems {
+  order: Order;
+  items: OrderItem[];
+}
+
+/** Current user's orders, each with its line items (newest first). */
+export async function getMyOrdersWithItems(): Promise<OrderWithItems[]> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from('orders')
+    .select('*, order_items(*)')
+    .order('placed_at', { ascending: false });
+  return (data ?? []).map((row) => {
+    const { order_items, ...order } = row as Order & { order_items: OrderItem[] };
+    return { order: order as Order, items: order_items ?? [] };
+  });
+}
+
 export interface OrderDetail {
   order: Order;
   items: OrderItem[];
@@ -85,6 +105,23 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     supabase.from('order_tracking').select('*').eq('order_id', orderId).maybeSingle(),
   ]);
   return { order, items: items ?? [], tracking: tracking ?? null };
+}
+
+export async function getDriverById(id: string | null): Promise<Driver | null> {
+  if (!id) return null;
+  const supabase = await createServerSupabase();
+  const { data } = await supabase.from('drivers').select('*').eq('id', id).maybeSingle();
+  return data ?? null;
+}
+
+export async function getChatMessages(orderId: string): Promise<ChatMessage[]> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .eq('order_id', orderId)
+    .order('created_at');
+  return data ?? [];
 }
 
 export async function getMyLoyaltyLedger(): Promise<LoyaltyLedgerEntry[]> {
