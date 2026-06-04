@@ -9,8 +9,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        brand: "#137c8b",
+        "brand-d": "#0f606b",
+        gold: "#a89723",
+        ink: "#1a1d1e",
+        muted: "#6b7173",
+        line: "#eceeef",
+        soft: "#f6f7f7",
+      },
+      fontFamily: {
+        sans: ["var(--ui-font)", "Poppins", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "Playfair Display", "Georgia", "serif"],
       },
     },
   },
