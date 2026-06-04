@@ -26,6 +26,12 @@
 !/.env.example
 !/middleware.ts
 !/next-env.d.ts
+!/.eslintrc.json
+!/eslint.config.mjs
+!/vitest.config.ts
+!/vitest.setup.ts
+!/playwright.config.ts
+!/e2e/
 
 # --- Never commit, even within allow-listed paths ---
 node_modules/
