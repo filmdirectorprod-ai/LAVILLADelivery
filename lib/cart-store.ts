@@ -12,6 +12,8 @@ import { persist } from 'zustand/middleware';
 export interface CartOpts {
   /** Resolved unit price in DH (base price × size multiplier). */
   unit: number;
+  /** Size price multiplier (0.25 / 1 / 1.6); the server re-derives price from it. */
+  sizeMult: number;
   sizeLabel: string | null;
   flavor: string | null;
   message: string;
@@ -26,7 +28,7 @@ export interface CartLine {
 
 /** Default options for a non-customized line at unit price. */
 export function defaultOpts(unit: number): CartOpts {
-  return { unit, sizeLabel: null, flavor: null, message: '', date: '' };
+  return { unit, sizeMult: 1, sizeLabel: null, flavor: null, message: '', date: '' };
 }
 
 interface CartState {
