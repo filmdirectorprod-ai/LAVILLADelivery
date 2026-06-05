@@ -161,21 +161,12 @@ export default function AuthPage() {
           overflow: 'auto',
         }}
       >
-        <div className="font-display" style={{ fontSize: 28, fontWeight: 700, color: 'var(--brand)' }}>
-          La Villa
-        </div>
-        <div
-          style={{
-            fontFamily: 'var(--ui-font)',
-            fontSize: 12,
-            color: 'var(--gold)',
-            fontWeight: 600,
-            letterSpacing: 1,
-            marginTop: 2,
-          }}
-        >
-          MAISON DE QUALITÉ · DEPUIS 2007
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/logo.png"
+          alt="La Villa — Maison de Qualité, depuis 2007"
+          style={{ width: 210, height: 'auto', display: 'block', marginLeft: -6 }}
+        />
 
         <h2
           style={{

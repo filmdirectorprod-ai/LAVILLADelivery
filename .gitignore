@@ -33,6 +33,13 @@
 !/playwright.config.ts
 !/e2e/
 
+# Static assets (Next serves /public at the web root). The home dir's Public
+# folder also holds unrelated macOS items (Drop Box, .localized), so descend
+# into /public but track ONLY the app's brand assets.
+!/public/
+/public/*
+!/public/brand/
+
 # --- Never commit, even within allow-listed paths ---
 node_modules/
 supabase/.verify-pgdata/
