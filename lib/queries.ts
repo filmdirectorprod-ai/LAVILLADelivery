@@ -8,6 +8,7 @@ import type {
   Zone,
   Driver,
   Profile,
+  Address,
   Order,
   OrderItem,
   OrderTracking,
@@ -64,6 +65,17 @@ export async function getMyProfile(): Promise<Profile | null> {
   if (!user) return null;
   const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
   return data ?? null;
+}
+
+/** Current user's saved addresses (default first, then newest). */
+export async function getMyAddresses(): Promise<Address[]> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from('addresses')
+    .select('*')
+    .order('is_default', { ascending: false })
+    .order('created_at', { ascending: false });
+  return data ?? [];
 }
 
 export async function getMyOrders(): Promise<Order[]> {

@@ -73,6 +73,13 @@ export interface Reward {
   active: boolean;
 }
 
+/** Per-user app preferences, persisted as the `profiles.settings` jsonb. */
+export interface ProfileSettings {
+  notify_orders?: boolean;
+  notify_promos?: boolean;
+  locale?: string;
+}
+
 export interface Profile {
   id: string;
   full_name: string;
@@ -80,6 +87,22 @@ export interface Profile {
   avatar_url: string | null;
   loyalty_points: number;
   loyalty_tier: LoyaltyTier;
+  settings: ProfileSettings;
+  created_at: string;
+}
+
+/** A saved delivery address (owner-scoped). */
+export interface Address {
+  id: string;
+  user_id: string;
+  label: string;
+  recipient: string | null;
+  phone: string | null;
+  line1: string;
+  city: string;
+  zone_id: string | null;
+  details: string | null;
+  is_default: boolean;
   created_at: string;
 }
 

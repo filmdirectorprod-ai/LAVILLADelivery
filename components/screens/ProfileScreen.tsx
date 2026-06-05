@@ -15,14 +15,14 @@ export interface ProfileScreenProps {
 }
 
 const MENU: [string, string, string | null][] = [
-  ['pin', 'Gérer les adresses', null],
+  ['pin', 'Gérer les adresses', '/profile/addresses'],
   ['card', 'Moyens de paiement', null],
   ['receipt', 'Mes commandes', '/orders'],
   ['heart', 'Favoris', '/search'],
   ['percent', 'Offres & promos', null],
   ['gift', 'Programme de fidélité', '/loyalty'],
-  ['info', 'Aide / Support', null],
-  ['settings', 'Paramètres', null],
+  ['info', 'Aide / Support', '/profile/help'],
+  ['settings', 'Paramètres', '/profile/settings'],
 ];
 
 export function ProfileScreen({ profile }: ProfileScreenProps) {
@@ -54,7 +54,7 @@ export function ProfileScreen({ profile }: ProfileScreenProps) {
               {profile?.phone ?? 'La Villa'}
             </div>
           </div>
-          <button style={{ width: 38, height: 38, borderRadius: 999, background: 'rgba(255,255,255,0.18)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <button onClick={() => router.push('/profile/edit')} aria-label="Modifier le profil" style={{ width: 38, height: 38, borderRadius: 999, background: 'rgba(255,255,255,0.18)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="edit" size={18} color="#fff" />
           </button>
         </div>
