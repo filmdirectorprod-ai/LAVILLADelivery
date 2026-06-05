@@ -165,7 +165,7 @@ export default function AuthPage() {
         <img
           src="/brand/logo.png"
           alt="La Villa — Maison de Qualité, depuis 2007"
-          style={{ width: 210, height: 'auto', display: 'block', marginLeft: -6 }}
+          style={{ width: 210, height: 'auto', display: 'block', margin: '0 auto' }}
         />
 
         <h2
