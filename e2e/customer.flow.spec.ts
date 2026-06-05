@@ -17,17 +17,17 @@ test.describe('Customer journey (requires live Supabase)', () => {
 
     // Open the catalog and pick the first product.
     await page.goto('/search');
-    await page.locator('[data-testid="product-card"], button, a').first().click();
+    await page.getByTestId('product-card').first().click();
     await page.waitForURL('**/product/**');
 
     // Add to cart, land on cart.
-    await page.getByRole('button', { name: /ajouter|panier/i }).first().click();
+    await page.getByRole('button', { name: /ajouter au panier/i }).first().click();
     await page.waitForURL('**/cart');
 
     // Proceed to checkout and place the order.
     await page.getByRole('button', { name: /commander/i }).click();
     await page.waitForURL('**/checkout');
-    await page.getByRole('button', { name: /confirmer|payer|commander/i }).first().click();
+    await page.getByRole('button', { name: /payer maintenant|confirmer/i }).first().click();
 
     // Server-authoritative order placement redirects to live tracking.
     await page.waitForURL('**/tracking/**', { timeout: 15_000 });
@@ -43,7 +43,7 @@ test.describe('Customer journey (requires live Supabase)', () => {
   test('orders list shows history with tabs', async ({ page }) => {
     await page.goto('/orders');
     await expect(page.getByRole('heading', { name: 'Mes commandes' })).toBeVisible();
-    await expect(page.getByText('En cours')).toBeVisible();
-    await expect(page.getByText('Terminées')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'En cours' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Terminées' })).toBeVisible();
   });
 });

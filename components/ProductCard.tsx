@@ -22,6 +22,7 @@ export function ProductCard({ p, onOpen, fav, onFav, onAdd }: ProductCardProps) 
   return (
     <div
       onClick={onOpen}
+      data-testid="product-card"
       style={{
         background: '#fff',
         borderRadius: 18,
