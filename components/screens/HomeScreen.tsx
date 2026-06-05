@@ -3,7 +3,7 @@
 // adapted to real fetched data + Next routing + the cart/favorites stores.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Category, Product, Zone } from '@/lib/types';
+import type { Address, Category, Product, Profile, Zone } from '@/lib/types';
 import type { CategoryUniverse, OrderMode } from '@/lib/types';
 import { formatDH } from '@/lib/format';
 import { useCart } from '@/lib/cart-store';
@@ -25,9 +25,11 @@ export interface HomeScreenProps {
   categories: Category[];
   zone: Zone | null;
   unread: number;
+  profile: Profile | null;
+  defaultAddress: Address | null;
 }
 
-export function HomeScreen({ products, categories, zone, unread }: HomeScreenProps) {
+export function HomeScreen({ products, categories, zone, unread, profile, defaultAddress }: HomeScreenProps) {
   const router = useRouter();
   const quickAddToCart = useCart((s) => s.quickAdd);
   const isFav = useFavorites((s) => s.isFav);
@@ -58,14 +60,21 @@ export function HomeScreen({ products, categories, zone, unread }: HomeScreenPro
       {/* Header */}
       <div style={{ padding: `${SAFE_TOP + 6}px 18px 14px`, background: '#fff' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ textAlign: 'left' }}>
+          <button
+            onClick={() => router.push('/profile/addresses')}
+            style={{ textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', maxWidth: 200 }}
+          >
             <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', fontWeight: 500 }}>
               {mode === 'retrait' ? 'Retrait à' : 'Livrer à'}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
               <Icon name="pin" size={16} color="var(--brand)" fill />
-              <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)' }}>
-                Fès, Av. Hassan II
+              <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {mode === 'retrait'
+                  ? 'La Villa — Av. Hassan II'
+                  : defaultAddress
+                    ? `${defaultAddress.label} · ${defaultAddress.line1}`
+                    : 'Choisir une adresse'}
               </span>
               <Icon name="down" size={15} color="var(--ink)" />
             </div>
@@ -87,7 +96,7 @@ export function HomeScreen({ products, categories, zone, unread }: HomeScreenPro
                 </span>
               </div>
             )}
-          </div>
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button
               onClick={() => router.push('/notifications')}
@@ -143,7 +152,7 @@ export function HomeScreen({ products, categories, zone, unread }: HomeScreenPro
                 overflow: 'hidden',
               }}
             >
-              <PhotoSlot label="avatar" style={{ width: '100%', height: '100%', borderRadius: 999 }} dim />
+              <PhotoSlot label={profile?.full_name ?? 'avatar'} src={profile?.avatar_url} style={{ width: '100%', height: '100%', borderRadius: 999 }} dim />
             </button>
           </div>
         </div>

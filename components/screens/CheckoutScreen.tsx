@@ -2,9 +2,9 @@
 // PAIEMENT / CHECKOUT — ported from the prototype (screens-order.jsx Checkout),
 // adapted to the cart/order stores + the server-authoritative place_order RPC
 // (POST /api/orders). The bill shown here is a preview; the server recomputes.
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Product, Profile, Zone } from '@/lib/types';
+import type { Address, Product, Profile, Zone } from '@/lib/types';
 import { formatDH } from '@/lib/format';
 import { computeOrder, REDEEM_PALIERS } from '@/lib/pricing';
 import { useCart } from '@/lib/cart-store';
@@ -16,8 +16,14 @@ import { Btn } from '@/components/ui/Btn';
 
 export interface CheckoutScreenProps {
   products: Product[];
-  zone: Zone | null;
+  zones: Zone[];
+  addresses: Address[];
   profile: Profile | null;
+}
+
+/** One-line human address used both for display and the order payload. */
+function formatAddress(a: Address): string {
+  return [a.line1, a.details, a.city].filter(Boolean).join(', ');
 }
 
 type Pay = 'cmi' | 'hps' | 'cashplus' | 'virement' | 'cod';
@@ -52,7 +58,7 @@ function Row({
   );
 }
 
-export function CheckoutScreen({ products, zone, profile }: CheckoutScreenProps) {
+export function CheckoutScreen({ products, zones, addresses, profile }: CheckoutScreenProps) {
   const router = useRouter();
   const items = useCart((s) => s.items);
   const clearCart = useCart((s) => s.clear);
@@ -65,6 +71,24 @@ export function CheckoutScreen({ products, zone, profile }: CheckoutScreenProps)
   const [slot, setSlot] = useState('asap');
   const [redeem, setRedeem] = useState<number | null>(null); // palier pts
   const [busy, setBusy] = useState(false);
+
+  // Selected delivery address — defaults to the user's default (addresses are
+  // already ordered default-first by the query), falling back to the first one.
+  const defaultAddressId = addresses[0]?.id ?? null;
+  const [addressId, setAddressId] = useState<string | null>(defaultAddressId);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const selectedAddress = useMemo(
+    () => addresses.find((a) => a.id === addressId) ?? null,
+    [addresses, addressId],
+  );
+
+  // The delivery zone is derived from the chosen address; if it has no zone (or
+  // we're on pickup), fall back to the cheapest zone for the fee preview.
+  const zone = useMemo<Zone | null>(() => {
+    if (mode === 'retrait') return null;
+    const fromAddress = zones.find((z) => z.id === selectedAddress?.zone_id);
+    return fromAddress ?? zones[0] ?? null;
+  }, [mode, zones, selectedAddress]);
 
   const points = profile?.loyalty_points ?? 0;
   const palier = REDEEM_PALIERS.find((r) => r.pts === redeem) ?? null;
@@ -83,6 +107,10 @@ export function CheckoutScreen({ products, zone, profile }: CheckoutScreenProps)
 
   const confirm = async () => {
     if (items.length === 0 || busy) return;
+    if (mode === 'livraison' && !selectedAddress) {
+      toast('Choisissez une adresse de livraison.');
+      return;
+    }
     setBusy(true);
     try {
       const payloadItems = items
@@ -105,7 +133,12 @@ export function CheckoutScreen({ products, zone, profile }: CheckoutScreenProps)
         body: JSON.stringify({
           items: payloadItems,
           mode,
-          address: mode === 'retrait' ? 'Retrait boutique' : '12 Av. Hassan II, Fès 30000',
+          address:
+            mode === 'retrait'
+              ? 'Retrait boutique — La Villa, Av. Hassan II, Fès'
+              : selectedAddress
+                ? formatAddress(selectedAddress)
+                : '',
           zone_id: mode === 'retrait' ? null : zone?.id ?? null,
           promo,
           redeem_pts: palier?.pts ?? 0,
@@ -233,43 +266,135 @@ export function CheckoutScreen({ products, zone, profile }: CheckoutScreenProps)
           <h3 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)', margin: '0 0 10px' }}>
             {mode === 'retrait' ? 'Point de retrait' : 'Adresse de livraison'}
           </h3>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              background: '#fff',
-              border: '1px solid var(--line)',
-              borderRadius: 16,
-              padding: '14px 15px',
-            }}
-          >
+
+          {mode === 'retrait' ? (
             <div
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: 11,
-                background: 'rgba(19,124,139,0.08)',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
+                gap: 12,
+                background: '#fff',
+                border: '1px solid var(--line)',
+                borderRadius: 16,
+                padding: '14px 15px',
               }}
             >
-              <Icon name={mode === 'retrait' ? 'store' : 'pin'} size={20} color="var(--brand)" fill={mode !== 'retrait'} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>
-                {mode === 'retrait' ? 'La Villa — Av. Hassan II' : 'Domicile'}
+              <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(19,124,139,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon name="store" size={20} color="var(--brand)" />
               </div>
-              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>
-                {mode === 'retrait' ? "Fès, ouvert jusqu'à 23h" : '12 Av. Hassan II, Fès 30000'}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>La Villa — Av. Hassan II</div>
+                <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>Fès, ouvert jusqu&apos;à 23h</div>
               </div>
             </div>
-            <button style={{ border: 'none', background: 'none', cursor: 'pointer' }}>
-              <Icon name="edit" size={19} color="var(--brand)" />
+          ) : addresses.length === 0 ? (
+            // No saved address — prompt the user to add one.
+            <button
+              onClick={() => router.push('/profile/addresses')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                width: '100%',
+                textAlign: 'left',
+                background: '#fff',
+                border: '1.5px dashed var(--brand)',
+                borderRadius: 16,
+                padding: '14px 15px',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(19,124,139,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon name="plus" size={20} color="var(--brand)" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--brand)' }}>Ajouter une adresse</div>
+                <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>Enregistrez votre adresse de livraison</div>
+              </div>
+              <Icon name="right" size={18} color="var(--muted)" />
             </button>
-          </div>
+          ) : (
+            <>
+              {/* Selected address card — tap to switch */}
+              <button
+                onClick={() => setPickerOpen((o) => !o)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  width: '100%',
+                  textAlign: 'left',
+                  background: '#fff',
+                  border: '1px solid var(--line)',
+                  borderRadius: 16,
+                  padding: '14px 15px',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(19,124,139,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon name="pin" size={20} color="var(--brand)" fill />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>
+                    {selectedAddress?.label ?? 'Adresse'}
+                  </div>
+                  <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {selectedAddress ? formatAddress(selectedAddress) : 'Choisir une adresse'}
+                  </div>
+                </div>
+                <Icon name={pickerOpen ? 'down' : 'edit'} size={19} color="var(--brand)" />
+              </button>
+
+              {/* Picker: other saved addresses + manage link */}
+              {pickerOpen && (
+                <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, overflow: 'hidden', marginTop: 8 }}>
+                  {addresses.map((a, i) => {
+                    const on = a.id === addressId;
+                    const z = zones.find((zz) => zz.id === a.zone_id);
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => { setAddressId(a.id); setPickerOpen(false); }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 11,
+                          width: '100%',
+                          textAlign: 'left',
+                          background: on ? 'rgba(19,124,139,0.06)' : '#fff',
+                          border: 'none',
+                          borderTop: i ? '1px solid var(--line)' : 'none',
+                          padding: '13px 15px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Icon name="pin" size={17} color={on ? 'var(--brand)' : 'var(--muted)'} fill={on} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: 'var(--ink)' }}>
+                            {a.label}
+                            {a.is_default && (
+                              <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--brand)', background: 'var(--soft)', padding: '1px 7px', borderRadius: 999, marginLeft: 7 }}>Par défaut</span>
+                            )}
+                          </div>
+                          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {[formatAddress(a), z ? formatDH(z.fee_dh) : null].filter(Boolean).join(' · ')}
+                          </div>
+                        </div>
+                        {on && <Icon name="check" size={17} color="var(--brand)" strokeWidth={2.4} />}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => router.push('/profile/addresses')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', textAlign: 'left', background: '#fff', border: 'none', borderTop: '1px solid var(--line)', padding: '13px 15px', cursor: 'pointer' }}
+                  >
+                    <Icon name="plus" size={17} color="var(--brand)" />
+                    <span style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, fontWeight: 600, color: 'var(--brand)' }}>Gérer mes adresses</span>
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </section>
 
         {/* time slot */}

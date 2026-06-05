@@ -49,14 +49,14 @@ type Draft = {
   is_default: boolean;
 };
 
-const emptyDraft = (isFirst: boolean): Draft => ({
+const emptyDraft = (isFirst: boolean, recipient = '', phone = ''): Draft => ({
   label: 'Domicile',
   line1: '',
   city: 'Fès',
   zone_id: null,
   details: '',
-  recipient: '',
-  phone: '',
+  recipient,
+  phone,
   is_default: isFirst,
 });
 
@@ -75,9 +75,13 @@ const toDraft = (a: Address): Draft => ({
 export interface AddressesScreenProps {
   addresses: Address[];
   zones: Zone[];
+  /** Pre-fills the recipient name on a brand-new address (from the profile). */
+  defaultRecipient?: string;
+  /** Pre-fills the contact phone on a brand-new address (from the profile). */
+  defaultPhone?: string;
 }
 
-export function AddressesScreen({ addresses: initial, zones }: AddressesScreenProps) {
+export function AddressesScreen({ addresses: initial, zones, defaultRecipient = '', defaultPhone = '' }: AddressesScreenProps) {
   const toast = useToast((s) => s.show);
   const [list, setList] = useState<Address[]>(initial);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -344,7 +348,7 @@ export function AddressesScreen({ addresses: initial, zones }: AddressesScreenPr
         )}
 
         <div style={{ marginTop: 16 }}>
-          <Btn full size="lg" variant="outline" onClick={() => { setError(null); setDraft(emptyDraft(list.length === 0)); }} icon={<Icon name="plus" size={18} color="var(--brand)" />}>
+          <Btn full size="lg" variant="outline" onClick={() => { setError(null); setDraft(emptyDraft(list.length === 0, defaultRecipient, defaultPhone)); }} icon={<Icon name="plus" size={18} color="var(--brand)" />}>
             Ajouter une adresse
           </Btn>
         </div>

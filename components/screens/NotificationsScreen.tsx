@@ -4,13 +4,16 @@
 // Realtime. Order notifications deep-link to tracking and are marked read on tap.
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Notification } from '@/lib/types';
+import type { Notification, ProfileSettings } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
+import { isNotificationEnabled } from '@/lib/notifications';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 
 export interface NotificationsScreenProps {
   notifications: Notification[];
+  /** User's notification preferences (from Paramètres) — gate the feed. */
+  settings?: ProfileSettings | null;
 }
 
 function iconFor(kind: string): string {
@@ -35,9 +38,12 @@ function whenLabel(iso: string): string {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 }
 
-export function NotificationsScreen({ notifications }: NotificationsScreenProps) {
+export function NotificationsScreen({ notifications, settings }: NotificationsScreenProps) {
   const router = useRouter();
-  const [list, setList] = useState<Notification[]>(notifications);
+  // Honour the user's notification preferences from Paramètres: hide muted kinds.
+  const [list, setList] = useState<Notification[]>(() =>
+    notifications.filter((n) => isNotificationEnabled(n.kind, settings)),
+  );
 
   useEffect(() => {
     const supabase = createClient();
@@ -45,13 +51,14 @@ export function NotificationsScreen({ notifications }: NotificationsScreenProps)
       .channel('notifications-feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
         const n = payload.new as Notification;
+        if (!isNotificationEnabled(n.kind, settings)) return; // muted kind
         setList((prev) => (prev.some((x) => x.id === n.id) ? prev : [n, ...prev]));
       })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [settings]);
 
   const open = async (n: Notification) => {
     if (!n.read) {
