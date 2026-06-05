@@ -16,6 +16,11 @@ import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import { Badge } from '@/components/ui/Badge';
+import { GoogleDeliveryMap } from '@/components/ui/GoogleDeliveryMap';
+
+// Real map renders only when a browser Maps key is configured; otherwise the
+// built-in SVG map is used (graceful fallback, no key required).
+const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 export interface TrackingScreenProps {
   order: Order;
@@ -27,6 +32,11 @@ export interface TrackingScreenProps {
 export function TrackingScreen({ order, items, tracking, driver }: TrackingScreenProps) {
   const router = useRouter();
   const [track, setTrack] = useState<OrderTracking | null>(tracking);
+  // GPS readout for the chip — fed by the real map when present, else the SVG route.
+  const [gps, setGps] = useState<{ lat: number; lng: number }>(() => {
+    const p = lvPosAt(tracking?.progress ?? 0);
+    return { lat: p.lat, lng: p.lng };
+  });
 
   useEffect(() => {
     const supabase = createClient();
@@ -48,6 +58,7 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
   const delivered = active >= 5;
   const prog = track?.progress ?? 0;
   const pos = lvPosAt(prog);
+  const gpsShown = MAPS_KEY ? gps : { lat: pos.lat, lng: pos.lng };
   const remainKm = Math.max(0, 1 - prog) * LV_ROUTE_TOTAL_KM;
   const remainMin = Math.max(1, Math.round(Math.max(0, 1 - prog) * LV_ROUTE_TOTAL_MIN));
   const itemCount = items.reduce((n, it) => n + it.qty, 0);
@@ -64,6 +75,17 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Map */}
       <div style={{ position: 'relative', height: 280, flexShrink: 0, background: '#eaf0f0', overflow: 'hidden' }}>
+        {MAPS_KEY && (
+          <GoogleDeliveryMap
+            apiKey={MAPS_KEY}
+            progress={prog}
+            destinationAddress={order.address}
+            delivered={delivered}
+            onPos={(lat, lng) => setGps({ lat, lng })}
+          />
+        )}
+        {!MAPS_KEY && (
+        <>
         <svg width="100%" height="100%" viewBox="0 0 400 280" preserveAspectRatio="xMidYMid slice" style={{ position: 'absolute', inset: 0 }}>
           <rect width="400" height="280" fill="#e9eeee" />
           {[40, 110, 180, 250].map((y) => (
@@ -82,6 +104,8 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
         <div style={{ position: 'absolute', left: `${dest.x}%`, top: `${dest.y}%`, transform: 'translate(-50%,-92%)' }}>
           <Icon name="pin" size={30} color="var(--ink)" fill />
         </div>
+        </>
+        )}
         <div
           style={{
             position: 'absolute',
@@ -99,9 +123,10 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
         >
           <span className="lv-livedot" style={{ width: 8, height: 8, borderRadius: 999, background: delivered ? 'var(--gold)' : 'var(--brand)' }} />
           <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10.5, color: 'var(--ink)', fontWeight: 600 }}>
-            GPS {pos.lat.toFixed(4)}, {pos.lng.toFixed(4)}
+            GPS {gpsShown.lat.toFixed(4)}, {gpsShown.lng.toFixed(4)}
           </span>
         </div>
+        {!MAPS_KEY && (
         <div
           style={{
             position: 'absolute',
@@ -130,6 +155,7 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
             <Icon name="scooter" size={22} color="#fff" />
           </div>
         </div>
+        )}
         <button
           onClick={() => router.push('/orders')}
           style={{
