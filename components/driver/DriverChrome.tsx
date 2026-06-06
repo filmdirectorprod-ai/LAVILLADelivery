@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { DriverTabBar } from '@/components/driver/DriverTabBar';
 
-const TAB_ROUTES = ['/driver', '/driver/history', '/driver/earnings', '/driver/profile'];
+const TAB_ROUTES = ['/driver', '/driver/requests', '/driver/history', '/driver/earnings', '/driver/profile'];
 
 export function DriverChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();

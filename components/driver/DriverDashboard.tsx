@@ -166,12 +166,24 @@ export function DriverDashboard({
         <Section title="Disponibles" count={online ? available.length : 0} />
         {!online ? (
           <Empty text="Vous êtes hors ligne. Activez « En ligne » pour recevoir des courses." />
-        ) : available.length === 0 ? (
-          <Empty text="Aucune commande à récupérer pour l’instant." />
         ) : (
-          available.map((b) => (
-            <OrderCard key={b.order.id} data={b} onClick={() => router.push(`/driver/order/${b.order.id}`)} />
-          ))
+          <button
+            onClick={() => router.push('/driver/requests')}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: 14, cursor: 'pointer', textAlign: 'left' }}
+          >
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon name="bell" size={20} color="var(--brand)" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14.5, color: 'var(--ink)' }}>
+                {available.length === 0 ? 'Aucune demande' : `${available.length} demande${available.length > 1 ? 's' : ''} disponible${available.length > 1 ? 's' : ''}`}
+              </div>
+              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>
+                {available.length === 0 ? 'Vous recevrez les nouvelles courses ici.' : 'Voir et accepter les courses'}
+              </div>
+            </div>
+            <Icon name="right" size={18} color="var(--muted)" />
+          </button>
         )}
       </div>
     </div>
@@ -247,32 +259,3 @@ function ActiveCard({ data, onOpen }: { data: DriverOrder; onOpen: () => void })
   );
 }
 
-function OrderCard({ data, onClick }: { data: DriverOrder; onClick: () => void }) {
-  const { order, tracking } = data;
-  const eta = etaMinutes(tracking?.eta_at ?? order.eta_at);
-  const isDelivery = order.mode === 'livraison';
-  return (
-    <button
-      onClick={onClick}
-      style={{ width: '100%', textAlign: 'left', background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: 14, marginBottom: 10, cursor: 'pointer', display: 'block' }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 38, height: 38, borderRadius: 11, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon name={isDelivery ? 'scooter' : 'store'} size={20} color="var(--brand)" />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>{order.code}</div>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {isDelivery ? order.address ?? 'Adresse de livraison' : 'Retrait en boutique'}
-          </div>
-        </div>
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>{formatDH(order.total_dh)}</div>
-          {eta !== null && (
-            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)' }}>~{eta} min</div>
-          )}
-        </div>
-      </div>
-    </button>
-  );
-}

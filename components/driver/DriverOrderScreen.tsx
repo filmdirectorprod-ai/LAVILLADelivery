@@ -176,11 +176,19 @@ export function DriverOrderScreen({
         {mine && initialContact && (
           <Card>
             <Row icon="user" label="Client" value={initialContact.full_name || '—'} />
-            {initialContact.phone && (
-              <a href={`tel:${initialContact.phone}`} style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', background: 'var(--soft)', borderRadius: 12, padding: '11px', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--brand)' }}>
-                <Icon name="phone" size={18} color="var(--brand)" /> Appeler le client
-              </a>
-            )}
+            <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => router.push(`/driver/chat/${order.id}`)}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: 'none', background: 'var(--soft)', borderRadius: 12, padding: '11px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--brand)' }}
+              >
+                <Icon name="message" size={18} color="var(--brand)" /> Message
+              </button>
+              {initialContact.phone && (
+                <a href={`tel:${initialContact.phone}`} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', background: 'var(--soft)', borderRadius: 12, padding: '11px', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--brand)' }}>
+                  <Icon name="phone" size={18} color="var(--brand)" /> Appeler
+                </a>
+              )}
+            </div>
           </Card>
         )}
 
