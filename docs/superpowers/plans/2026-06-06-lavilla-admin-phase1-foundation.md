@@ -4,7 +4,7 @@
 
 **Goal:** Stand up the admin (gérant) back-office shell: a staff role, RLS read access across all data, a full-width desktop sidebar layout outside the phone frame, and a gated `/admin` route that only `admin@lavilla.ma` can reach.
 
-**Architecture:** New `app/(admin)` route group with its own server `layout.tsx` that gates on a `profiles.is_staff` flag (checked via the SECURITY DEFINER `lv_is_staff()` helper, mirroring the driver's `lv_is_driver()`). A client `AdminChrome` renders the desktop sidebar + content area; `globals.css` drops the `.lv-frame` phone constraints for admin via `:has()`. Staff RLS `select` policies (added in migration 0014) let the admin read across all customers/drivers using the normal request-scoped client — no service-role in the browser.
+**Architecture:** New `app/admin` route group with its own server `layout.tsx` that gates on a `profiles.is_staff` flag (checked via the SECURITY DEFINER `lv_is_staff()` helper, mirroring the driver's `lv_is_driver()`). A client `AdminChrome` renders the desktop sidebar + content area; `globals.css` drops the `.lv-frame` phone constraints for admin via `:has()`. Staff RLS `select` policies (added in migration 0014) let the admin read across all customers/drivers using the normal request-scoped client — no service-role in the browser.
 
 **Tech Stack:** Next.js 14 App Router (TS), Supabase `@supabase/ssr` + Postgres RLS, Vitest (unit), React inline-style design system (existing tokens).
 
@@ -27,8 +27,8 @@
 - Create `components/admin/AdminGate.tsx` — non-staff dead-end.
 - Create `components/admin/AdminChrome.tsx` — desktop sidebar shell (client).
 - Modify `app/globals.css` — `.lv-frame:has(.lv-admin-root)` escape.
-- Create `app/(admin)/layout.tsx` — staff gate + chrome.
-- Create `app/(admin)/page.tsx` — Vue d'ensemble placeholder (real KPIs land in Phase 2).
+- Create `app/admin/layout.tsx` — staff gate + chrome.
+- Create `app/admin/page.tsx` — Vue d'ensemble placeholder (real KPIs land in Phase 2).
 
 ---
 
@@ -482,12 +482,12 @@ git commit -m "feat(admin): desktop sidebar chrome + phone-frame escape"
 ## Task 5: `(admin)` route group — gated layout + overview placeholder
 
 **Files:**
-- Create: `app/(admin)/layout.tsx`
-- Create: `app/(admin)/page.tsx`
+- Create: `app/admin/layout.tsx`
+- Create: `app/admin/page.tsx`
 
 - [ ] **Step 1: Gated layout**
 
-Create `app/(admin)/layout.tsx`:
+Create `app/admin/layout.tsx`:
 
 ```tsx
 // Admin (gérant) section — staff gate. Auth is already enforced by middleware;
@@ -508,7 +508,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
 - [ ] **Step 2: Overview placeholder page**
 
-Create `app/(admin)/page.tsx` (real KPIs/map/tables arrive in Phase 2 — this proves the shell renders):
+Create `app/admin/page.tsx` (real KPIs/map/tables arrive in Phase 2 — this proves the shell renders):
 
 ```tsx
 // Vue d'ensemble — placeholder. Phase 2 fills in live KPIs, the hourly activity
@@ -543,7 +543,7 @@ Then:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add "app/(admin)/layout.tsx" "app/(admin)/page.tsx"
+git add "app/admin/layout.tsx" "app/admin/page.tsx"
 git commit -m "feat(admin): gated (admin) route group + overview shell"
 ```
 

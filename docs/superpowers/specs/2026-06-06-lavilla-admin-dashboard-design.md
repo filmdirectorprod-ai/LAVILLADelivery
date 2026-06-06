@@ -34,8 +34,8 @@ reviews, delivery zones, driver support, incidents, and planning.
 ## Architecture
 
 ### Routing & layout
-- New route group **`app/(admin)`** (URL prefix `/admin`).
-  - `app/(admin)/layout.tsx` — server component. Calls `getMyStaff()`; if the
+- New route group **`app/admin`** (URL prefix `/admin`).
+  - `app/admin/layout.tsx` — server component. Calls `getMyStaff()`; if the
     user is not staff, render a friendly dead-end (`AdminGate`), mirroring
     `DriverGate`. Otherwise render `AdminChrome`.
   - `AdminChrome` (client) — desktop shell: fixed left **sidebar** (brand-d
@@ -48,7 +48,7 @@ reviews, delivery zones, driver support, incidents, and planning.
 - Reuse existing design tokens (`--brand`, `--brand-d`, `--gold`, `--line`,
   cards radius 18, soft shadows) in a desktop scale.
 
-### Pages (under `app/(admin)/`)
+### Pages (under `app/admin/`)
 1. `/admin` — **Vue d'ensemble**
 2. `/admin/orders` — **Commandes**
 3. `/admin/kitchen` — **Cuisine**
@@ -146,7 +146,7 @@ reviews, delivery zones, driver support, incidents, and planning.
 
 ## Build order
 1. **Infra**: migration 0014 (is_staff, lv_is_staff, staff RLS, online cols,
-   new tables, staff RPCs) + `app/(admin)` route group + `AdminChrome` /
+   new tables, staff RPCs) + `app/admin` route group + `AdminChrome` /
    `AdminGate` + frame escape + `getMyStaff()`.
 2. **Vue d'ensemble** (the headline, fully live).
 3. **Commandes** + **Cuisine**.
