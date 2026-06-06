@@ -119,6 +119,60 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
   return { order, items: items ?? [], tracking: tracking ?? null };
 }
 
+/** The Driver row linked to the current auth user, or null if not a driver. */
+export async function getMyDriver(): Promise<Driver | null> {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from('drivers').select('*').eq('user_id', user.id).maybeSingle();
+  return data ?? null;
+}
+
+export interface DriverOrder {
+  order: Order;
+  tracking: OrderTracking | null;
+}
+
+/**
+ * Driver dashboard feed: every still-active order the driver may see — both the
+ * unclaimed "available" pool and their own assigned deliveries (RLS decides
+ * visibility via orders_driver_read). The caller splits the two by
+ * tracking.driver_id / tracking.manual.
+ */
+export async function getDriverBoard(): Promise<DriverOrder[]> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from('orders')
+    .select('*, order_tracking(*)')
+    .in('status', ['preparing', 'en_route'])
+    .order('placed_at', { ascending: false });
+  return (data ?? []).map((row) => {
+    const { order_tracking, ...order } = row as Order & {
+      order_tracking: OrderTracking | OrderTracking[] | null;
+    };
+    const tracking = Array.isArray(order_tracking)
+      ? order_tracking[0] ?? null
+      : order_tracking ?? null;
+    return { order: order as Order, tracking };
+  });
+}
+
+export interface DriverContact {
+  full_name: string | null;
+  phone: string | null;
+  address: string | null;
+}
+
+/** Customer contact for an order the current driver has claimed (RPC, 0008). */
+export async function getDriverOrderContact(orderId: string): Promise<DriverContact | null> {
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.rpc('driver_order_contact', { p_order: orderId });
+  if (error || !data || (Array.isArray(data) && data.length === 0)) return null;
+  return Array.isArray(data) ? data[0] : data;
+}
+
 export async function getDriverById(id: string | null): Promise<Driver | null> {
   if (!id) return null;
   const supabase = await createServerSupabase();

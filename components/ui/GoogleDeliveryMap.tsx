@@ -14,11 +14,17 @@ const FALLBACK_DEST = { lat: 34.041, lng: -4.9897 };
 
 export interface GoogleDeliveryMapProps {
   apiKey: string;
-  /** Journey progress 0..1 (Supabase Realtime). */
+  /** Journey progress 0..1 (Supabase Realtime). Used when no real GPS is set. */
   progress: number;
   /** Free-text delivery address to geocode for the destination marker. */
   destinationAddress: string | null;
   delivered: boolean;
+  /**
+   * Real driver GPS from order_tracking (0008). When provided, the marker
+   * follows these true coordinates instead of interpolating along the route by
+   * `progress`. Null falls back to the simulated progress animation.
+   */
+  driverPos?: { lat: number; lng: number } | null;
   /** Reports the driver's current GPS so the parent can show a coordinate chip. */
   onPos?: (lat: number, lng: number) => void;
 }
@@ -49,13 +55,14 @@ function pointAtFraction(
   return path[path.length - 1];
 }
 
-export function GoogleDeliveryMap({ apiKey, progress, destinationAddress, delivered, onPos }: GoogleDeliveryMapProps) {
+export function GoogleDeliveryMap({ apiKey, progress, destinationAddress, delivered, driverPos, onPos }: GoogleDeliveryMapProps) {
   const divRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const driverRef = useRef<google.maps.Marker | null>(null);
   const pathRef = useRef<google.maps.LatLng[]>([]);
   const animRef = useRef<number | null>(null);
   const shownFracRef = useRef(0);
+  const lastPosRef = useRef<google.maps.LatLng | null>(null);
   const readyRef = useRef(false);
 
   // ── One-time map + route setup ──────────────────────────────────────────────
@@ -177,7 +184,11 @@ export function GoogleDeliveryMap({ apiKey, progress, destinationAddress, delive
 
         readyRef.current = true;
         shownFracRef.current = progress;
-        const p0 = pointAtFraction(path, progress);
+        const p0 = driverPos
+          ? new google.maps.LatLng(driverPos.lat, driverPos.lng)
+          : pointAtFraction(path, progress);
+        driverRef.current?.setPosition(p0);
+        lastPosRef.current = p0;
         onPos?.(p0.lat(), p0.lng());
       })
       .catch(() => {
@@ -193,8 +204,9 @@ export function GoogleDeliveryMap({ apiKey, progress, destinationAddress, delive
   }, [apiKey, destinationAddress]);
 
   // ── Animate the driver marker whenever progress advances ────────────────────
+  // Skipped when a real GPS position is driving the marker (handled below).
   useEffect(() => {
-    if (!readyRef.current) return;
+    if (!readyRef.current || driverPos) return;
     const path = pathRef.current;
     const marker = driverRef.current;
     if (!marker || path.length === 0) return;
@@ -209,6 +221,7 @@ export function GoogleDeliveryMap({ apiKey, progress, destinationAddress, delive
       const frac = from + (to - from) * t;
       const pt = pointAtFraction(path, frac);
       marker.setPosition(pt);
+      lastPosRef.current = pt;
       onPos?.(pt.lat(), pt.lng());
       if (t < 1) {
         animRef.current = requestAnimationFrame(tick);
@@ -223,7 +236,35 @@ export function GoogleDeliveryMap({ apiKey, progress, destinationAddress, delive
       if (animRef.current) cancelAnimationFrame(animRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progress, delivered]);
+  }, [progress, delivered, driverPos]);
+
+  // ── Follow the real driver GPS when present (overrides progress) ─────────────
+  useEffect(() => {
+    if (!readyRef.current || !driverPos) return;
+    const marker = driverRef.current;
+    if (!marker) return;
+    const g = google.maps.geometry.spherical;
+    const to = new google.maps.LatLng(driverPos.lat, driverPos.lng);
+    const from = lastPosRef.current ?? to;
+    const start = performance.now();
+    const dur = 1000;
+
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / dur);
+      const pt = g.interpolate(from, to, t);
+      marker.setPosition(pt);
+      lastPosRef.current = pt;
+      onPos?.(pt.lat(), pt.lng());
+      if (t < 1) animRef.current = requestAnimationFrame(tick);
+    };
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    animRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driverPos?.lat, driverPos?.lng]);
 
   return <div ref={divRef} style={{ position: 'absolute', inset: 0 }} />;
 }

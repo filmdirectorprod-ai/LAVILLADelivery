@@ -58,7 +58,10 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
   const delivered = active >= 5;
   const prog = track?.progress ?? 0;
   const pos = lvPosAt(prog);
-  const gpsShown = MAPS_KEY ? gps : { lat: pos.lat, lng: pos.lng };
+  // Real driver GPS (0008): present once a real livreur is streaming position.
+  const driverPos =
+    track?.lat != null && track?.lng != null ? { lat: track.lat, lng: track.lng } : null;
+  const gpsShown = driverPos ?? (MAPS_KEY ? gps : { lat: pos.lat, lng: pos.lng });
   const remainKm = Math.max(0, 1 - prog) * LV_ROUTE_TOTAL_KM;
   const remainMin = Math.max(1, Math.round(Math.max(0, 1 - prog) * LV_ROUTE_TOTAL_MIN));
   const itemCount = items.reduce((n, it) => n + it.qty, 0);
@@ -81,6 +84,7 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
             progress={prog}
             destinationAddress={order.address}
             delivered={delivered}
+            driverPos={driverPos}
             onPos={(lat, lng) => setGps({ lat, lng })}
           />
         )}

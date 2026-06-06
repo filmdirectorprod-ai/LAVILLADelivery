@@ -63,6 +63,8 @@ export interface Driver {
   vehicle: string | null;
   rating: number;
   phone: string | null;
+  /** Linked auth user (0008) — null for seeded demo drivers. */
+  user_id: string | null;
 }
 
 export interface Reward {
@@ -163,6 +165,11 @@ export interface OrderTracking {
   progress: number;
   eta_at: string | null;
   driver_id: string | null;
+  /** Live driver GPS (0008) — null until a real driver streams position. */
+  lat: number | null;
+  lng: number | null;
+  /** True once a real driver has claimed the order (auto-mover lets go). */
+  manual: boolean;
   updated_at: string;
 }
 
