@@ -204,6 +204,26 @@ export async function getDriverDeliveries(): Promise<DriverDelivery[]> {
   return data as DriverDelivery[];
 }
 
+export interface DriverReview {
+  review_id: string;
+  rating: number;
+  tags: string[];
+  comment: string;
+  created_at: string;
+  customer_name: string;
+}
+
+/**
+ * Client reviews left on orders the current driver delivered (RPC, migration
+ * 0011). Powers the "Mes évaluations clients" block on the Tournée screen.
+ */
+export async function getDriverReviews(): Promise<DriverReview[]> {
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.rpc('driver_reviews');
+  if (error || !data) return [];
+  return data as DriverReview[];
+}
+
 export async function getChatMessages(orderId: string): Promise<ChatMessage[]> {
   const supabase = await createServerSupabase();
   const { data } = await supabase

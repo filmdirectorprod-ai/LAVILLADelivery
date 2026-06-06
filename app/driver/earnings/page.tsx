@@ -1,10 +1,16 @@
-// /driver/earnings — Server Component. Earnings are derived from the driver's
-// completed deliveries (driver_deliveries RPC, migration 0010): the screen sums
-// delivery_fee_dh into today / week / total.
-import { getDriverDeliveries } from '@/lib/queries';
+// /driver/earnings — Server Component. The "Tournée" stats screen: earnings are
+// derived from completed deliveries (driver_deliveries RPC, 0010) and client
+// ratings from driver_reviews (0011).
+import { getMyDriver, getDriverDeliveries, getDriverReviews } from '@/lib/queries';
 import { DriverEarningsScreen } from '@/components/driver/DriverEarningsScreen';
 
 export default async function DriverEarningsPage() {
-  const deliveries = await getDriverDeliveries();
-  return <DriverEarningsScreen deliveries={deliveries} />;
+  const [driver, deliveries, reviews] = await Promise.all([
+    getMyDriver(),
+    getDriverDeliveries(),
+    getDriverReviews(),
+  ]);
+  return (
+    <DriverEarningsScreen driverName={driver?.name ?? 'Livreur'} deliveries={deliveries} reviews={reviews} />
+  );
 }

@@ -10,7 +10,7 @@ import { SAFE_BOTTOM } from '@/lib/layout';
 const TABS: { href: string; label: string; icon: IconName }[] = [
   { href: '/driver', label: 'Accueil', icon: 'home' },
   { href: '/driver/history', label: 'Historique', icon: 'clock' },
-  { href: '/driver/earnings', label: 'Gains', icon: 'cash' },
+  { href: '/driver/earnings', label: 'Tournée', icon: 'cash' },
   { href: '/driver/profile', label: 'Profil', icon: 'user' },
 ];
 

@@ -24,6 +24,18 @@ const STAGE_LABEL: Record<number, string> = {
   4: 'Livrée',
 };
 
+// The driver-facing course is a 4-step journey. Stages 0/1 (order still being
+// prepared) both map to step 1 "en route vers le restaurant".
+const STEP_PHRASE: Record<number, string> = {
+  1: 'En route vers le restaurant',
+  2: 'Commande récupérée',
+  3: 'En route vers le client',
+  4: 'Commande livrée',
+};
+function stepIndex(stage: number): number {
+  return stage <= 1 ? 1 : Math.min(stage, 4);
+}
+
 export function DriverOrderScreen({
   driverId,
   detail,
@@ -152,6 +164,9 @@ export function DriverOrderScreen({
 
       {/* Body */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '16px' }}>
+        {/* Step progress */}
+        <StepBar isDelivery={isDelivery} step={stepIndex(stage)} />
+
         {/* Destination / mode */}
         <Card>
           <Row icon={isDelivery ? 'pin' : 'store'} label={isDelivery ? 'Adresse de livraison' : 'Retrait en boutique'} value={isDelivery ? order.address ?? '—' : 'La Villa — Av. Hassan II'} />
@@ -205,6 +220,43 @@ export function DriverOrderScreen({
           </Btn>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+// Four-segment progress + the current step's headline, mirroring the customer
+// tracking sheet. `step` is 1..4 (see stepIndex).
+function StepBar({ isDelivery, step }: { isDelivery: boolean; step: number }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        {[1, 2, 3, 4].map((s) => (
+          <span
+            key={s}
+            style={{
+              flex: 1,
+              height: 5,
+              borderRadius: 999,
+              background: s <= step ? 'var(--brand)' : 'var(--line)',
+            }}
+          />
+        ))}
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--ui-font)',
+          fontSize: 11.5,
+          fontWeight: 700,
+          letterSpacing: 0.6,
+          textTransform: 'uppercase',
+          color: 'var(--muted)',
+        }}
+      >
+        {isDelivery ? 'Livraison' : 'Retrait'} · Étape {step}/4
+      </div>
+      <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 20, color: 'var(--ink)', margin: '4px 0 0' }}>
+        {STEP_PHRASE[step]}
+      </h2>
     </div>
   );
 }
