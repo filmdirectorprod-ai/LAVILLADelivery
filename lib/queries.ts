@@ -130,6 +130,22 @@ export async function getMyDriver(): Promise<Driver | null> {
   return data ?? null;
 }
 
+/** The current user's profile IFF they are staff (gérant), else null. Gate for
+ *  the /admin section, mirroring getMyDriver() for the driver section. */
+export async function getMyStaff(): Promise<Profile | null> {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
+  return data && (data as Profile & { is_staff?: boolean }).is_staff ? (data as Profile) : null;
+}
+
 export interface DriverOrder {
   order: Order;
   tracking: OrderTracking | null;
