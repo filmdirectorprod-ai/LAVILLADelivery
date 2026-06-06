@@ -13,8 +13,13 @@ import { formatDH } from '@/lib/format';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { Btn } from '@/components/ui/Btn';
+import { GoogleDeliveryMap } from '@/components/ui/GoogleDeliveryMap';
 import type { OrderDetail, DriverContact } from '@/lib/queries';
 import type { OrderTracking } from '@/lib/types';
+
+// Real Fès map renders when a browser Maps key is configured; otherwise a
+// neutral placeholder keeps the layout intact (no key required to build).
+const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 const STAGE_LABEL: Record<number, string> = {
   0: 'Confirmée',
@@ -58,6 +63,13 @@ export function DriverOrderScreen({
   const stage = tracking?.stage ?? 0;
   const delivered = order.status === 'delivered' || stage >= 4;
   const isDelivery = order.mode === 'livraison';
+
+  // Map inputs: follow the driver's own streamed GPS when present, else animate
+  // along the route by progress. Only meaningful for delivery (livraison) orders.
+  const prog = tracking?.progress ?? 0;
+  const driverPos =
+    tracking?.lat != null && tracking?.lng != null ? { lat: tracking.lat, lng: tracking.lng } : null;
+  const showMap = isDelivery;
 
   // Keep optimistic tracking in sync if the server props change (router.refresh).
   useEffect(() => {
@@ -145,7 +157,7 @@ export function DriverOrderScreen({
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div style={{ padding: `${SAFE_TOP + 4}px 16px 14px`, background: 'var(--brand-d)', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ padding: `${SAFE_TOP + 4}px 16px 14px`, background: 'linear-gradient(150deg, var(--brand), var(--brand-d))', display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={() => router.push('/driver')} aria-label="Retour" style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.16)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <Icon name="left" size={20} color="#fff" />
         </button>
@@ -162,8 +174,38 @@ export function DriverOrderScreen({
         )}
       </div>
 
+      {/* Live map (delivery orders) */}
+      {showMap && (
+        <div style={{ position: 'relative', height: 230, flexShrink: 0, background: '#eaf0f0', overflow: 'hidden' }}>
+          {MAPS_KEY ? (
+            <GoogleDeliveryMap
+              apiKey={MAPS_KEY}
+              progress={prog}
+              destinationAddress={order.address}
+              delivered={delivered}
+              driverPos={driverPos}
+            />
+          ) : (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, color: 'var(--muted)' }}>
+              <Icon name="pin" size={26} color="var(--muted)" />
+              <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5 }}>Carte indisponible</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Body */}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '16px' }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: 'auto',
+          padding: '16px',
+          ...(showMap
+            ? { marginTop: -18, borderTopLeftRadius: 20, borderTopRightRadius: 20, background: 'var(--bg, #f6f8f8)', position: 'relative', zIndex: 1, boxShadow: '0 -8px 22px -16px rgba(0,0,0,0.35)' }
+            : {}),
+        }}
+      >
         {/* Step progress */}
         <StepBar isDelivery={isDelivery} step={stepIndex(stage)} />
 
@@ -179,12 +221,12 @@ export function DriverOrderScreen({
             <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
               <button
                 onClick={() => router.push(`/driver/chat/${order.id}`)}
-                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: 'none', background: 'var(--soft)', borderRadius: 12, padding: '11px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--brand)' }}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: 'none', background: 'var(--soft)', borderRadius: 999, padding: '12px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--brand)' }}
               >
                 <Icon name="message" size={18} color="var(--brand)" /> Message
               </button>
               {initialContact.phone && (
-                <a href={`tel:${initialContact.phone}`} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', background: 'var(--soft)', borderRadius: 12, padding: '11px', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--brand)' }}>
+                <a href={`tel:${initialContact.phone}`} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', background: 'var(--soft)', borderRadius: 999, padding: '12px', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--brand)' }}>
                   <Icon name="phone" size={18} color="var(--brand)" /> Appeler
                 </a>
               )}
@@ -194,7 +236,7 @@ export function DriverOrderScreen({
 
         {/* Items */}
         <Card>
-          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, color: 'var(--ink)', marginBottom: 10 }}>Articles</div>
+          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)', marginBottom: 10 }}>Articles</div>
           {items.length === 0 ? (
             <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>
               {mine ? 'Aucun article.' : 'Acceptez la commande pour voir le détail.'}
@@ -209,7 +251,7 @@ export function DriverOrderScreen({
               </div>
             ))
           )}
-          <div style={{ borderTop: '1px solid var(--line)', marginTop: 10, paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>
+          <div style={{ borderTop: '1px solid var(--line)', marginTop: 10, paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
             <span>Total</span>
             <span>{formatDH(order.total_dh)}</span>
           </div>
@@ -271,7 +313,7 @@ function StepBar({ isDelivery, step }: { isDelivery: boolean; step: number }) {
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: 14, marginBottom: 12 }}>
+    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 14, marginBottom: 12, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}>
       {children}
     </div>
   );

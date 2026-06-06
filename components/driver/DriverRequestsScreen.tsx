@@ -13,6 +13,8 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/lib/toast-store';
 import { formatDH } from '@/lib/format';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
+import { Btn } from '@/components/ui/Btn';
+import { Badge } from '@/components/ui/Badge';
 import type { Order, OrderTracking } from '@/lib/types';
 import type { DriverOrder } from '@/lib/queries';
 
@@ -92,7 +94,7 @@ export function DriverRequestsScreen({ initialBoard }: { initialBoard: DriverOrd
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: `${SAFE_TOP + 6}px 16px 14px`, background: 'var(--brand-d)' }}>
+      <div style={{ padding: `${SAFE_TOP + 6}px 16px 14px`, background: 'linear-gradient(150deg, var(--brand), var(--brand-d))' }}>
         <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 21, color: '#fff', margin: 0 }}>
           Nouvelles commandes
         </h1>
@@ -107,7 +109,7 @@ export function DriverRequestsScreen({ initialBoard }: { initialBoard: DriverOrd
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: `16px 16px ${SAFE_BOTTOM + 16}px` }}>
         {available.length === 0 ? (
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', background: '#fff', border: '1px dashed var(--line)', borderRadius: 14, padding: '26px 16px', textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', background: '#fff', border: '1px dashed var(--line)', borderRadius: 18, padding: '26px 16px', textAlign: 'center' }}>
             Aucune commande à récupérer pour l’instant.
           </div>
         ) : (
@@ -133,12 +135,12 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       style={{
         border: 'none',
         borderRadius: 999,
-        padding: '8px 16px',
+        padding: '9px 16px',
         cursor: 'pointer',
         fontFamily: 'var(--ui-font)',
-        fontSize: 13,
-        fontWeight: 700,
-        background: active ? '#fff' : 'rgba(255,255,255,0.14)',
+        fontSize: 13.5,
+        fontWeight: 600,
+        background: active ? '#fff' : 'rgba(255,255,255,0.16)',
         color: active ? 'var(--brand-d)' : '#fff',
       }}
     >
@@ -161,11 +163,11 @@ function RequestCard({
   const { order } = data;
   const isDelivery = order.mode === 'livraison';
   return (
-    <div style={{ background: '#fff', border: '1.5px solid var(--brand)', borderRadius: 18, padding: 16, marginBottom: 12 }}>
+    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 16, marginBottom: 12, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>{order.code}</span>
-          <span style={{ fontFamily: 'var(--ui-font)', fontSize: 11, fontWeight: 700, color: 'var(--brand-d)', background: 'var(--soft)', borderRadius: 999, padding: '3px 9px' }}>Nouveau</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>{order.code}</span>
+          <Badge gold>Nouveau</Badge>
         </div>
         <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)' }}>{timeAgo(order.placed_at)}</span>
       </div>
@@ -179,7 +181,7 @@ function RequestCard({
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>La Villa · boutique</div>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 14.5, fontWeight: 700, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 14.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {isDelivery ? order.address ?? 'Adresse de livraison' : 'Retrait en boutique'}
           </div>
         </div>
@@ -193,20 +195,12 @@ function RequestCard({
 
       {/* actions */}
       <div style={{ display: 'flex', gap: 10 }}>
-        <button
-          onClick={onRefuse}
-          disabled={busy}
-          style={{ flex: 1, border: '1.5px solid var(--line)', background: '#fff', borderRadius: 14, padding: '13px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14.5, color: 'var(--muted)' }}
-        >
+        <Btn variant="ghost" onClick={onRefuse} disabled={busy} style={{ flex: 1 }}>
           Refuser
-        </button>
-        <button
-          onClick={onAccept}
-          disabled={busy}
-          style={{ flex: 2, border: 'none', background: 'var(--brand)', borderRadius: 14, padding: '13px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14.5, color: '#fff', opacity: busy ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-        >
+        </Btn>
+        <Btn onClick={onAccept} disabled={busy} style={{ flex: 2 }}>
           {busy ? 'Acceptation…' : `Accepter · ${formatDH(order.total_dh)}`}
-        </button>
+        </Btn>
       </div>
     </div>
   );
@@ -215,7 +209,7 @@ function RequestCard({
 function Metric({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <div style={{ flex: 1, padding: '12px 0', textAlign: 'center', borderRight: accent ? '1px solid var(--line)' : 'none' }}>
-      <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 16, color: accent ? 'var(--brand)' : 'var(--ink)' }}>{value}</div>
+      <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 16, color: accent ? 'var(--brand)' : 'var(--ink)' }}>{value}</div>
       <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{label}</div>
     </div>
   );

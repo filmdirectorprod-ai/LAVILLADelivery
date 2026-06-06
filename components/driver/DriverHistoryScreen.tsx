@@ -21,7 +21,7 @@ function formatTime(iso: string): string {
 export function DriverHistoryScreen({ deliveries }: { deliveries: DriverDelivery[] }) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: `${SAFE_TOP + 6}px 16px 16px`, background: 'var(--brand-d)' }}>
+      <div style={{ padding: `${SAFE_TOP + 6}px 16px 16px`, background: 'linear-gradient(150deg, var(--brand), var(--brand-d))' }}>
         <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Livreur</div>
         <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 22, color: '#fff', margin: '2px 0 0' }}>
           Historique
@@ -40,7 +40,7 @@ export function DriverHistoryScreen({ deliveries }: { deliveries: DriverDelivery
               color: 'var(--muted)',
               background: '#fff',
               border: '1px dashed var(--line)',
-              borderRadius: 14,
+              borderRadius: 18,
               padding: '26px 16px',
               textAlign: 'center',
             }}
@@ -56,12 +56,13 @@ export function DriverHistoryScreen({ deliveries }: { deliveries: DriverDelivery
                 style={{
                   background: '#fff',
                   border: '1px solid var(--line)',
-                  borderRadius: 16,
+                  borderRadius: 18,
                   padding: 14,
                   marginBottom: 10,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
+                  boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)',
                 }}
               >
                 <div
@@ -79,7 +80,7 @@ export function DriverHistoryScreen({ deliveries }: { deliveries: DriverDelivery
                   <Icon name={isDelivery ? 'scooter' : 'store'} size={20} color="var(--brand)" />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>
+                  <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
                     {d.code}
                   </div>
                   <div
@@ -96,7 +97,7 @@ export function DriverHistoryScreen({ deliveries }: { deliveries: DriverDelivery
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>
+                  <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>
                     {formatDH(d.total_dh)}
                   </div>
                   <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--brand)', fontWeight: 600 }}>

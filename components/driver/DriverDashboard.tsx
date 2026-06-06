@@ -111,9 +111,11 @@ export function DriverDashboard({
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div style={{ padding: `${SAFE_TOP + 6}px 16px 18px`, background: 'var(--brand-d)' }}>
+      <div style={{ padding: `${SAFE_TOP + 6}px 16px 18px`, background: 'linear-gradient(150deg, var(--brand), var(--brand-d))' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <PhotoSlot label={driver.name} src={driver.avatar_url ?? undefined} style={{ width: 52, height: 52, borderRadius: 16 }} />
+          <div style={{ width: 52, height: 52, borderRadius: 999, border: '2.5px solid var(--gold)', padding: 2, flexShrink: 0 }}>
+            <PhotoSlot label={driver.name} src={driver.avatar_url ?? undefined} style={{ width: '100%', height: '100%', borderRadius: 999 }} dim />
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {driver.name}
@@ -169,13 +171,13 @@ export function DriverDashboard({
         ) : (
           <button
             onClick={() => router.push('/driver/requests')}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: 14, cursor: 'pointer', textAlign: 'left' }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 14, cursor: 'pointer', textAlign: 'left', boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}
           >
             <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Icon name="bell" size={20} color="var(--brand)" />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14.5, color: 'var(--ink)' }}>
+              <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)' }}>
                 {available.length === 0 ? 'Aucune demande' : `${available.length} demande${available.length > 1 ? 's' : ''} disponible${available.length > 1 ? 's' : ''}`}
               </div>
               <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>
@@ -202,7 +204,7 @@ function Stat({ label, value }: { label: string; value: number | string }) {
 function Section({ title, count }: { title: string; count: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-      <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15.5, color: 'var(--ink)', margin: 0 }}>{title}</h2>
+      <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 17, color: 'var(--ink)', margin: 0 }}>{title}</h2>
       <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)' }}>{count}</span>
     </div>
   );
@@ -210,7 +212,7 @@ function Section({ title, count }: { title: string; count: number }) {
 
 function Empty({ text }: { text: string }) {
   return (
-    <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', background: '#fff', border: '1px dashed var(--line)', borderRadius: 14, padding: '18px 16px', textAlign: 'center' }}>
+    <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', background: '#fff', border: '1px dashed var(--line)', borderRadius: 18, padding: '18px 16px', textAlign: 'center' }}>
       {text}
     </div>
   );
@@ -226,7 +228,7 @@ function ActiveCard({ data, onOpen }: { data: DriverOrder; onOpen: () => void })
   return (
     <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>{order.code}</span>
+        <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>{order.code}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--soft)', borderRadius: 999, padding: '5px 11px' }}>
           <span className="lv-livedot" style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--brand)' }} />
           <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--brand)' }}>{STAGE_LABEL[stage] ?? '—'}</span>
@@ -250,7 +252,7 @@ function ActiveCard({ data, onOpen }: { data: DriverOrder; onOpen: () => void })
 
       <button
         onClick={onOpen}
-        style={{ width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--brand)', border: 'none', borderRadius: 12, padding: '12px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14.5, color: '#fff' }}
+        style={{ width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--brand)', border: 'none', borderRadius: 999, padding: '13px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: '#fff', boxShadow: '0 8px 20px -8px var(--brand)' }}
       >
         Voir la course
         <Icon name="right" size={18} color="#fff" />

@@ -29,17 +29,16 @@ export function DriverProfileScreen({
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: `${SAFE_TOP + 6}px 16px 20px`, background: 'var(--brand-d)' }}>
-        <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Livreur</div>
-        <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 22, color: '#fff', margin: '2px 0 16px' }}>
-          Profil
-        </h1>
+      <div style={{ padding: `${SAFE_TOP + 10}px 18px 22px`, background: 'linear-gradient(150deg, var(--brand), var(--brand-d))' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <PhotoSlot
-            label={driver.name}
-            src={driver.avatar_url ?? undefined}
-            style={{ width: 60, height: 60, borderRadius: 18 }}
-          />
+          <div style={{ width: 64, height: 64, borderRadius: 999, border: '2.5px solid var(--gold)', padding: 2, flexShrink: 0 }}>
+            <PhotoSlot
+              label={driver.name}
+              src={driver.avatar_url ?? undefined}
+              style={{ width: '100%', height: '100%', borderRadius: 999 }}
+              dim
+            />
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
@@ -54,7 +53,7 @@ export function DriverProfileScreen({
             >
               {driver.name}
             </div>
-            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
+            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>
               {driver.vehicle ?? 'Scooter'} · ⭐ {driver.rating.toFixed(1)}
             </div>
           </div>
@@ -68,7 +67,7 @@ export function DriverProfileScreen({
           <Stat label="Note" value={driver.rating.toFixed(1)} />
         </div>
 
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}>
           <NavRow
             icon="phone"
             label="Téléphone"
@@ -84,8 +83,8 @@ export function DriverProfileScreen({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ flex: 1, background: '#fff', border: '1px solid var(--line)', borderRadius: 14, padding: '12px' }}>
-      <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 17, color: 'var(--ink)' }}>{value}</div>
+    <div style={{ flex: 1, background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: '14px 12px' }}>
+      <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 17, color: 'var(--ink)' }}>{value}</div>
       <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{label}</div>
     </div>
   );

@@ -69,55 +69,62 @@ export function DriverChatScreen({
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--soft)' }}>
-      {/* header */}
-      <div style={{ background: 'var(--brand-d)', padding: `${SAFE_TOP + 4}px 14px 12px` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-          <button
-            onClick={() => router.push(`/driver/order/${order.id}`)}
-            aria-label="Retour"
-            style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.16)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-          >
-            <Icon name="left" size={20} color="#fff" />
-          </button>
-          <PhotoSlot label={customerName} style={{ width: 42, height: 42, borderRadius: 999, flexShrink: 0 }} dim />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {customerName}
-            </div>
-            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
-              Client · Commande {order.code}
-            </div>
-          </div>
-          {contact?.phone && (
-            <a
-              href={`tel:${contact.phone}`}
-              aria-label="Appeler"
-              style={{ width: 42, height: 42, borderRadius: 999, background: 'rgba(255,255,255,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, textDecoration: 'none' }}
-            >
-              <Icon name="phone" size={19} color="#fff" fill />
-            </a>
-          )}
-        </div>
-
-        {/* course banner */}
+      {/* header — light, mirrors the customer ChatScreen */}
+      <div
+        style={{
+          padding: `${SAFE_TOP + 4}px 14px 12px`,
+          background: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 11,
+          borderBottom: '1px solid var(--line)',
+        }}
+      >
         <button
           onClick={() => router.push(`/driver/order/${order.id}`)}
-          style={{ width: '100%', marginTop: 12, display: 'flex', alignItems: 'center', gap: 11, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 14, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}
+          aria-label="Retour"
+          style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'var(--soft)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
         >
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Icon name="scooter" size={18} color="#fff" />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: '#fff' }}>
-              Commande {order.code} · {order.mode === 'livraison' ? 'À livrer' : 'Retrait'}
-            </div>
-            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {order.address ?? 'Voir la course'} — voir la course
-            </div>
-          </div>
-          <Icon name="right" size={18} color="rgba(255,255,255,0.7)" />
+          <Icon name="left" size={20} color="var(--ink)" />
         </button>
+        <PhotoSlot label={customerName} style={{ width: 42, height: 42, borderRadius: 999, flexShrink: 0 }} dim />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {customerName}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--brand)' }}>
+            <span className="lv-livedot" style={{ width: 7, height: 7, borderRadius: 999, background: 'var(--brand)' }} /> Client · Commande {order.code}
+          </div>
+        </div>
+        {contact?.phone && (
+          <a
+            href={`tel:${contact.phone}`}
+            aria-label="Appeler"
+            style={{ width: 42, height: 42, borderRadius: 999, background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, textDecoration: 'none' }}
+          >
+            <Icon name="phone" size={19} color="#fff" fill />
+          </a>
+        )}
       </div>
+
+      {/* course banner — light card linking back to the course */}
+      <button
+        onClick={() => router.push(`/driver/order/${order.id}`)}
+        style={{ display: 'flex', alignItems: 'center', gap: 11, margin: '10px 16px 0', background: '#fff', border: '1px solid var(--line)', borderRadius: 14, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}
+      >
+        <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon name="scooter" size={18} color="var(--brand)" />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: 'var(--ink)' }}>
+            Commande {order.code} · {order.mode === 'livraison' ? 'À livrer' : 'Retrait'}
+          </div>
+          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {order.address ?? 'Voir la course'} — voir la course
+          </div>
+        </div>
+        <Icon name="right" size={18} color="var(--muted)" />
+      </button>
 
       {/* messages */}
       <div ref={scroller} style={{ flex: 1, overflow: 'auto', padding: '16px 16px 8px', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -133,7 +140,7 @@ export function DriverChatScreen({
                   style={{
                     padding: '10px 14px',
                     borderRadius: me ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                    background: me ? 'var(--brand-d)' : '#fff',
+                    background: me ? 'var(--brand)' : '#fff',
                     color: me ? '#fff' : 'var(--ink)',
                     fontFamily: 'var(--ui-font)',
                     fontSize: 14,

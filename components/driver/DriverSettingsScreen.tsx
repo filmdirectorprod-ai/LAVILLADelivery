@@ -79,7 +79,7 @@ export function DriverSettingsScreen() {
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: `16px 16px ${SAFE_BOTTOM + 16}px` }}>
         <SectionTitle>Notifications</SectionTitle>
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}>
           <ToggleRow
             icon="bell"
             label="Notifications de commande"
@@ -97,7 +97,7 @@ export function DriverSettingsScreen() {
 
         <div style={{ height: 18 }} />
         <SectionTitle>Application</SectionTitle>
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}>
           <InfoRow icon="info" label="Langue" value="Français" />
           <InfoRow icon="info" label="Version" value={APP_VERSION} last />
         </div>

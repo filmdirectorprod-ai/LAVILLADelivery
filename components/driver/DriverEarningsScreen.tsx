@@ -62,7 +62,7 @@ export function DriverEarningsScreen({
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: `${SAFE_TOP + 6}px 16px 14px`, background: 'var(--brand-d)' }}>
+      <div style={{ padding: `${SAFE_TOP + 6}px 16px 14px`, background: 'linear-gradient(150deg, var(--brand), var(--brand-d))' }}>
         <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 21, color: '#fff', margin: 0 }}>
           Tournée
         </h1>
@@ -130,7 +130,7 @@ export function DriverEarningsScreen({
         <div style={{ height: 16 }} />
 
         {/* Évaluations clients */}
-        <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15.5, color: 'var(--ink)', margin: '0 0 10px 2px' }}>
+        <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 17, color: 'var(--ink)', margin: '0 0 10px 2px' }}>
           Mes évaluations clients
         </h2>
         {reviews.length === 0 ? (
@@ -141,7 +141,7 @@ export function DriverEarningsScreen({
               color: 'var(--muted)',
               background: '#fff',
               border: '1px dashed var(--line)',
-              borderRadius: 14,
+              borderRadius: 18,
               padding: '20px 16px',
               textAlign: 'center',
             }}
@@ -158,7 +158,7 @@ export function DriverEarningsScreen({
 
 function Tile({ icon, value, label }: { icon: string; value: string; label: string }) {
   return (
-    <div style={{ flex: 1, background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: 13 }}>
+    <div style={{ flex: 1, background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 13, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}>
       <div
         style={{
           width: 34,
@@ -172,7 +172,7 @@ function Tile({ icon, value, label }: { icon: string; value: string; label: stri
       >
         <Icon name={icon} size={18} color="var(--brand)" />
       </div>
-      <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 17, color: 'var(--ink)', marginTop: 9 }}>
+      <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 17, color: 'var(--ink)', marginTop: 9 }}>
         {value}
       </div>
       <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{label}</div>
@@ -182,13 +182,13 @@ function Tile({ icon, value, label }: { icon: string; value: string; label: stri
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 16 }}>{children}</div>
+    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 16, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}>{children}</div>
   );
 }
 
 function CardTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', margin: '0 0 14px' }}>
+    <h3 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)', margin: '0 0 14px' }}>
       {children}
     </h3>
   );
@@ -239,12 +239,13 @@ function ReviewRow({ review }: { review: DriverReview }) {
       style={{
         background: '#fff',
         border: '1px solid var(--line)',
-        borderRadius: 16,
+        borderRadius: 18,
         padding: 14,
         marginBottom: 10,
         display: 'flex',
         alignItems: 'center',
         gap: 12,
+        boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)',
       }}
     >
       <div
@@ -262,7 +263,7 @@ function ReviewRow({ review }: { review: DriverReview }) {
         <Icon name="user" size={19} color="var(--muted)" />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14.5, color: 'var(--ink)' }}>
+        <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)' }}>
           {review.customer_name}
         </div>
         <div
@@ -284,7 +285,7 @@ function ReviewRow({ review }: { review: DriverReview }) {
           alignItems: 'center',
           gap: 4,
           fontFamily: 'var(--ui-font)',
-          fontWeight: 700,
+          fontWeight: 600,
           fontSize: 14,
           color: 'var(--ink)',
           flexShrink: 0,
