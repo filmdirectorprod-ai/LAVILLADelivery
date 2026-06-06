@@ -7,6 +7,7 @@
 import type { ReactNode } from 'react';
 import { getMyDriver } from '@/lib/queries';
 import { DriverGate } from '@/components/driver/DriverGate';
+import { DriverChrome } from '@/components/driver/DriverChrome';
 
 export default async function DriverLayout({ children }: { children: ReactNode }) {
   const driver = await getMyDriver();
@@ -14,7 +15,7 @@ export default async function DriverLayout({ children }: { children: ReactNode }
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--soft)' }}>
-      {children}
+      <DriverChrome>{children}</DriverChrome>
     </div>
   );
 }

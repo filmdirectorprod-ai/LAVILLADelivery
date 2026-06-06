@@ -180,6 +180,30 @@ export async function getDriverById(id: string | null): Promise<Driver | null> {
   return data ?? null;
 }
 
+export interface DriverDelivery {
+  order_id: string;
+  code: string;
+  mode: string;
+  address: string | null;
+  total_dh: number;
+  delivery_fee_dh: number;
+  delivered_at: string;
+  placed_at: string;
+}
+
+/**
+ * The current driver's COMPLETED deliveries. RLS only exposes still-active
+ * orders (preparing/en_route), so finished ones come through a SECURITY DEFINER
+ * RPC (migration 0010) scoped to lv_current_driver(). Source for the History and
+ * Earnings screens — earnings = sum of delivery_fee_dh (0 for retrait).
+ */
+export async function getDriverDeliveries(): Promise<DriverDelivery[]> {
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.rpc('driver_deliveries');
+  if (error || !data) return [];
+  return data as DriverDelivery[];
+}
+
 export async function getChatMessages(orderId: string): Promise<ChatMessage[]> {
   const supabase = await createServerSupabase();
   const { data } = await supabase
