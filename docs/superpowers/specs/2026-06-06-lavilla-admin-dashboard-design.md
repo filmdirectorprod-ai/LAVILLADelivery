@@ -26,8 +26,9 @@ reviews, delivery zones, driver support, incidents, and planning.
 
 ## Users & access
 
-- **Staff account**: a single dedicated email (TBD — supplied at implementation
-  time) marked `profiles.is_staff = true` in migration 0014.
+- **Staff account**: the dedicated email **`admin@lavilla.ma`**, marked
+  `profiles.is_staff = true` in migration 0014. (The account must be created via
+  normal sign-up first so a `profiles` row exists; the migration flips the flag.)
 - Customers and drivers must **never** reach `/admin` — gated by layout + RLS.
 
 ## Architecture
