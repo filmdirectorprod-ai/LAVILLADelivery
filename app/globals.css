@@ -124,3 +124,15 @@ body {
     font-family: var(--font-display), "Playfair Display", Georgia, serif;
   }
 }
+
+/* Admin renders full-width, outside the centered phone frame. The marker class
+   lives on AdminChrome's root; :has() lifts the .lv-frame constraints only when
+   an admin page is mounted. */
+.lv-frame:has(.lv-admin-root) {
+  max-width: none;
+  height: 100dvh;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--soft);
+}
