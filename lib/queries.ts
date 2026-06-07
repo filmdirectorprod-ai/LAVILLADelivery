@@ -420,6 +420,30 @@ export async function getAdminReviewsData(): Promise<AdminReviewsData> {
   return { rows };
 }
 
+export interface AdminProductsData {
+  products: Product[];
+  categories: Category[];
+}
+
+/**
+ * Snapshot for the admin Produits screen: the FULL catalogue (active and inactive
+ * — products is public-read with no active filter) plus the categories for
+ * grouping. The client container refetches the same shapes on realtime changes and
+ * regroups via lib/admin-products.ts; edits go through the admin_update_product
+ * RPC (0016).
+ */
+export async function getAdminProductsData(): Promise<AdminProductsData> {
+  const supabase = await createServerSupabase();
+  const [productsRes, categoriesRes] = await Promise.all([
+    supabase.from('products').select('*').order('name'),
+    supabase.from('categories').select('*').order('sort'),
+  ]);
+  return {
+    products: (productsRes.data ?? []) as Product[],
+    categories: (categoriesRes.data ?? []) as Category[],
+  };
+}
+
 export interface KitchenTicket {
   order: Order;
   items: OrderItem[];
