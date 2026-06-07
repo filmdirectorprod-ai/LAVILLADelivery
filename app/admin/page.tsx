@@ -1,14 +1,11 @@
-// Vue d'ensemble — placeholder. Phase 2 fills in live KPIs, the hourly activity
-// chart, the live driver map, and the in-progress orders table.
-export default function AdminOverviewPage() {
-  return (
-    <div style={{ padding: '28px 32px' }}>
-      <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--ink)', margin: 0 }}>
-        Vue d&apos;ensemble
-      </h1>
-      <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>
-        Tableau de bord en temps réel — à venir (Phase 2).
-      </p>
-    </div>
-  );
+// Vue d'ensemble — live admin dashboard. Server component fetches the first-paint
+// snapshot under staff RLS; OverviewScreen takes over with realtime updates.
+import { getAdminOverviewData } from '@/lib/queries';
+import { OverviewScreen } from '@/components/admin/overview/OverviewScreen';
+
+export const dynamic = 'force-dynamic';
+
+export default async function AdminOverviewPage() {
+  const initial = await getAdminOverviewData();
+  return <OverviewScreen initial={initial} mapsKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY} />;
 }
