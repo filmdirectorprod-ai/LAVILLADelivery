@@ -8,6 +8,7 @@ export type CategoryUniverse = Universe | 'all';
 export type OrderStatus =
   | 'pending'
   | 'preparing'
+  | 'ready'
   | 'en_route'
   | 'delivered'
   | 'cancelled';

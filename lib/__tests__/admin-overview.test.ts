@@ -42,6 +42,7 @@ describe('bucketOrdersByHour', () => {
 describe('computeOverviewKpis', () => {
   const orders = [
     { status: 'preparing', total_dh: 100 },
+    { status: 'ready', total_dh: 75 },
     { status: 'en_route', total_dh: 50 },
     { status: 'delivered', total_dh: 200 },
     { status: 'cancelled', total_dh: 999 },
@@ -55,13 +56,13 @@ describe('computeOverviewKpis', () => {
 
   it('counts today orders and in-progress orders', () => {
     const k = computeOverviewKpis({ orders, drivers, ratings });
-    expect(k.ordersToday).toBe(4);
-    expect(k.inProgress).toBe(2); // preparing + en_route
+    expect(k.ordersToday).toBe(5);
+    expect(k.inProgress).toBe(3); // preparing + ready + en_route
   });
 
   it('sums revenue of non-cancelled orders only', () => {
     const k = computeOverviewKpis({ orders, drivers, ratings });
-    expect(k.revenueToday).toBe(350); // 100 + 50 + 200
+    expect(k.revenueToday).toBe(425); // 100 + 75 + 50 + 200
   });
 
   it('reports online / total drivers', () => {

@@ -3,6 +3,8 @@
 // serves the server first-paint and the client realtime refetch, and stays unit
 // testable. No React, no I/O.
 
+import { isInProgressOrderStatus } from '@/lib/order-status';
+
 /** UTC midnight of `ref` (default: now) as an ISO string — the lower bound for
  *  "today's" orders. Computed in UTC (not the runtime's local time) so the
  *  server first-paint and the client realtime refetch agree on the boundary
@@ -42,7 +44,7 @@ export interface OverviewKpis {
 /** Headline numbers for the KPI cards, derived from today's raw rows. Revenue
  *  excludes cancelled orders; in-progress = preparing + en_route. */
 export function computeOverviewKpis({ orders, drivers, ratings }: OverviewKpiInput): OverviewKpis {
-  const inProgress = orders.filter((o) => o.status === 'preparing' || o.status === 'en_route').length;
+  const inProgress = orders.filter((o) => isInProgressOrderStatus(o.status)).length;
   const revenueToday = orders
     .filter((o) => o.status !== 'cancelled')
     .reduce((sum, o) => sum + (o.total_dh ?? 0), 0);
