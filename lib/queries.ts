@@ -5,6 +5,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { startOfTodayISO } from '@/lib/admin-overview';
 import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import { buildAdminOrderRows, type AdminOrderRow } from '@/lib/admin-orders';
+import { buildDriverRows, type DriverRow } from '@/lib/admin-drivers';
 import type {
   Category,
   Product,
@@ -349,6 +350,37 @@ export async function getAdminOrdersData(): Promise<AdminOrdersData> {
     (profilesRes.data ?? []) as { id: string; full_name: string | null }[],
   );
   return { rows, drivers: (driversRes.data ?? []) as Driver[] };
+}
+
+export interface AdminDriversData {
+  rows: DriverRow[];
+}
+
+/**
+ * Snapshot for the admin Livreurs screen: the full driver roster with each
+ * driver's deliveries completed today and the earnings from them. Staff RLS
+ * (0014) exposes every driver/order/tracking row; the per-driver aggregate is
+ * built by lib/admin-drivers.ts so the client realtime refetch matches. "Today"
+ * uses the same UTC boundary as the rest of the dashboard.
+ */
+export async function getAdminDriversData(): Promise<AdminDriversData> {
+  const supabase = await createServerSupabase();
+  const since = startOfTodayISO();
+  const [driversRes, ordersRes, trackingRes] = await Promise.all([
+    supabase.from('drivers').select('*').order('name'),
+    supabase
+      .from('orders')
+      .select('id, status, delivery_fee_dh')
+      .eq('status', 'delivered')
+      .gte('placed_at', since),
+    supabase.from('order_tracking').select('order_id, driver_id').not('driver_id', 'is', null),
+  ]);
+  const rows = buildDriverRows(
+    (driversRes.data ?? []) as Driver[],
+    (ordersRes.data ?? []) as { id: string; status: string; delivery_fee_dh: number }[],
+    (trackingRes.data ?? []) as { order_id: string; driver_id: string | null }[],
+  );
+  return { rows };
 }
 
 export interface KitchenTicket {
