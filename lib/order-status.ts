@@ -9,14 +9,14 @@
 import type { OrderStatus } from '@/lib/types';
 
 /** Statuses an order passes through while still open for the customer. */
-export const ACTIVE_ORDER_STATUSES: OrderStatus[] = ['pending', 'preparing', 'ready', 'en_route'] as OrderStatus[];
+export const ACTIVE_ORDER_STATUSES: OrderStatus[] = ['pending', 'preparing', 'ready', 'en_route'];
 
 /** Statuses the admin counts as "in progress" (kitchen → delivery; excludes the
  *  never-used `pending`). */
-export const IN_PROGRESS_ORDER_STATUSES: OrderStatus[] = ['preparing', 'ready', 'en_route'] as OrderStatus[];
+export const IN_PROGRESS_ORDER_STATUSES: OrderStatus[] = ['preparing', 'ready', 'en_route'];
 
 /** Statuses an order must be in to appear in / be claimed from the driver pool. */
-export const DRIVER_POOL_STATUSES: OrderStatus[] = ['ready', 'en_route'] as OrderStatus[];
+export const DRIVER_POOL_STATUSES: OrderStatus[] = ['ready', 'en_route'];
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'En attente',
@@ -25,7 +25,7 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   en_route: 'En route',
   delivered: 'Livrée',
   cancelled: 'Annulée',
-} as Record<OrderStatus, string>;
+};
 
 /** French label for a status; falls back to the raw value if unknown. */
 export function orderStatusLabel(status: string): string {
