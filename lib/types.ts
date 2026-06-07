@@ -207,3 +207,41 @@ export interface Notification {
   read: boolean;
   created_at: string;
 }
+
+export type IncidentSeverity = 'basse' | 'moyenne' | 'haute';
+export type IncidentStatus = 'open' | 'resolved';
+
+/** An operational issue raised against an order and/or driver (admin Incidents). */
+export interface Incident {
+  id: string;
+  order_id: string | null;
+  driver_id: string | null;
+  kind: string;
+  severity: IncidentSeverity;
+  status: IncidentStatus;
+  title: string;
+  detail: string;
+  created_by: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+/** One message in a per-driver support thread (admin Support). */
+export interface SupportMessage {
+  id: string;
+  driver_id: string;
+  sender: 'driver' | 'staff';
+  body: string;
+  read_by_staff: boolean;
+  created_at: string;
+}
+
+/** A scheduled delivery shift for one driver (admin Planning). */
+export interface DriverShift {
+  id: string;
+  driver_id: string;
+  starts_at: string;
+  ends_at: string;
+  note: string;
+  created_at: string;
+}

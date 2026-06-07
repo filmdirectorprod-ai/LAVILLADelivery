@@ -7,6 +7,9 @@ import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import { buildAdminOrderRows, type AdminOrderRow } from '@/lib/admin-orders';
 import { buildDriverRows, type DriverRow } from '@/lib/admin-drivers';
 import { buildReviewRows, type ReviewRow } from '@/lib/admin-reviews';
+import { buildIncidentRows, type IncidentRow } from '@/lib/admin-incidents';
+import { buildShiftWeek, mondayOf, isoDate, type ShiftWeek } from '@/lib/admin-planning';
+import { buildSupportThreads } from '@/lib/admin-support';
 import type {
   Category,
   Product,
@@ -18,6 +21,9 @@ import type {
   OrderItem,
   OrderTracking,
   Review,
+  Incident,
+  SupportMessage,
+  DriverShift,
   ChatMessage,
   Reward,
   Notification,
@@ -458,6 +464,94 @@ export async function getAdminZonesData(): Promise<AdminZonesData> {
   const supabase = await createServerSupabase();
   const { data } = await supabase.from('delivery_zones').select('*').order('fee_dh');
   return { zones: (data ?? []) as Zone[] };
+}
+
+export interface AdminIncidentsData {
+  rows: IncidentRow[];
+  /** Driver roster for the create form. */
+  drivers: { id: string; name: string }[];
+  /** Recent orders for the create form. */
+  orders: { id: string; code: string }[];
+}
+
+/**
+ * Snapshot for the admin Incidents screen: every incident joined to its
+ * driver/order, plus the driver roster and recent orders for the create form.
+ * incidents is staff-only (0018); the client refetches the same shapes on realtime
+ * changes and reorders via lib/admin-incidents.ts.
+ */
+export async function getAdminIncidentsData(): Promise<AdminIncidentsData> {
+  const supabase = await createServerSupabase();
+  const [incidentsRes, driversRes, ordersRes] = await Promise.all([
+    supabase.from('incidents').select('*').order('created_at', { ascending: false }),
+    supabase.from('drivers').select('id, name').order('name'),
+    supabase.from('orders').select('id, code').order('placed_at', { ascending: false }).limit(100),
+  ]);
+  const rows = buildIncidentRows(
+    (incidentsRes.data ?? []) as Incident[],
+    (driversRes.data ?? []) as { id: string; name: string }[],
+    (ordersRes.data ?? []) as { id: string; code: string }[],
+  );
+  return {
+    rows,
+    drivers: (driversRes.data ?? []) as { id: string; name: string }[],
+    orders: (ordersRes.data ?? []) as { id: string; code: string }[],
+  };
+}
+
+export interface AdminPlanningData {
+  week: ShiftWeek;
+  drivers: { id: string; name: string }[];
+  /** ISO date (YYYY-MM-DD) of the Monday this week starts on. */
+  weekStart: string;
+}
+
+/**
+ * Snapshot for the admin Planning screen: the shift roster for the week containing
+ * `ref`, laid out as a driver × day grid, plus the driver roster for the add form.
+ * driver_shifts is staff-only (0018); the client refetches and rebuilds via
+ * lib/admin-planning.ts.
+ */
+export async function getAdminPlanningData(ref: Date = new Date()): Promise<AdminPlanningData> {
+  const supabase = await createServerSupabase();
+  const monday = mondayOf(ref);
+  const nextMonday = new Date(monday.getTime() + 7 * 24 * 3600 * 1000);
+  const [shiftsRes, driversRes] = await Promise.all([
+    supabase
+      .from('driver_shifts')
+      .select('*')
+      .gte('starts_at', monday.toISOString())
+      .lt('starts_at', nextMonday.toISOString())
+      .order('starts_at'),
+    supabase.from('drivers').select('id, name').order('name'),
+  ]);
+  const drivers = (driversRes.data ?? []) as { id: string; name: string }[];
+  const week = buildShiftWeek((shiftsRes.data ?? []) as DriverShift[], drivers, monday);
+  return { week, drivers, weekStart: isoDate(monday) };
+}
+
+export interface AdminSupportData {
+  threads: { driver: { id: string; name: string }; messages: SupportMessage[]; unread: number }[];
+}
+
+/**
+ * Snapshot for the admin Support screen: one thread per driver that has any
+ * support message, with its messages oldest-first and the staff-unread count.
+ * support_messages is staff-readable across all threads (0018); the client
+ * refetches the same shapes on realtime changes and rebuilds via
+ * lib/admin-support.ts.
+ */
+export async function getAdminSupportData(): Promise<AdminSupportData> {
+  const supabase = await createServerSupabase();
+  const [messagesRes, driversRes] = await Promise.all([
+    supabase.from('support_messages').select('*').order('created_at'),
+    supabase.from('drivers').select('id, name').order('name'),
+  ]);
+  const threads = buildSupportThreads(
+    (messagesRes.data ?? []) as SupportMessage[],
+    (driversRes.data ?? []) as { id: string; name: string }[],
+  );
+  return { threads };
 }
 
 export interface KitchenTicket {
