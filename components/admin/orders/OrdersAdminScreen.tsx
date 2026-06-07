@@ -1,34 +1,48 @@
 // components/admin/orders/OrdersAdminScreen.tsx
-// Live container for the admin Commandes screen. Renders the server snapshot,
-// subscribes to postgres_changes on orders / order_items / order_tracking, and
-// refetches the same raw shapes — rebuilt via lib/admin-orders.ts so server and
-// client agree. Staff writes go through the 0015 RPCs, then a refetch.
+// Live container for the admin Commandes screen. Renders the server snapshot as a
+// full-width table with count-badge tabs (Toutes / En cours / À assigner /
+// Terminées), an inline per-row driver assignment, a "Marquer prête" action, sales
+// CSV export, and an optional "Affectation auto" mode that round-robins unassigned
+// ready orders across online drivers. Subscribes to postgres_changes on orders /
+// order_items / order_tracking and refetches the same raw shapes — rebuilt via
+// lib/admin-orders.ts so server and client agree. Staff writes go through the 0015
+// RPCs, then a refetch.
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
-import { orderStatusLabel, orderStatusPill, ACTIVE_ORDER_STATUSES } from '@/lib/order-status';
-import { buildAdminOrderRows, filterAdminOrders, type AdminOrderRow } from '@/lib/admin-orders';
+import { orderStatusLabel, orderStatusPill } from '@/lib/order-status';
+import {
+  buildAdminOrderRows,
+  filterAdminOrdersByTab,
+  countOrdersByTab,
+  orderItemsSummary,
+  ordersToCsv,
+  pickAutoAssignments,
+  type AdminOrderRow,
+  type OrderTab,
+} from '@/lib/admin-orders';
 import type { AdminOrdersData } from '@/lib/queries';
-import type { Driver, Order, OrderItem, OrderStatus, OrderTracking } from '@/lib/types';
-import { OrderDetailPanel } from './OrderDetailPanel';
+import type { Driver, Order, OrderItem, OrderTracking } from '@/lib/types';
 
-const STATUS_TABS: { value: OrderStatus | 'all'; label: string }[] = [
+const TABS: { value: OrderTab; label: string }[] = [
   { value: 'all', label: 'Toutes' },
-  { value: 'preparing', label: 'En préparation' },
-  { value: 'ready', label: 'Prêtes' },
-  { value: 'en_route', label: 'En route' },
-  { value: 'delivered', label: 'Livrées' },
-  { value: 'cancelled', label: 'Annulées' },
+  { value: 'active', label: 'En cours' },
+  { value: 'unassigned', label: 'À assigner' },
+  { value: 'done', label: 'Terminées' },
 ];
+
+function timeLabel(iso: string): string {
+  return new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
 
 export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
   const [rows, setRows] = useState<AdminOrderRow[]>(initial.rows);
   const [drivers, setDrivers] = useState<Driver[]>(initial.drivers);
-  const [status, setStatus] = useState<OrderStatus | 'all'>('all');
+  const [tab, setTab] = useState<OrderTab>('all');
   const [query, setQuery] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(initial.rows[0]?.order.id ?? null);
   const [busy, setBusy] = useState(false);
+  const [autoAssign, setAutoAssign] = useState(false);
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
@@ -70,8 +84,8 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
     };
   }, [refetch]);
 
-  const visible = useMemo(() => filterAdminOrders(rows, { status, query }), [rows, status, query]);
-  const selected = useMemo(() => rows.find((r) => r.order.id === selectedId) ?? null, [rows, selectedId]);
+  const counts = useMemo(() => countOrdersByTab(rows), [rows]);
+  const visible = useMemo(() => filterAdminOrdersByTab(rows, tab, query), [rows, tab, query]);
 
   const runRpc = useCallback(
     async (fn: string, params: Record<string, unknown>) => {
@@ -88,38 +102,93 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
   const onAssignDriver = (orderId: string, driverId: string) => runRpc('admin_assign_driver', { p_order: orderId, p_driver: driverId });
   const onCancel = (orderId: string) => runRpc('admin_set_order_status', { p_order: orderId, p_status: 'cancelled' });
 
-  const activeCount = rows.filter((r) => (ACTIVE_ORDER_STATUSES as string[]).includes(r.order.status)).length;
+  // Auto-assign: when on, round-robin unassigned ready/preparing orders across
+  // online drivers. Guarded by a ref so the same order isn't dispatched twice while
+  // a previous assignment + refetch is still settling.
+  const inFlight = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!autoAssign || busy) return;
+    const onlineIds = drivers.filter((d) => d.is_online).map((d) => d.id);
+    const plan = pickAutoAssignments(rows, onlineIds).filter((a) => !inFlight.current.has(a.orderId));
+    if (plan.length === 0) return;
+    plan.forEach((a) => inFlight.current.add(a.orderId));
+    (async () => {
+      const supabase = createClient();
+      for (const a of plan) {
+        await supabase.rpc('admin_assign_driver', { p_order: a.orderId, p_driver: a.driverId });
+      }
+      plan.forEach((a) => inFlight.current.delete(a.orderId));
+      refetch();
+    })();
+  }, [autoAssign, busy, rows, drivers, refetch]);
+
+  const exportSales = useCallback(() => {
+    const csv = ordersToCsv(visible);
+    const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ventes-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [visible]);
 
   return (
     <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div>
-        <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--ink)', margin: 0 }}>Commandes</h1>
-        <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>
-          {activeCount} commande{activeCount > 1 ? 's' : ''} active{activeCount > 1 ? 's' : ''}
-        </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--ink)', margin: 0 }}>Commandes</h1>
+          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>
+            {counts.active} en cours · {counts.unassigned} à assigner
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+            <input type="checkbox" checked={autoAssign} onChange={(e) => setAutoAssign(e.target.checked)} />
+            Affectation auto
+          </label>
+          <button
+            type="button"
+            onClick={exportSales}
+            style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 16px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--ink)', background: '#fff' }}
+          >
+            Exporter ventes
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {STATUS_TABS.map((t) => (
-            <button
-              key={t.value}
-              onClick={() => setStatus(t.value)}
-              style={{
-                border: '1px solid var(--line)',
-                borderRadius: 999,
-                padding: '7px 14px',
-                cursor: 'pointer',
-                fontFamily: 'var(--ui-font)',
-                fontSize: 13,
-                fontWeight: 600,
-                background: status === t.value ? 'var(--brand)' : '#fff',
-                color: status === t.value ? '#fff' : 'var(--muted)',
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
+          {TABS.map((t) => {
+            const active = tab === t.value;
+            return (
+              <button
+                key={t.value}
+                onClick={() => setTab(t.value)}
+                style={{
+                  border: '1px solid var(--line)',
+                  borderRadius: 999,
+                  padding: '7px 14px',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--ui-font)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  background: active ? 'var(--brand)' : '#fff',
+                  color: active ? '#fff' : 'var(--muted)',
+                }}
+              >
+                {t.label}
+                <span style={{ fontSize: 11.5, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: active ? 'rgba(255,255,255,0.22)' : 'var(--soft)', color: active ? '#fff' : 'var(--muted)' }}>
+                  {counts[t.value]}
+                </span>
+              </button>
+            );
+          })}
         </div>
         <input
           value={query}
@@ -129,57 +198,89 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1fr)', gap: 22, alignItems: 'start' }}>
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
-          {visible.length === 0 ? (
-            <div style={{ padding: '28px 22px', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', textAlign: 'center' }}>
-              Aucune commande.
-            </div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {['Commande', 'Client', 'Total', 'Statut'].map((h) => (
-                    <th key={h} style={{ textAlign: 'left', padding: '12px 18px', fontFamily: 'var(--ui-font)', fontSize: 11.5, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--muted)', background: 'var(--soft)' }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((r) => {
-                  const pill = orderStatusPill(r.order.status);
-                  const isSel = r.order.id === selectedId;
-                  return (
-                    <tr
-                      key={r.order.id}
-                      onClick={() => setSelectedId(r.order.id)}
-                      style={{ borderTop: '1px solid var(--line)', cursor: 'pointer', background: isSel ? 'var(--soft)' : '#fff' }}
-                    >
-                      <td style={{ padding: '13px 18px', fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{r.order.code}</td>
-                      <td style={{ padding: '13px 18px', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>{r.customerName ?? '—'}</td>
-                      <td style={{ padding: '13px 18px', fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--ink)' }}>{formatDH(r.order.total_dh)}</td>
-                      <td style={{ padding: '13px 18px' }}>
-                        <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: pill.bg, color: pill.fg }}>
-                          {orderStatusLabel(r.order.status)}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <OrderDetailPanel
-          row={selected}
-          drivers={drivers}
-          busy={busy}
-          onMarkReady={onMarkReady}
-          onAssignDriver={onAssignDriver}
-          onCancel={onCancel}
-        />
+      <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)', overflowX: 'auto' }}>
+        {visible.length === 0 ? (
+          <div style={{ padding: '36px 22px', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', textAlign: 'center' }}>
+            Aucune commande.
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 880 }}>
+            <thead>
+              <tr>
+                {['Commande', 'Client', 'Articles', 'Total', 'Livreur', 'Statut', ''].map((h, i) => (
+                  <th key={i} style={{ textAlign: 'left', padding: '12px 18px', fontFamily: 'var(--ui-font)', fontSize: 11.5, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--muted)', background: 'var(--soft)' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((r) => {
+                const pill = orderStatusPill(r.order.status);
+                const canCancel = r.order.status !== 'delivered' && r.order.status !== 'cancelled';
+                const canAssign = r.order.status === 'preparing' || r.order.status === 'ready' || r.order.status === 'en_route';
+                return (
+                  <tr key={r.order.id} style={{ borderTop: '1px solid var(--line)' }}>
+                    <td style={{ padding: '12px 18px' }}>
+                      <div style={{ fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{r.order.code}</div>
+                      <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>{timeLabel(r.order.placed_at)}</div>
+                    </td>
+                    <td style={{ padding: '12px 18px', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>{r.customerName ?? '—'}</td>
+                    <td style={{ padding: '12px 18px', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)', maxWidth: 220 }}>{orderItemsSummary(r.items)}</td>
+                    <td style={{ padding: '12px 18px', fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{formatDH(r.order.total_dh)}</td>
+                    <td style={{ padding: '12px 18px' }}>
+                      {canAssign ? (
+                        <select
+                          value={r.tracking?.driver_id ?? ''}
+                          disabled={busy}
+                          onChange={(e) => e.target.value && onAssignDriver(r.order.id, e.target.value)}
+                          style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '7px 10px', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)', background: '#fff', maxWidth: 170 }}
+                        >
+                          <option value="">Assigner…</option>
+                          {drivers.map((d) => (
+                            <option key={d.id} value={d.id}>{d.name}{d.is_online ? ' ·●' : ''}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>{r.driverName ?? '—'}</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 18px' }}>
+                      <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: pill.bg, color: pill.fg }}>
+                        {orderStatusLabel(r.order.status)}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 18px', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
+                        {r.order.status === 'preparing' && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onMarkReady(r.order.id)}
+                            style={{ border: 'none', borderRadius: 8, padding: '6px 12px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#fff', background: 'var(--brand)', opacity: busy ? 0.6 : 1 }}
+                          >
+                            Prête
+                          </button>
+                        )}
+                        {canCancel && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onCancel(r.order.id)}
+                            title="Annuler la commande"
+                            style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 10px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#a23', background: '#fff', opacity: busy ? 0.6 : 1 }}
+                          >
+                            Annuler
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
