@@ -8,13 +8,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { startOfTodayISO } from '@/lib/admin-overview';
-import { buildDriverRows } from '@/lib/admin-drivers';
+import { buildDriverRows, driverRoutesToCsv } from '@/lib/admin-drivers';
 import type { AdminDriversData } from '@/lib/queries';
 import type { Driver } from '@/lib/types';
 import { DriverCard } from './DriverCard';
 
 type RawOrder = { id: string; status: string; delivery_fee_dh: number };
 type RawTracking = { order_id: string; driver_id: string | null };
+type RawActive = { id: string; code: string; status: string };
 
 export function DriversScreen({ initial }: { initial: AdminDriversData }) {
   const [rows, setRows] = useState<AdminDriversData['rows']>(initial.rows);
@@ -22,7 +23,7 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
   const refetch = useCallback(async () => {
     const supabase = createClient();
     const since = startOfTodayISO(); // shared UTC boundary — matches the server paint
-    const [driversRes, ordersRes, trackingRes] = await Promise.all([
+    const [driversRes, ordersRes, trackingRes, activeRes] = await Promise.all([
       supabase.from('drivers').select('*').order('name'),
       supabase
         .from('orders')
@@ -30,12 +31,14 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
         .eq('status', 'delivered')
         .gte('placed_at', since),
       supabase.from('order_tracking').select('order_id, driver_id').not('driver_id', 'is', null),
+      supabase.from('orders').select('id, code, status').in('status', ['ready', 'en_route']),
     ]);
     setRows(
       buildDriverRows(
         (driversRes.data ?? []) as Driver[],
         (ordersRes.data ?? []) as RawOrder[],
         (trackingRes.data ?? []) as RawTracking[],
+        (activeRes.data ?? []) as RawActive[],
       ),
     );
   }, []);
@@ -54,14 +57,39 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
   }, [refetch]);
 
   const onlineCount = useMemo(() => rows.filter((r) => r.driver.is_online).length, [rows]);
+  const onRouteCount = useMemo(() => rows.filter((r) => r.currentRoute).length, [rows]);
+
+  const exportRoutes = useCallback(() => {
+    const csv = driverRoutesToCsv(rows);
+    const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tournees-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [rows]);
 
   return (
     <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div>
-        <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--ink)', margin: 0 }}>Livreurs</h1>
-        <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>
-          {onlineCount} en ligne sur {rows.length} livreur{rows.length > 1 ? 's' : ''}
-        </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--ink)', margin: 0 }}>Livreurs — tournées du jour</h1>
+          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>
+            {onlineCount} en ligne sur {rows.length} livreur{rows.length > 1 ? 's' : ''} · {onRouteCount} en course
+          </p>
+        </div>
+        {rows.length > 0 && (
+          <button
+            type="button"
+            onClick={exportRoutes}
+            style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 16px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--ink)', background: '#fff' }}
+          >
+            Exporter tournées
+          </button>
+        )}
       </div>
 
       {rows.length === 0 ? (

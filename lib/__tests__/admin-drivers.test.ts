@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeDriverDayStats, buildDriverRows } from '@/lib/admin-drivers';
+import { computeDriverDayStats, buildDriverRows, driverRoutesToCsv } from '@/lib/admin-drivers';
 import type { Driver } from '@/lib/types';
 
 function driver(over: Partial<Driver> & { id: string; name: string }): Driver {
@@ -73,5 +73,21 @@ describe('buildDriverRows', () => {
     const rows = buildDriverRows(drivers, orders, tracking);
     expect(rows.map((r) => r.driver.id)).toEqual(['d3', 'd2', 'd1']);
     // d3 & d2 online (d3 has more deliveries → first); d1 offline last.
+  });
+
+  it('attaches the current route from active orders, null when none', () => {
+    const active = [{ id: 'a1', code: 'LV-9', status: 'en_route' }];
+    const activeTracking = [...tracking, { order_id: 'a1', driver_id: 'd2' }];
+    const rows = buildDriverRows(drivers, orders, activeTracking, active);
+    const byId = Object.fromEntries(rows.map((r) => [r.driver.id, r]));
+    expect(byId.d2.currentRoute).toEqual({ code: 'LV-9', status: 'en_route' });
+    expect(byId.d1.currentRoute).toBeNull();
+  });
+
+  it('exports a tournées CSV with a header and one row per driver', () => {
+    const rows = buildDriverRows(drivers, orders, tracking);
+    const lines = driverRoutesToCsv(rows).split('\n');
+    expect(lines[0]).toContain('"Livreur"');
+    expect(lines).toHaveLength(1 + rows.length);
   });
 });

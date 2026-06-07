@@ -374,7 +374,7 @@ export interface AdminDriversData {
 export async function getAdminDriversData(): Promise<AdminDriversData> {
   const supabase = await createServerSupabase();
   const since = startOfTodayISO();
-  const [driversRes, ordersRes, trackingRes] = await Promise.all([
+  const [driversRes, ordersRes, trackingRes, activeRes] = await Promise.all([
     supabase.from('drivers').select('*').order('name'),
     supabase
       .from('orders')
@@ -382,11 +382,13 @@ export async function getAdminDriversData(): Promise<AdminDriversData> {
       .eq('status', 'delivered')
       .gte('placed_at', since),
     supabase.from('order_tracking').select('order_id, driver_id').not('driver_id', 'is', null),
+    supabase.from('orders').select('id, code, status').in('status', ['ready', 'en_route']),
   ]);
   const rows = buildDriverRows(
     (driversRes.data ?? []) as Driver[],
     (ordersRes.data ?? []) as { id: string; status: string; delivery_fee_dh: number }[],
     (trackingRes.data ?? []) as { order_id: string; driver_id: string | null }[],
+    (activeRes.data ?? []) as { id: string; code: string; status: string }[],
   );
   return { rows };
 }

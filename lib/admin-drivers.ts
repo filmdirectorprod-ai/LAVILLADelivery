@@ -22,10 +22,25 @@ export interface DriverDayStats {
   earnings: number;
 }
 
+/** An order currently in a driver's hands (ready/en_route), for the "tournée du
+ *  jour" card. */
+export interface ActiveOrderLink {
+  id: string;
+  code: string;
+  status: string;
+}
+
+export interface CurrentRoute {
+  code: string;
+  status: string;
+}
+
 export interface DriverRow {
   driver: Driver;
   deliveries: number;
   earnings: number;
+  /** The order this driver is currently delivering, if any. */
+  currentRoute: CurrentRoute | null;
 }
 
 /** Accumulate per-driver day stats from today's orders. Only `delivered` orders
@@ -52,17 +67,37 @@ export function computeDriverDayStats(
   return stats;
 }
 
-/** Build the Livreurs roster rows: each driver with today's deliveries/earnings,
- *  sorted online-first, then by most deliveries, then by name. */
+/** Build the Livreurs roster rows: each driver with today's deliveries/earnings and
+ *  the order they're currently delivering (if any), sorted online-first, then by
+ *  most deliveries, then by name. */
 export function buildDriverRows(
   drivers: Driver[],
   orders: StatsOrder[],
   tracking: StatsTracking[],
+  activeOrders: ActiveOrderLink[] = [],
 ): DriverRow[] {
   const stats = computeDriverDayStats(orders, tracking);
+  // Driver → the order they're currently on (first active order found).
+  const driverByOrder = new Map<string, string>();
+  for (const t of tracking) {
+    if (t.driver_id) driverByOrder.set(t.order_id, t.driver_id);
+  }
+  const routeByDriver = new Map<string, CurrentRoute>();
+  for (const o of activeOrders) {
+    const driverId = driverByOrder.get(o.id);
+    if (driverId && !routeByDriver.has(driverId)) {
+      routeByDriver.set(driverId, { code: o.code, status: o.status });
+    }
+  }
+
   const rows = drivers.map((driver) => {
     const s = stats.get(driver.id) ?? { deliveries: 0, earnings: 0 };
-    return { driver, deliveries: s.deliveries, earnings: s.earnings };
+    return {
+      driver,
+      deliveries: s.deliveries,
+      earnings: s.earnings,
+      currentRoute: routeByDriver.get(driver.id) ?? null,
+    };
   });
   rows.sort((a, b) => {
     const onA = a.driver.is_online ? 1 : 0;
@@ -72,4 +107,23 @@ export function buildDriverRows(
     return a.driver.name.localeCompare(b.driver.name);
   });
   return rows;
+}
+
+/** Serialise the roster to a CSV of the day's tournées (one row per driver). */
+export function driverRoutesToCsv(rows: DriverRow[]): string {
+  const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  const header = ['Livreur', 'Véhicule', 'En ligne', 'Livraisons', 'Gains DH', 'Course en cours'];
+  const lines = rows.map((r) =>
+    [
+      r.driver.name,
+      r.driver.vehicle ?? '',
+      r.driver.is_online ? 'oui' : 'non',
+      r.deliveries,
+      r.earnings,
+      r.currentRoute ? r.currentRoute.code : '',
+    ]
+      .map(esc)
+      .join(','),
+  );
+  return [header.map(esc).join(','), ...lines].join('\n');
 }

@@ -3,6 +3,7 @@
 // today's deliveries + earnings. Pure presentational — all data is prop-driven.
 import { Icon } from '@/components/ui/Icon';
 import { formatDH } from '@/lib/format';
+import { orderStatusLabel } from '@/lib/order-status';
 import type { DriverRow } from '@/lib/admin-drivers';
 
 function lastSeenLabel(iso: string | null | undefined): string {
@@ -20,7 +21,7 @@ export interface DriverCardProps {
 }
 
 export function DriverCard({ row }: DriverCardProps) {
-  const { driver, deliveries, earnings } = row;
+  const { driver, deliveries, earnings, currentRoute } = row;
   const online = !!driver.is_online;
   return (
     <div
@@ -102,8 +103,18 @@ export function DriverCard({ row }: DriverCardProps) {
         </div>
       </div>
 
-      <div style={{ padding: '0 18px 14px', fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)' }}>
-        {online ? 'Actif maintenant' : lastSeenLabel(driver.last_seen)}
+      <div style={{ padding: '0 18px 16px' }}>
+        {currentRoute ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(19,124,139,0.10)', borderRadius: 12, padding: '9px 12px' }}>
+            <Icon name="scooter" size={16} color="var(--brand-d)" />
+            <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--brand-d)' }}>{currentRoute.code}</span>
+            <span style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--brand-d)', marginLeft: 'auto' }}>{orderStatusLabel(currentRoute.status)}</span>
+          </div>
+        ) : (
+          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)' }}>
+            {online ? 'Disponible — aucune course en cours' : lastSeenLabel(driver.last_seen)}
+          </div>
+        )}
       </div>
     </div>
   );
