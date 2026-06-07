@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildIncidentRows, openIncidentCount } from '@/lib/admin-incidents';
+import { buildIncidentRows, openIncidentCount, partitionIncidentRows } from '@/lib/admin-incidents';
 import type { Incident } from '@/lib/types';
 
 function incident(over: Partial<Incident> & { id: string }): Incident {
@@ -67,5 +67,22 @@ describe('openIncidentCount', () => {
       incident({ id: 'i3', status: 'open' }),
     ];
     expect(openIncidentCount(list)).toBe(2);
+  });
+});
+
+describe('partitionIncidentRows', () => {
+  it('splits into open and resolved, preserving input order', () => {
+    const rows = buildIncidentRows(
+      [
+        incident({ id: 'open-high', status: 'open', severity: 'haute' }),
+        incident({ id: 'open-low', status: 'open', severity: 'basse' }),
+        incident({ id: 'done', status: 'resolved', resolved_at: '2026-06-07T12:00:00Z' }),
+      ],
+      drivers,
+      orders,
+    );
+    const { open, resolved } = partitionIncidentRows(rows);
+    expect(open.map((r) => r.incident.id)).toEqual(['open-high', 'open-low']);
+    expect(resolved.map((r) => r.incident.id)).toEqual(['done']);
   });
 });

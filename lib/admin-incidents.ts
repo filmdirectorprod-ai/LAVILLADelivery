@@ -57,3 +57,15 @@ export function buildIncidentRows(
 export function openIncidentCount(incidents: Incident[]): number {
   return incidents.filter((i) => i.status === 'open').length;
 }
+
+/** Split already-ordered rows into open ("À traiter") and resolved buckets,
+ *  preserving the input order within each bucket. */
+export function partitionIncidentRows(rows: IncidentRow[]): { open: IncidentRow[]; resolved: IncidentRow[] } {
+  const open: IncidentRow[] = [];
+  const resolved: IncidentRow[] = [];
+  for (const r of rows) {
+    if (r.incident.status === 'resolved') resolved.push(r);
+    else open.push(r);
+  }
+  return { open, resolved };
+}

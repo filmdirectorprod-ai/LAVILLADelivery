@@ -6,7 +6,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { buildIncidentRows, openIncidentCount } from '@/lib/admin-incidents';
+import { buildIncidentRows, openIncidentCount, partitionIncidentRows } from '@/lib/admin-incidents';
 import type { AdminIncidentsData } from '@/lib/queries';
 import type { Incident } from '@/lib/types';
 import { IncidentCard } from './IncidentCard';
@@ -77,6 +77,7 @@ export function IncidentsScreen({ initial }: { initial: AdminIncidentsData }) {
   );
 
   const openCount = useMemo(() => openIncidentCount(rows.map((r) => r.incident)), [rows]);
+  const { open, resolved } = useMemo(() => partitionIncidentRows(rows), [rows]);
 
   return (
     <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -102,15 +103,35 @@ export function IncidentsScreen({ initial }: { initial: AdminIncidentsData }) {
         <IncidentForm drivers={drivers} orders={orders} busy={busy} onCreate={onCreate} onCancel={() => setShowForm(false)} />
       )}
 
-      {rows.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
-          Aucun incident. Tout roule.
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18, alignItems: 'start' }}>
-          {rows.map((row) => (
-            <IncidentCard key={row.incident.id} row={row} busy={busy} onResolve={onResolve} />
-          ))}
+      {/* À traiter */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 16, color: 'var(--ink)', margin: 0 }}>
+          À traiter · {open.length}
+        </h2>
+        {open.length === 0 ? (
+          <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: '32px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--muted)' }}>
+            Aucun incident ouvert 🎉
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18, alignItems: 'start' }}>
+            {open.map((row) => (
+              <IncidentCard key={row.incident.id} row={row} busy={busy} onResolve={onResolve} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Résolus */}
+      {resolved.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 16, color: 'var(--muted)', margin: 0 }}>
+            Résolus · {resolved.length}
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18, alignItems: 'start' }}>
+            {resolved.map((row) => (
+              <IncidentCard key={row.incident.id} row={row} busy={busy} onResolve={onResolve} />
+            ))}
+          </div>
         </div>
       )}
     </div>
