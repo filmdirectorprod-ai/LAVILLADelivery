@@ -65,6 +65,9 @@ export interface Driver {
   phone: string | null;
   /** Linked auth user (0008) — null for seeded demo drivers. */
   user_id: string | null;
+  /** Presence (0014) — set by the driver app on login/logout. */
+  is_online?: boolean;
+  last_seen?: string | null;
 }
 
 export interface Reward {

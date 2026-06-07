@@ -2,6 +2,7 @@
 // (RLS-enforced) client; catalog tables are public-read, personal tables are
 // owner-scoped by policy. Import only from Server Components / Route Handlers.
 import { createServerSupabase } from '@/lib/supabase/server';
+import { startOfTodayISO } from '@/lib/admin-overview';
 import type {
   Category,
   Product,
@@ -266,4 +267,41 @@ export async function getMyNotifications(): Promise<Notification[]> {
     .select('*')
     .order('created_at', { ascending: false });
   return data ?? [];
+}
+
+export interface AdminOverviewData {
+  /** Today's orders (placed_at >= local midnight), newest first. */
+  orders: Order[];
+  /** All drivers (for online/total counts, names, ratings). */
+  drivers: Driver[];
+  /** Every review's rating (for the average + count KPI). */
+  ratings: number[];
+  /** Driver GPS rows with coords, for the live map. */
+  tracking: Pick<OrderTracking, 'order_id' | 'driver_id' | 'lat' | 'lng' | 'updated_at'>[];
+}
+
+/**
+ * One-shot snapshot for the admin Vue d'ensemble first paint. Staff RLS (0014)
+ * lets the gérant read every customer/driver row. The client container refetches
+ * the same shapes on realtime changes and recomputes via lib/admin-overview.ts.
+ */
+export async function getAdminOverviewData(): Promise<AdminOverviewData> {
+  const supabase = await createServerSupabase();
+  const since = startOfTodayISO();
+  const [ordersRes, driversRes, reviewsRes, trackingRes] = await Promise.all([
+    supabase.from('orders').select('*').gte('placed_at', since).order('placed_at', { ascending: false }),
+    supabase.from('drivers').select('*'),
+    supabase.from('reviews').select('rating'),
+    supabase
+      .from('order_tracking')
+      .select('order_id, driver_id, lat, lng, updated_at')
+      .not('driver_id', 'is', null)
+      .not('lat', 'is', null),
+  ]);
+  return {
+    orders: ordersRes.data ?? [],
+    drivers: driversRes.data ?? [],
+    ratings: (reviewsRes.data ?? []).map((r) => (r as { rating: number }).rating),
+    tracking: trackingRes.data ?? [],
+  };
 }
