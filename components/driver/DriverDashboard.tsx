@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
+import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import type { Driver, Order, OrderTracking } from '@/lib/types';
@@ -81,7 +82,7 @@ export function DriverDashboard({
     const { data } = await supabase
       .from('orders')
       .select('*, order_tracking(*)')
-      .in('status', ['preparing', 'en_route'])
+      .in('status', DRIVER_POOL_STATUSES)
       .order('placed_at', { ascending: false });
     setBoard(mapBoard(data ?? []));
   }, []);

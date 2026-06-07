@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/lib/toast-store';
 import { formatDH } from '@/lib/format';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
+import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import { Btn } from '@/components/ui/Btn';
 import { Badge } from '@/components/ui/Badge';
 import type { Order, OrderTracking } from '@/lib/types';
@@ -51,7 +52,7 @@ export function DriverRequestsScreen({ initialBoard }: { initialBoard: DriverOrd
     const { data } = await supabase
       .from('orders')
       .select('*, order_tracking(*)')
-      .in('status', ['preparing', 'en_route'])
+      .in('status', DRIVER_POOL_STATUSES)
       .order('placed_at', { ascending: false });
     setBoard(mapBoard(data ?? []));
   }, []);

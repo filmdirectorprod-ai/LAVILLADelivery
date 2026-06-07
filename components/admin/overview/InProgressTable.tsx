@@ -2,6 +2,7 @@
 // Table of in-progress orders (preparing / en_route) for the overview. Shows the
 // order code, mode, total, status pill and assigned driver. Prop-driven.
 import { formatDH } from '@/lib/format';
+import { orderStatusLabel, orderStatusPill } from '@/lib/order-status';
 import type { Order } from '@/lib/types';
 
 export interface InProgressRow {
@@ -12,11 +13,6 @@ export interface InProgressRow {
 export interface InProgressTableProps {
   rows: InProgressRow[];
 }
-
-const STATUS_LABEL: Record<string, string> = {
-  preparing: 'En préparation',
-  en_route: 'En route',
-};
 
 export function InProgressTable({ rows }: InProgressTableProps) {
   return (
@@ -82,11 +78,11 @@ export function InProgressTable({ rows }: InProgressTableProps) {
                       fontWeight: 600,
                       padding: '4px 10px',
                       borderRadius: 999,
-                      background: order.status === 'en_route' ? 'rgba(19,124,139,0.12)' : 'rgba(168,151,35,0.14)',
-                      color: order.status === 'en_route' ? 'var(--brand-d)' : 'var(--gold)',
+                      background: orderStatusPill(order.status).bg,
+                      color: orderStatusPill(order.status).fg,
                     }}
                   >
-                    {STATUS_LABEL[order.status] ?? order.status}
+                    {orderStatusLabel(order.status)}
                   </span>
                 </td>
                 <td style={{ padding: '14px 22px', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: driverName ? 'var(--ink)' : 'var(--muted)' }}>

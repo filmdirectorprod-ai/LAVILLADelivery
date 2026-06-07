@@ -3,6 +3,7 @@
 // owner-scoped by policy. Import only from Server Components / Route Handlers.
 import { createServerSupabase } from '@/lib/supabase/server';
 import { startOfTodayISO } from '@/lib/admin-overview';
+import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import type {
   Category,
   Product,
@@ -163,7 +164,7 @@ export async function getDriverBoard(): Promise<DriverOrder[]> {
   const { data } = await supabase
     .from('orders')
     .select('*, order_tracking(*)')
-    .in('status', ['preparing', 'en_route'])
+    .in('status', DRIVER_POOL_STATUSES)
     .order('placed_at', { ascending: false });
   return (data ?? []).map((row) => {
     const { order_tracking, ...order } = row as Order & {

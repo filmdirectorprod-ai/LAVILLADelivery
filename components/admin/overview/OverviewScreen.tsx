@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
+import { isInProgressOrderStatus } from '@/lib/order-status';
 import {
   bucketOrdersByHour,
   computeOverviewKpis,
@@ -81,7 +82,7 @@ export function OverviewScreen({
     const driverIdByOrder = (orderId: string) =>
       data.tracking.find((t) => t.order_id === orderId)?.driver_id ?? null;
     return data.orders
-      .filter((o: Order) => o.status === 'preparing' || o.status === 'en_route')
+      .filter((o: Order) => isInProgressOrderStatus(o.status))
       .map((order) => ({ order, driverName: driverNameById(driverIdByOrder(order.id)) }));
   }, [data]);
 

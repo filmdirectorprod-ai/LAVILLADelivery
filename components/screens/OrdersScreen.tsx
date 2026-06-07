@@ -4,9 +4,10 @@
 // from the order status; reorder rebuilds the cart from the line snapshots.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { OrderStatus, Product } from '@/lib/types';
+import type { Product } from '@/lib/types';
 import type { OrderWithItems } from '@/lib/queries';
 import { formatDH } from '@/lib/format';
+import { isActiveOrderStatus, orderStatusLabel } from '@/lib/order-status';
 import { defaultOpts, useCart } from '@/lib/cart-store';
 import { useToast } from '@/lib/toast-store';
 import { SAFE_TOP } from '@/lib/layout';
@@ -19,8 +20,6 @@ export interface OrdersScreenProps {
   orders: OrderWithItems[];
   products: Product[];
 }
-
-const ACTIVE: OrderStatus[] = ['pending', 'preparing', 'en_route'];
 
 function whenLabel(iso: string): string {
   const d = new Date(iso);
@@ -36,7 +35,7 @@ export function OrdersScreen({ orders, products }: OrdersScreenProps) {
 
   const byId = new Map(products.map((p) => [p.id, p]));
   const list = orders.filter(({ order }) =>
-    tab === 'en_cours' ? ACTIVE.includes(order.status) : !ACTIVE.includes(order.status),
+    tab === 'en_cours' ? isActiveOrderStatus(order.status) : !isActiveOrderStatus(order.status),
   );
 
   const reorder = (items: OrderWithItems['items']) => {
@@ -66,14 +65,14 @@ export function OrdersScreen({ orders, products }: OrdersScreenProps) {
 
       <div style={{ padding: '16px 18px 0', display: 'flex', flexDirection: 'column', gap: 13 }}>
         {list.map(({ order: o, items }) => {
-          const active = ACTIVE.includes(o.status);
+          const active = isActiveOrderStatus(o.status);
           const names = items.map((it) => it.name_snapshot).join(', ');
           return (
             <div key={o.id} style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                   <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)' }}>{o.code}</span>
-                  <Badge gold={active}>{active ? '● En route' : 'Livrée'}</Badge>
+                  <Badge gold={active}>{active ? '● ' + orderStatusLabel(o.status) : orderStatusLabel(o.status)}</Badge>
                 </div>
                 <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)' }}>{whenLabel(o.placed_at)}</span>
               </div>
