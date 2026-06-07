@@ -6,6 +6,7 @@ import { startOfTodayISO } from '@/lib/admin-overview';
 import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import { buildAdminOrderRows, type AdminOrderRow } from '@/lib/admin-orders';
 import { buildDriverRows, type DriverRow } from '@/lib/admin-drivers';
+import { buildReviewRows, type ReviewRow } from '@/lib/admin-reviews';
 import type {
   Category,
   Product,
@@ -16,6 +17,7 @@ import type {
   Order,
   OrderItem,
   OrderTracking,
+  Review,
   ChatMessage,
   Reward,
   Notification,
@@ -379,6 +381,41 @@ export async function getAdminDriversData(): Promise<AdminDriversData> {
     (driversRes.data ?? []) as Driver[],
     (ordersRes.data ?? []) as { id: string; status: string; delivery_fee_dh: number }[],
     (trackingRes.data ?? []) as { order_id: string; driver_id: string | null }[],
+  );
+  return { rows };
+}
+
+export interface AdminReviewsData {
+  rows: ReviewRow[];
+}
+
+/**
+ * Snapshot for the admin Avis clients screen: every review joined to its
+ * customer, order code and delivering driver, newest first. Staff RLS (0014)
+ * exposes every review/profile/order/tracking/driver row; the join is built by
+ * lib/admin-reviews.ts so the client realtime refetch matches.
+ */
+export async function getAdminReviewsData(): Promise<AdminReviewsData> {
+  const supabase = await createServerSupabase();
+  const { data: reviews } = await supabase
+    .from('reviews')
+    .select('*')
+    .order('created_at', { ascending: false });
+  const list = (reviews ?? []) as Review[];
+
+  const [profilesRes, ordersRes, trackingRes, driversRes] = await Promise.all([
+    supabase.from('profiles').select('id, full_name'),
+    supabase.from('orders').select('id, code'),
+    supabase.from('order_tracking').select('order_id, driver_id').not('driver_id', 'is', null),
+    supabase.from('drivers').select('id, name'),
+  ]);
+
+  const rows = buildReviewRows(
+    list,
+    (profilesRes.data ?? []) as { id: string; full_name: string | null }[],
+    (ordersRes.data ?? []) as { id: string; code: string }[],
+    (trackingRes.data ?? []) as { order_id: string; driver_id: string | null }[],
+    (driversRes.data ?? []) as { id: string; name: string }[],
   );
   return { rows };
 }
