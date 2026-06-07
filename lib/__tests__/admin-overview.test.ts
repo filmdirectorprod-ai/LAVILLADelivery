@@ -7,15 +7,16 @@ import {
 } from '@/lib/admin-overview';
 
 describe('startOfTodayISO', () => {
-  it('returns midnight (local) of the given date as an ISO string', () => {
-    const ref = new Date(2026, 5, 7, 14, 30, 0); // 7 Jun 2026 14:30 local
-    const iso = startOfTodayISO(ref);
-    const back = new Date(iso);
-    expect(back.getFullYear()).toBe(2026);
-    expect(back.getMonth()).toBe(5);
-    expect(back.getDate()).toBe(7);
-    expect(back.getHours()).toBe(0);
-    expect(back.getMinutes()).toBe(0);
+  it('returns UTC midnight of the ref day (timezone-independent)', () => {
+    // Constructed in UTC so the assertion holds in any runtime timezone — the
+    // helper must produce the same boundary on a UTC server and a UTC+1 browser.
+    const ref = new Date('2026-06-07T14:30:00.000Z');
+    expect(startOfTodayISO(ref)).toBe('2026-06-07T00:00:00.000Z');
+  });
+
+  it('rolls to the correct UTC day for an evening UTC timestamp', () => {
+    const ref = new Date('2026-06-07T23:59:59.000Z');
+    expect(startOfTodayISO(ref)).toBe('2026-06-07T00:00:00.000Z');
   });
 });
 

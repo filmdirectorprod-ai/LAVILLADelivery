@@ -12,6 +12,7 @@ import {
   bucketOrdersByHour,
   computeOverviewKpis,
   latestDriverPositions,
+  startOfTodayISO,
 } from '@/lib/admin-overview';
 import type { AdminOverviewData } from '@/lib/queries';
 import type { Order } from '@/lib/types';
@@ -31,7 +32,7 @@ export function OverviewScreen({
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    const since = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+    const since = startOfTodayISO(); // shared UTC boundary — matches the server paint
     const [ordersRes, driversRes, reviewsRes, trackingRes] = await Promise.all([
       supabase.from('orders').select('*').gte('placed_at', since).order('placed_at', { ascending: false }),
       supabase.from('drivers').select('*'),

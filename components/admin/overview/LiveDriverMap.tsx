@@ -4,7 +4,7 @@
 // refits the viewport when positions change. With no Maps key it degrades to a
 // readable list so the dashboard never breaks.
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 import type { DriverPosition } from '@/lib/admin-overview';
 
@@ -18,7 +18,10 @@ export interface LiveDriverMapProps {
 
 export function LiveDriverMap({ apiKey, positions }: LiveDriverMapProps) {
   const divRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<google.maps.Map | null>(null);
+  // Map readiness is state (not a ref) so the marker-sync effect re-runs once the
+  // async Maps loader resolves — otherwise the first set of online drivers, which
+  // is already present at mount, would never be plotted.
+  const [map, setMap] = useState<google.maps.Map | null>(null);
   const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
 
   // One-time map init.
@@ -30,17 +33,16 @@ export function LiveDriverMap({ apiKey, positions }: LiveDriverMapProps) {
       .load()
       .then(() => {
         if (cancelled || !divRef.current) return;
-        const map = new google.maps.Map(divRef.current, {
+        const mapInstance = new google.maps.Map(divRef.current, {
           center: ORIGIN,
           zoom: 13,
           disableDefaultUI: true,
           clickableIcons: false,
           styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }],
         });
-        mapRef.current = map;
         new google.maps.Marker({
           position: ORIGIN,
-          map,
+          map: mapInstance,
           title: 'La Villa',
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
@@ -51,6 +53,7 @@ export function LiveDriverMap({ apiKey, positions }: LiveDriverMapProps) {
             strokeWeight: 3,
           },
         });
+        setMap(mapInstance);
       })
       .catch(() => {
         /* load failed — fallback panel covers it */
@@ -60,9 +63,8 @@ export function LiveDriverMap({ apiKey, positions }: LiveDriverMapProps) {
     };
   }, [apiKey]);
 
-  // Sync markers whenever positions change.
+  // Sync markers whenever the map becomes ready or positions change.
   useEffect(() => {
-    const map = mapRef.current;
     if (!map) return;
     const live = markersRef.current;
     const seen = new Set<string>();
@@ -103,7 +105,7 @@ export function LiveDriverMap({ apiKey, positions }: LiveDriverMapProps) {
     bounds.extend(ORIGIN);
     for (const p of positions) bounds.extend({ lat: p.lat, lng: p.lng });
     if (positions.length > 0) map.fitBounds(bounds, 60);
-  }, [positions]);
+  }, [map, positions]);
 
   const shellStyle: React.CSSProperties = {
     background: '#fff',

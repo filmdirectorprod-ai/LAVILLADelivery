@@ -3,10 +3,13 @@
 // serves the server first-paint and the client realtime refetch, and stays unit
 // testable. No React, no I/O.
 
-/** Midnight (local time) of `ref` (default: now) as an ISO string — the lower
- *  bound for "today's" orders. Local time matches the single venue's day. */
+/** UTC midnight of `ref` (default: now) as an ISO string — the lower bound for
+ *  "today's" orders. Computed in UTC (not the runtime's local time) so the
+ *  server first-paint and the client realtime refetch agree on the boundary
+ *  regardless of where each runs; otherwise a UTC server and a UTC+1 browser
+ *  would disagree about "today" for an hour around midnight. */
 export function startOfTodayISO(ref: Date = new Date()): string {
-  const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate(), 0, 0, 0, 0);
+  const d = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate()));
   return d.toISOString();
 }
 
