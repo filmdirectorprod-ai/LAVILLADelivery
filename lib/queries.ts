@@ -4,6 +4,7 @@
 import { createServerSupabase } from '@/lib/supabase/server';
 import { startOfTodayISO } from '@/lib/admin-overview';
 import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
+import { buildAdminOrderRows, type AdminOrderRow } from '@/lib/admin-orders';
 import type {
   Category,
   Product,
@@ -305,4 +306,79 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
     ratings: (reviewsRes.data ?? []).map((r) => (r as { rating: number }).rating),
     tracking: trackingRes.data ?? [],
   };
+}
+
+export interface AdminOrdersData {
+  rows: AdminOrderRow[];
+  /** All drivers, for the assignment dropdown (name-sorted). */
+  drivers: Driver[];
+}
+
+/**
+ * Snapshot for the admin Commandes first paint: the 200 most recent orders with
+ * their items, tracking, customer and driver names, plus the driver roster for
+ * reassignment. Staff RLS (0014) exposes every customer/driver row. The client
+ * container refetches the same raw shapes and rebuilds via lib/admin-orders.ts.
+ */
+export async function getAdminOrdersData(): Promise<AdminOrdersData> {
+  const supabase = await createServerSupabase();
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('*')
+    .order('placed_at', { ascending: false })
+    .limit(200);
+  const list = (orders ?? []) as Order[];
+  const ids = list.map((o) => o.id);
+
+  const [itemsRes, trackingRes, driversRes, profilesRes] = await Promise.all([
+    ids.length
+      ? supabase.from('order_items').select('*').in('order_id', ids)
+      : Promise.resolve({ data: [] as OrderItem[] }),
+    ids.length
+      ? supabase.from('order_tracking').select('*').in('order_id', ids)
+      : Promise.resolve({ data: [] as OrderTracking[] }),
+    supabase.from('drivers').select('*').order('name'),
+    supabase.from('profiles').select('id, full_name'),
+  ]);
+
+  const rows = buildAdminOrderRows(
+    list,
+    (itemsRes.data ?? []) as OrderItem[],
+    (trackingRes.data ?? []) as OrderTracking[],
+    (driversRes.data ?? []) as Driver[],
+    (profilesRes.data ?? []) as { id: string; full_name: string | null }[],
+  );
+  return { rows, drivers: (driversRes.data ?? []) as Driver[] };
+}
+
+export interface KitchenTicket {
+  order: Order;
+  items: OrderItem[];
+}
+
+/**
+ * Orders currently in the kitchen (`preparing`), oldest first (FIFO), each with
+ * its line items to prepare. Powers the Cuisine board; the client refetches the
+ * same shapes on realtime changes.
+ */
+export async function getKitchenOrdersData(): Promise<KitchenTicket[]> {
+  const supabase = await createServerSupabase();
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('status', 'preparing')
+    .order('placed_at', { ascending: true });
+  const list = (orders ?? []) as Order[];
+  const ids = list.map((o) => o.id);
+  const { data: items } = ids.length
+    ? await supabase.from('order_items').select('*').in('order_id', ids)
+    : { data: [] as OrderItem[] };
+
+  const byOrder = new Map<string, OrderItem[]>();
+  for (const it of (items ?? []) as OrderItem[]) {
+    const cur = byOrder.get(it.order_id);
+    if (cur) cur.push(it);
+    else byOrder.set(it.order_id, [it]);
+  }
+  return list.map((order) => ({ order, items: byOrder.get(order.id) ?? [] }));
 }
