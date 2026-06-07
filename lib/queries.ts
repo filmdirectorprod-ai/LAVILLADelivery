@@ -444,6 +444,22 @@ export async function getAdminProductsData(): Promise<AdminProductsData> {
   };
 }
 
+export interface AdminZonesData {
+  zones: Zone[];
+}
+
+/**
+ * Snapshot for the admin Zones de livraison screen: every delivery zone. zones is
+ * public-read (0002); CRUD goes through the admin_upsert_zone / admin_delete_zone
+ * RPCs (0017). The client refetches the same shape on realtime changes and sorts
+ * via lib/admin-zones.ts.
+ */
+export async function getAdminZonesData(): Promise<AdminZonesData> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase.from('delivery_zones').select('*').order('fee_dh');
+  return { zones: (data ?? []) as Zone[] };
+}
+
 export interface KitchenTicket {
   order: Order;
   items: OrderItem[];
