@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ADMIN_NAV, isActiveNav } from '@/lib/admin-nav';
 import { Icon } from '@/components/ui/Icon';
+import { NotificationBell } from '@/components/admin/NotificationBell';
 
 export function AdminChrome({ children, managerName }: { children: ReactNode; managerName: string }) {
   const pathname = usePathname();
@@ -73,7 +74,26 @@ export function AdminChrome({ children, managerName }: { children: ReactNode; ma
         </div>
       </aside>
 
-      <main style={{ flex: 1, minWidth: 0, overflow: 'auto', background: 'var(--soft)' }}>{children}</main>
+      <main style={{ flex: 1, minWidth: 0, overflow: 'auto', background: 'var(--soft)' }}>
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 30,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: 12,
+            padding: '12px 32px',
+            background: 'rgba(246,247,247,0.92)',
+            backdropFilter: 'blur(6px)',
+            borderBottom: '1px solid var(--line)',
+          }}
+        >
+          <NotificationBell />
+        </div>
+        {children}
+      </main>
     </div>
   );
 }

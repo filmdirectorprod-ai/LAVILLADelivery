@@ -9,7 +9,7 @@ import { buildDriverRows, type DriverRow } from '@/lib/admin-drivers';
 import { buildReviewRows, type ReviewRow } from '@/lib/admin-reviews';
 import { buildIncidentRows, type IncidentRow } from '@/lib/admin-incidents';
 import { buildShiftWeek, mondayOf, isoDate, type ShiftWeek } from '@/lib/admin-planning';
-import { buildSupportThreads } from '@/lib/admin-support';
+import { buildSupportThreads, type SupportThread, type RawSupportDriver } from '@/lib/admin-support';
 import type {
   Category,
   Product,
@@ -533,25 +533,25 @@ export async function getAdminPlanningData(ref: Date = new Date()): Promise<Admi
 }
 
 export interface AdminSupportData {
-  threads: { driver: { id: string; name: string }; messages: SupportMessage[]; unread: number }[];
+  threads: SupportThread[];
 }
 
 /**
- * Snapshot for the admin Support screen: one thread per driver that has any
- * support message, with its messages oldest-first and the staff-unread count.
- * support_messages is staff-readable across all threads (0018); the client
- * refetches the same shapes on realtime changes and rebuilds via
- * lib/admin-support.ts.
+ * Snapshot for the admin Support screen: one thread per driver in the roster
+ * (including drivers with no messages), each carrying presence/avatar/matricule,
+ * its messages oldest-first and the staff-unread count. support_messages is
+ * staff-readable across all threads (0018); the client refetches the same shapes
+ * on realtime changes and rebuilds via lib/admin-support.ts.
  */
 export async function getAdminSupportData(): Promise<AdminSupportData> {
   const supabase = await createServerSupabase();
   const [messagesRes, driversRes] = await Promise.all([
     supabase.from('support_messages').select('*').order('created_at'),
-    supabase.from('drivers').select('id, name').order('name'),
+    supabase.from('drivers').select('id, name, avatar_url, is_online').order('name'),
   ]);
   const threads = buildSupportThreads(
     (messagesRes.data ?? []) as SupportMessage[],
-    (driversRes.data ?? []) as { id: string; name: string }[],
+    (driversRes.data ?? []) as RawSupportDriver[],
   );
   return { threads };
 }

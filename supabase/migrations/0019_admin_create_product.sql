@@ -9,6 +9,19 @@
 -- appears in the customer app at once. Idempotent; safe to re-run. Run manually in
 -- the Supabase SQL editor (after 0018).
 
+-- unaccent may not be installed; provide a dependency-free fallback that maps the
+-- common French accented letters so the slug stays clean without the extension.
+-- Defined before lv_slugify because that SQL function references it and PostgreSQL
+-- validates SQL function bodies at creation time.
+create or replace function public.unaccent_safe(p_text text)
+returns text language sql immutable as $$
+  select translate(
+    p_text,
+    'àâäáãçéèêëíìîïñóòôöõúùûüýÿœæ',
+    'aaaaaceeeeiiiinooooouuuuyyoa'
+  );
+$$;
+
 -- Slugify helper: lowercases, strips accents, turns runs of non-alphanumerics into
 -- single hyphens, trims leading/trailing hyphens. Empty input falls back to 'produit'.
 create or replace function public.lv_slugify(p_text text)
@@ -24,17 +37,6 @@ returns text language sql immutable as $$
       ''
     ),
     'produit'
-  );
-$$;
-
--- unaccent may not be installed; provide a dependency-free fallback that maps the
--- common French accented letters so the slug stays clean without the extension.
-create or replace function public.unaccent_safe(p_text text)
-returns text language sql immutable as $$
-  select translate(
-    p_text,
-    'àâäáãçéèêëíìîïñóòôöõúùûüýÿœæ',
-    'aaaaaceeeeiiiinooooouuuuyyoa'
   );
 $$;
 
