@@ -163,7 +163,7 @@ export default function AuthPage() {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/brand/logo.png"
+          src="/brand/logo-client.png"
           alt="La Villa — Maison de Qualité, depuis 2007"
           style={{ width: 210, height: 'auto', display: 'block', margin: '0 auto' }}
         />

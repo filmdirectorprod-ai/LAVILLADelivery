@@ -56,9 +56,9 @@ export default function OnboardingPage() {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/brand/logo.png"
+          src="/brand/logo-client.png"
           alt="La Villa — Maison de Qualité, depuis 2007"
-          style={{ width: 116, height: 'auto', display: 'block' }}
+          style={{ width: 140, height: 'auto', display: 'block' }}
         />
       </div>
 
