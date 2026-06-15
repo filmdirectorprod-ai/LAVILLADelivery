@@ -25,12 +25,12 @@ export function AdminChrome({ children, managerName }: { children: ReactNode; ma
         }}
       >
         <div style={{ padding: '0 10px 18px' }}>
-          <div style={{ background: '#fff', borderRadius: 14, padding: '12px 14px', display: 'flex', justifyContent: 'center', boxShadow: '0 6px 16px -10px rgba(0,0,0,0.5)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 2px' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/brand/logo.png"
               alt="La Villa — Maison de Qualité, depuis 2007"
-              style={{ width: '100%', maxWidth: 180, height: 'auto', display: 'block' }}
+              style={{ width: '100%', maxWidth: 190, height: 'auto', display: 'block' }}
             />
           </div>
           <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11, letterSpacing: 1.5, color: 'var(--gold)', fontWeight: 600, marginTop: 10, textAlign: 'center' }}>
