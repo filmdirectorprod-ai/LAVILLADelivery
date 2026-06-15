@@ -10,6 +10,8 @@ import { buildReviewRows, type ReviewRow } from '@/lib/admin-reviews';
 import { buildIncidentRows, type IncidentRow } from '@/lib/admin-incidents';
 import { buildShiftWeek, mondayOf, isoDate, type ShiftWeek } from '@/lib/admin-planning';
 import { buildSupportThreads, type SupportThread, type RawSupportDriver } from '@/lib/admin-support';
+import { loadKitchenBoard } from '@/lib/kitchen-data';
+import type { KitchenBoard } from '@/lib/kitchen';
 import type {
   Category,
   Product,
@@ -140,6 +142,33 @@ export async function getMyDriver(): Promise<Driver | null> {
   if (!user) return null;
   const { data } = await supabase.from('drivers').select('*').eq('user_id', user.id).maybeSingle();
   return data ?? null;
+}
+
+/**
+ * The current driver's upcoming shifts for the "Mon planning" screen. RLS
+ * (shifts_driver_read, 0018) scopes the table to this driver's own rows; we keep
+ * only shifts that haven't ended yet, earliest first. The client refetches the
+ * same shape on realtime changes and groups via lib/driver-planning.ts.
+ */
+export async function getMyShifts(): Promise<DriverShift[]> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from('driver_shifts')
+    .select('*')
+    .gte('ends_at', new Date().toISOString())
+    .order('starts_at');
+  return (data ?? []) as DriverShift[];
+}
+
+/**
+ * The current driver's support thread with the gérant for the "Support" screen,
+ * oldest message first. RLS (support_driver_read, 0018) scopes it to this
+ * driver's own thread; the client refetches/subscribes for live replies.
+ */
+export async function getMySupportMessages(): Promise<SupportMessage[]> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase.from('support_messages').select('*').order('created_at');
+  return (data ?? []) as SupportMessage[];
 }
 
 /** The current user's profile IFF they are staff (gérant), else null. Gate for
@@ -556,34 +585,13 @@ export async function getAdminSupportData(): Promise<AdminSupportData> {
   return { threads };
 }
 
-export interface KitchenTicket {
-  order: Order;
-  items: OrderItem[];
-}
-
 /**
- * Orders currently in the kitchen (`preparing`), oldest first (FIFO), each with
- * its line items to prepare. Powers the Cuisine board; the client refetches the
- * same shapes on realtime changes.
+ * Snapshot for the redesigned Cuisine board: the three kanban columns (pending /
+ * preparing / ready), the per-station load model and the late-order codes — all
+ * derived by lib/kitchen.ts from the active+ready orders. The client refetches
+ * the same shape (via lib/kitchen-data.ts) on realtime changes.
  */
-export async function getKitchenOrdersData(): Promise<KitchenTicket[]> {
+export async function getKitchenBoard(): Promise<KitchenBoard> {
   const supabase = await createServerSupabase();
-  const { data: orders } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('status', 'preparing')
-    .order('placed_at', { ascending: true });
-  const list = (orders ?? []) as Order[];
-  const ids = list.map((o) => o.id);
-  const { data: items } = ids.length
-    ? await supabase.from('order_items').select('*').in('order_id', ids)
-    : { data: [] as OrderItem[] };
-
-  const byOrder = new Map<string, OrderItem[]>();
-  for (const it of (items ?? []) as OrderItem[]) {
-    const cur = byOrder.get(it.order_id);
-    if (cur) cur.push(it);
-    else byOrder.set(it.order_id, [it]);
-  }
-  return list.map((order) => ({ order, items: byOrder.get(order.id) ?? [] }));
+  return loadKitchenBoard(supabase);
 }

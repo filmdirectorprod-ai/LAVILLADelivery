@@ -41,6 +41,27 @@ export default function OnboardingPage() {
             'linear-gradient(to top, rgba(8,28,31,0.92) 18%, rgba(8,28,31,0.35) 52%, rgba(8,28,31,0.15) 100%)',
         }}
       />
+      {/* Logo (pastille claire pour rester lisible sur la photo sombre) */}
+      <div
+        style={{
+          position: 'absolute',
+          top: SAFE_TOP + 6,
+          left: 18,
+          zIndex: 3,
+          background: '#fff',
+          borderRadius: 14,
+          padding: '8px 12px',
+          boxShadow: '0 8px 20px -12px rgba(0,0,0,0.5)',
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/logo.png"
+          alt="La Villa — Maison de Qualité, depuis 2007"
+          style={{ width: 116, height: 'auto', display: 'block' }}
+        />
+      </div>
+
       <button
         onClick={() => router.push('/auth')}
         style={{

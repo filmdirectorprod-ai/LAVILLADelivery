@@ -14,7 +14,8 @@ import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
-import type { Driver, Order, OrderTracking } from '@/lib/types';
+import { unreadFromStaff, SUPPORT_SEEN_KEY } from '@/lib/driver-support';
+import type { Driver, Order, OrderTracking, SupportMessage } from '@/lib/types';
 import type { DriverOrder } from '@/lib/queries';
 
 const STAGE_LABEL: Record<number, string> = {
@@ -59,6 +60,7 @@ export function DriverDashboard({
   const router = useRouter();
   const [board, setBoard] = useState<DriverOrder[]>(initialBoard);
   const [online, setOnline] = useState(true);
+  const [supportUnread, setSupportUnread] = useState(0);
 
   useEffect(() => {
     const stored = localStorage.getItem(ONLINE_KEY);
@@ -99,6 +101,39 @@ export function DriverDashboard({
     };
   }, [refetch]);
 
+  // Support badge: count staff replies newer than this device's last visit.
+  const refreshSupport = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('support_messages')
+      .select('*')
+      .eq('driver_id', driver.id)
+      .order('created_at');
+    let lastSeen: string | null = null;
+    try {
+      lastSeen = localStorage.getItem(SUPPORT_SEEN_KEY);
+    } catch {
+      /* storage unavailable */
+    }
+    setSupportUnread(unreadFromStaff((data ?? []) as SupportMessage[], lastSeen));
+  }, [driver.id]);
+
+  useEffect(() => {
+    refreshSupport();
+    const supabase = createClient();
+    const channel = supabase
+      .channel('driver-support-badge')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `driver_id=eq.${driver.id}` },
+        refreshSupport,
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [driver.id, refreshSupport]);
+
   const mine = board.filter((b) => b.tracking?.driver_id === driver.id && b.tracking?.manual);
   const available = board.filter((b) => !b.tracking?.manual);
   const activeDelivery = mine[0] ?? null;
@@ -131,6 +166,36 @@ export function DriverDashboard({
             style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.14)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
           >
             <Icon name="logout" size={19} color="#fff" />
+          </button>
+        </div>
+
+        {/* Quick actions — planning + support */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <button
+            onClick={() => router.push('/driver/planning')}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 14, padding: '14px 14px', cursor: 'pointer' }}
+          >
+            <Icon name="calendar" size={20} color="#fff" />
+            <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: '#fff', whiteSpace: 'nowrap' }}>
+              Mon planning
+            </span>
+          </button>
+          <button
+            onClick={() => router.push('/driver/support')}
+            style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 14, padding: '14px 14px', cursor: 'pointer' }}
+          >
+            <Icon name="message" size={20} color="#fff" />
+            <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: '#fff', whiteSpace: 'nowrap' }}>
+              Support
+            </span>
+            {supportUnread > 0 && (
+              <span
+                aria-label={`${supportUnread} message${supportUnread > 1 ? 's' : ''} non lu${supportUnread > 1 ? 's' : ''}`}
+                style={{ position: 'absolute', top: -7, right: -7, minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, background: 'var(--gold)', color: 'var(--brand-d)', border: '2px solid var(--brand-d)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 800 }}
+              >
+                {supportUnread > 9 ? '9+' : supportUnread}
+              </span>
+            )}
           </button>
         </div>
 
