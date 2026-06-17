@@ -12,13 +12,16 @@ import { buildDriverRows, driverRoutesToCsv } from '@/lib/admin-drivers';
 import type { AdminDriversData } from '@/lib/queries';
 import type { Driver } from '@/lib/types';
 import { DriverCard } from './DriverCard';
+import { DriverAccountModal } from './DriverAccountModal';
 
 type RawOrder = { id: string; status: string; delivery_fee_dh: number };
+type AccountModal = { mode: 'new' } | { mode: 'link'; driver: { id: string; name: string } };
 type RawTracking = { order_id: string; driver_id: string | null };
 type RawActive = { id: string; code: string; status: string };
 
 export function DriversScreen({ initial }: { initial: AdminDriversData }) {
   const [rows, setRows] = useState<AdminDriversData['rows']>(initial.rows);
+  const [modal, setModal] = useState<AccountModal | null>(null);
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
@@ -81,15 +84,24 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
             {onlineCount} en ligne sur {rows.length} livreur{rows.length > 1 ? 's' : ''} · {onRouteCount} en course
           </p>
         </div>
-        {rows.length > 0 && (
+        <div style={{ display: 'flex', gap: 10 }}>
+          {rows.length > 0 && (
+            <button
+              type="button"
+              onClick={exportRoutes}
+              style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 16px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--ink)', background: '#fff' }}
+            >
+              Exporter tournées
+            </button>
+          )}
           <button
             type="button"
-            onClick={exportRoutes}
-            style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 16px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--ink)', background: '#fff' }}
+            onClick={() => setModal({ mode: 'new' })}
+            style={{ border: 'none', borderRadius: 10, padding: '9px 16px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: '#fff', background: 'var(--brand)' }}
           >
-            Exporter tournées
+            + Nouveau livreur
           </button>
-        )}
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -99,9 +111,25 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 18, alignItems: 'start' }}>
           {rows.map((row) => (
-            <DriverCard key={row.driver.id} row={row} />
+            <DriverCard
+              key={row.driver.id}
+              row={row}
+              onCreateAccess={() => setModal({ mode: 'link', driver: { id: row.driver.id, name: row.driver.name } })}
+            />
           ))}
         </div>
+      )}
+
+      {modal && (
+        <DriverAccountModal
+          mode={modal.mode}
+          driver={modal.mode === 'link' ? modal.driver : null}
+          onClose={() => setModal(null)}
+          onDone={() => {
+            setModal(null);
+            refetch();
+          }}
+        />
       )}
     </div>
   );

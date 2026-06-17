@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Btn } from '@/components/ui/Btn';
 import { Icon } from '@/components/ui/Icon';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
+import { loginToEmail } from '@/lib/driver-credentials';
 
 const fieldWrap: React.CSSProperties = {
   display: 'flex',
@@ -41,20 +42,23 @@ export default function DriverAuthPage() {
   const supabaseRef = useRef<ReturnType<typeof createClient>>();
   const getSupabase = () => (supabaseRef.current ??= createClient());
 
-  const [email, setEmail] = useState('');
+  const [identifiant, setIdentifiant] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
     setError(null);
-    if (!email || !password) {
-      setError('Renseignez votre e-mail et votre mot de passe.');
+    if (!identifiant || !password) {
+      setError('Renseignez votre identifiant et votre mot de passe.');
       return;
     }
     setBusy(true);
     try {
-      const { error } = await getSupabase().auth.signInWithPassword({ email, password });
+      const { error } = await getSupabase().auth.signInWithPassword({
+        email: loginToEmail(identifiant),
+        password,
+      });
       if (error) throw error;
       router.replace('/driver');
       router.refresh();
@@ -119,15 +123,17 @@ export default function DriverAuthPage() {
           boxShadow: '0 20px 50px -24px rgba(0,0,0,0.55)',
         }}
       >
-        <label style={labelStyle}>E-mail</label>
+        <label style={labelStyle}>Identifiant</label>
         <div style={fieldWrap}>
           <Icon name="user" size={17} color="var(--muted)" />
           <input
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="livreur@lavilla.ma"
+            type="text"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={identifiant}
+            onChange={(e) => setIdentifiant(e.target.value)}
+            placeholder="votre identifiant"
             style={fieldStyle}
           />
         </div>

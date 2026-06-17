@@ -18,11 +18,14 @@ function lastSeenLabel(iso: string | null | undefined): string {
 
 export interface DriverCardProps {
   row: DriverRow;
+  /** Open the "create login" modal for this driver (shown when it has no account). */
+  onCreateAccess?: () => void;
 }
 
-export function DriverCard({ row }: DriverCardProps) {
+export function DriverCard({ row, onCreateAccess }: DriverCardProps) {
   const { driver, deliveries, earnings, currentRoute } = row;
   const online = !!driver.is_online;
+  const hasAccount = Boolean(driver.user_id);
   return (
     <div
       style={{
@@ -114,6 +117,25 @@ export function DriverCard({ row }: DriverCardProps) {
           <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)' }}>
             {online ? 'Disponible — aucune course en cours' : lastSeenLabel(driver.last_seen)}
           </div>
+        )}
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--line)', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        {hasAccount ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: '#2f9e6f' }}>
+            <Icon name="check" size={14} color="#2f9e6f" /> Accès livreur actif
+          </span>
+        ) : (
+          <>
+            <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)' }}>Pas encore d&apos;accès</span>
+            <button
+              type="button"
+              onClick={onCreateAccess}
+              style={{ border: '1px solid var(--brand)', borderRadius: 9, padding: '7px 13px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 12.5, color: 'var(--brand)', background: '#fff' }}
+            >
+              Créer un accès
+            </button>
+          </>
         )}
       </div>
     </div>
