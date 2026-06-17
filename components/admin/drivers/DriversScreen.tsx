@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { startOfTodayISO } from '@/lib/admin-overview';
 import { buildDriverRows, driverRoutesToCsv } from '@/lib/admin-drivers';
+import { isDriverOnline } from '@/lib/admin-presence';
 import type { AdminDriversData } from '@/lib/queries';
 import type { Driver } from '@/lib/types';
 import { DriverCard } from './DriverCard';
@@ -54,12 +55,16 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_tracking' }, refetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refetch)
       .subscribe();
+    // Periodic refetch so a driver whose heartbeat went stale flips to offline
+    // even without a new DB event (lib/admin-presence applies the freshness TTL).
+    const tick = setInterval(refetch, 60_000);
     return () => {
+      clearInterval(tick);
       supabase.removeChannel(channel);
     };
   }, [refetch]);
 
-  const onlineCount = useMemo(() => rows.filter((r) => r.driver.is_online).length, [rows]);
+  const onlineCount = useMemo(() => rows.filter((r) => isDriverOnline(r.driver)).length, [rows]);
   const onRouteCount = useMemo(() => rows.filter((r) => r.currentRoute).length, [rows]);
 
   const exportRoutes = useCallback(() => {

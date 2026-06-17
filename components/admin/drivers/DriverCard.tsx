@@ -4,6 +4,7 @@
 import { Icon } from '@/components/ui/Icon';
 import { formatDH } from '@/lib/format';
 import { orderStatusLabel } from '@/lib/order-status';
+import { isDriverOnline } from '@/lib/admin-presence';
 import type { DriverRow } from '@/lib/admin-drivers';
 
 function lastSeenLabel(iso: string | null | undefined): string {
@@ -24,7 +25,7 @@ export interface DriverCardProps {
 
 export function DriverCard({ row, onCreateAccess }: DriverCardProps) {
   const { driver, deliveries, earnings, currentRoute } = row;
-  const online = !!driver.is_online;
+  const online = isDriverOnline(driver);
   const hasAccount = Boolean(driver.user_id);
   return (
     <div
