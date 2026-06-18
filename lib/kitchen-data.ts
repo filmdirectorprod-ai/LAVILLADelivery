@@ -8,8 +8,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildKitchenBoard, type KitchenBoard } from '@/lib/kitchen';
 import type { Order, OrderItem, Universe } from '@/lib/types';
 
-/** Statuses shown on the Cuisine board (the three kanban columns). */
-export const KITCHEN_STATUSES = ['pending', 'preparing', 'ready'] as const;
+/** Statuses shown on the Cuisine board (confirmed work only). */
+export const KITCHEN_STATUSES = ['preparing', 'ready'] as const;
 
 export async function loadKitchenBoard(
   supabase: SupabaseClient,

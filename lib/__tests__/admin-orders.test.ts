@@ -112,10 +112,13 @@ describe('order tabs', () => {
     expect(orderMatchesTab(rows[0], 'unassigned')).toBe(true);
     expect(orderMatchesTab(rows[2], 'unassigned')).toBe(false); // has driver
     expect(orderMatchesTab(rows[3], 'done')).toBe(true);
+    const pendingRow = buildAdminOrderRows([order({ id: 'p', status: 'pending' })], [], [], [], [])[0];
+    expect(orderMatchesTab(pendingRow, 'toconfirm')).toBe(true);
+    expect(orderMatchesTab(rows[0], 'toconfirm')).toBe(false);
   });
 
   it('counts each tab', () => {
-    expect(countOrdersByTab(rows)).toEqual({ all: 5, active: 3, unassigned: 2, done: 2 });
+    expect(countOrdersByTab(rows)).toEqual({ all: 5, toconfirm: 0, active: 3, unassigned: 2, done: 2 });
   });
 
   it('filters by tab + query', () => {

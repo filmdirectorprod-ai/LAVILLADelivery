@@ -118,9 +118,9 @@ describe('buildKitchenBoard', () => {
     return buildKitchenBoard(input);
   }
 
-  it('splits orders into columns by status', () => {
+  it('shows only confirmed columns (preparing + ready); pending is excluded', () => {
     const orders = [
-      mkOrder({ id: 'o1', status: 'pending' }),
+      mkOrder({ id: 'o1', status: 'pending' }), // awaiting confirmation → not in kitchen
       mkOrder({ id: 'o2', status: 'preparing' }),
       mkOrder({ id: 'o3', status: 'ready' }),
     ];
@@ -130,22 +130,21 @@ describe('buildKitchenBoard', () => {
       ['o3', [mkItem({ id: 'i3', order_id: 'o3', product_id: 'p1' })]],
     ]);
     const b = board(orders, items);
-    expect(b.pending.map((t) => t.order.id)).toEqual(['o1']);
     expect(b.preparing.map((t) => t.order.id)).toEqual(['o2']);
     expect(b.ready.map((t) => t.order.id)).toEqual(['o3']);
   });
 
   it('computes item counts and short customer names', () => {
-    const orders = [mkOrder({ id: 'o1', status: 'pending', user_id: 'u9' })];
+    const orders = [mkOrder({ id: 'o1', status: 'preparing', user_id: 'u9' })];
     const items = new Map([['o1', [mkItem({ id: 'i1', order_id: 'o1', product_id: 'p1', qty: 2 }), mkItem({ id: 'i2', order_id: 'o1', product_id: 'p1', qty: 3 })]]]);
     const b = board(orders, items, (u) => (u === 'u9' ? 'Mehdi Rahimi' : null));
-    expect(b.pending[0].itemCount).toBe(5);
-    expect(b.pending[0].customerName).toBe('Mehdi R.');
+    expect(b.preparing[0].itemCount).toBe(5);
+    expect(b.preparing[0].customerName).toBe('Mehdi R.');
   });
 
-  it('aggregates active orders into station load (pending + preparing only)', () => {
+  it('aggregates station load from preparing orders only', () => {
     const orders = [
-      mkOrder({ id: 'o1', status: 'pending' }),
+      mkOrder({ id: 'o1', status: 'preparing' }),
       mkOrder({ id: 'o2', status: 'preparing' }),
       mkOrder({ id: 'o3', status: 'ready' }), // ready must NOT count toward load
     ];
@@ -163,7 +162,7 @@ describe('buildKitchenBoard', () => {
   });
 
   it('caps loadPct at 100 and flags saturation when active >= capacity', () => {
-    const orders = Array.from({ length: 5 }, (_, i) => mkOrder({ id: `o${i}`, status: 'pending' }));
+    const orders = Array.from({ length: 5 }, (_, i) => mkOrder({ id: `o${i}`, status: 'preparing' }));
     const items = new Map(orders.map((o) => [o.id, [mkItem({ id: `i${o.id}`, order_id: o.id, product_id: 'p1' })]]));
     const b = board(orders, items);
     const pat = b.stations.find((s) => s.station === 'patisserie')!;
@@ -192,9 +191,9 @@ describe('buildKitchenBoard', () => {
     expect(pat.waitMinutes).toBe(0);
   });
 
-  it('lists late codes only for active orders; ready is never late', () => {
+  it('lists late codes only for preparing orders; ready is never late', () => {
     const orders = [
-      mkOrder({ id: 'o1', code: 'LV-A', status: 'pending', eta_at: '2026-06-08T11:00:00Z' }), // late
+      mkOrder({ id: 'o1', code: 'LV-A', status: 'preparing', eta_at: '2026-06-08T11:00:00Z' }), // late
       mkOrder({ id: 'o2', code: 'LV-B', status: 'preparing', eta_at: '2026-06-08T13:00:00Z' }), // on time
       mkOrder({ id: 'o3', code: 'LV-C', status: 'ready', eta_at: '2026-06-08T10:00:00Z' }), // past eta but ready → not late
     ];
@@ -205,10 +204,10 @@ describe('buildKitchenBoard', () => {
   });
 
   it('handles orders with no items map entry gracefully', () => {
-    const orders = [mkOrder({ id: 'o1', status: 'pending' })];
+    const orders = [mkOrder({ id: 'o1', status: 'preparing' })];
     const b = board(orders, new Map());
-    expect(b.pending[0].items).toEqual([]);
-    expect(b.pending[0].itemCount).toBe(0);
-    expect(b.pending[0].station).toBe('patisserie');
+    expect(b.preparing[0].items).toEqual([]);
+    expect(b.preparing[0].itemCount).toBe(0);
+    expect(b.preparing[0].station).toBe('patisserie');
   });
 });

@@ -67,18 +67,21 @@ export function filterAdminOrders(rows: AdminOrderRow[], filter: AdminOrdersFilt
 }
 
 /** The four header tabs on the Commandes screen. */
-export type OrderTab = 'all' | 'active' | 'unassigned' | 'done';
+export type OrderTab = 'all' | 'toconfirm' | 'active' | 'unassigned' | 'done';
 
 const ACTIVE_STATUSES: OrderStatus[] = ['preparing', 'ready', 'en_route'];
 const DONE_STATUSES: OrderStatus[] = ['delivered', 'cancelled'];
 
-/** Whether a row belongs to a tab. "unassigned" = an order awaiting pickup
+/** Whether a row belongs to a tab. "toconfirm" = a fresh order awaiting the
+ *  gérant's confirmation (pending). "unassigned" = an order awaiting pickup
  *  (preparing/ready) with no driver on its tracking row yet. */
 export function orderMatchesTab(row: AdminOrderRow, tab: OrderTab): boolean {
   const s = row.order.status;
   switch (tab) {
     case 'all':
       return true;
+    case 'toconfirm':
+      return s === 'pending';
     case 'active':
       return ACTIVE_STATUSES.includes(s);
     case 'unassigned':
@@ -100,9 +103,10 @@ export function filterAdminOrdersByTab(rows: AdminOrderRow[], tab: OrderTab, que
 
 /** Count of rows per tab, for the header badges. */
 export function countOrdersByTab(rows: AdminOrderRow[]): Record<OrderTab, number> {
-  const counts: Record<OrderTab, number> = { all: 0, active: 0, unassigned: 0, done: 0 };
+  const counts: Record<OrderTab, number> = { all: 0, toconfirm: 0, active: 0, unassigned: 0, done: 0 };
   for (const r of rows) {
     counts.all += 1;
+    if (orderMatchesTab(r, 'toconfirm')) counts.toconfirm += 1;
     if (orderMatchesTab(r, 'active')) counts.active += 1;
     if (orderMatchesTab(r, 'unassigned')) counts.unassigned += 1;
     if (orderMatchesTab(r, 'done')) counts.done += 1;

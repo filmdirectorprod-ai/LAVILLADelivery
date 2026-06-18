@@ -17,7 +17,7 @@ import { Icon } from '@/components/ui/Icon';
 import { StationLoadCard } from './StationLoadCard';
 import { KitchenTicketCard, type KitchenAction } from './KitchenTicketCard';
 
-const EMPTY: KitchenBoard = { pending: [], preparing: [], ready: [], stations: [], lateCodes: [] };
+const EMPTY: KitchenBoard = { preparing: [], ready: [], stations: [], lateCodes: [] };
 
 function todayLabel(): string {
   const s = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -56,7 +56,6 @@ export function KitchenScreen({ initial }: { initial: KitchenBoard }) {
     [refetch],
   );
 
-  const startAction: KitchenAction = { label: 'Démarrer la préparation', color: 'var(--brand)', onClick: callRpc('admin_start_preparation') };
   const readyAction: KitchenAction = { label: 'Marquer prête', color: 'var(--gold)', onClick: callRpc('admin_mark_order_ready') };
   const handoffAction: KitchenAction = { label: 'Remettre au livreur', color: '#2f9e6f', onClick: callRpc('admin_handoff_to_driver') };
 
@@ -104,9 +103,8 @@ export function KitchenScreen({ initial }: { initial: KitchenBoard }) {
         </div>
       )}
 
-      {/* Kanban */}
+      {/* Kanban — only confirmed work (confirmation happens in Commandes) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, alignItems: 'start' }}>
-        <KitchenColumn title="En attente" tone="var(--muted)" tickets={board.pending} busy={busy} action={startAction} />
         <KitchenColumn title="En préparation" tone="var(--brand)" tickets={board.preparing} busy={busy} action={readyAction} />
         <KitchenColumn title="Prêt" tone="#2f9e6f" tickets={board.ready} busy={busy} action={handoffAction} />
       </div>

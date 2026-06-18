@@ -46,7 +46,6 @@ export interface StationLoad {
 }
 
 export interface KitchenBoard {
-  pending: KitchenTicket[];
   preparing: KitchenTicket[];
   ready: KitchenTicket[];
   stations: StationLoad[];
@@ -54,7 +53,7 @@ export interface KitchenBoard {
 }
 
 export interface KitchenInput {
-  /** Orders with status in (pending, preparing, ready), already FIFO-ordered. */
+  /** Orders with status in (preparing, ready), already FIFO-ordered. */
   orders: Order[];
   itemsByOrder: Map<string, OrderItem[]>;
   universeOf: (productId: string | null) => Universe | null;
@@ -121,11 +120,13 @@ export function buildKitchenBoard(input: KitchenInput): KitchenBoard {
     };
   };
 
-  const pending = input.orders.filter((o) => o.status === 'pending').map((o) => make(o, true));
+  // The kitchen only shows confirmed work: preparing (cooking) + ready (waiting
+  // for a driver). Unconfirmed `pending` orders live in the Commandes "À confirmer"
+  // flow, not here.
   const preparing = input.orders.filter((o) => o.status === 'preparing').map((o) => make(o, true));
   const ready = input.orders.filter((o) => o.status === 'ready').map((o) => make(o, false));
 
-  const active = [...pending, ...preparing];
+  const active = preparing;
   const stations: StationLoad[] = STATION_ORDER.map((st) => {
     const mine = active.filter((t) => t.station === st);
     const capacity = STATION_CAPACITY[st];
@@ -146,5 +147,5 @@ export function buildKitchenBoard(input: KitchenInput): KitchenBoard {
 
   const lateCodes = active.filter((t) => t.late).map((t) => t.order.code);
 
-  return { pending, preparing, ready, stations, lateCodes };
+  return { preparing, ready, stations, lateCodes };
 }

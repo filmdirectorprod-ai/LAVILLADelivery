@@ -24,8 +24,10 @@ import {
 } from '@/lib/admin-orders';
 import type { AdminOrdersData } from '@/lib/queries';
 import type { Driver, Order, OrderItem, OrderTracking } from '@/lib/types';
+import { OrderConfirmPanel } from './OrderConfirmPanel';
 
 const TABS: { value: OrderTab; label: string }[] = [
+  { value: 'toconfirm', label: 'À confirmer' },
   { value: 'all', label: 'Toutes' },
   { value: 'active', label: 'En cours' },
   { value: 'unassigned', label: 'À assigner' },
@@ -39,10 +41,11 @@ function timeLabel(iso: string): string {
 export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
   const [rows, setRows] = useState<AdminOrderRow[]>(initial.rows);
   const [drivers, setDrivers] = useState<Driver[]>(initial.drivers);
-  const [tab, setTab] = useState<OrderTab>('all');
+  const [tab, setTab] = useState<OrderTab>('toconfirm');
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [autoAssign, setAutoAssign] = useState(false);
+  const [confirmRow, setConfirmRow] = useState<AdminOrderRow | null>(null);
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
@@ -141,7 +144,7 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
         <div>
           <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--ink)', margin: 0 }}>Commandes</h1>
           <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>
-            {counts.active} en cours · {counts.unassigned} à assigner
+            {counts.toconfirm} à confirmer · {counts.active} en cours · {counts.unassigned} à assigner
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -252,6 +255,15 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
                     </td>
                     <td style={{ padding: '12px 18px', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
+                        {r.order.status === 'pending' && (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmRow(r)}
+                            style={{ border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 700, color: '#fff', background: '#2f9e6f' }}
+                          >
+                            Vérifier
+                          </button>
+                        )}
                         {r.order.status === 'preparing' && (
                           <button
                             type="button"
@@ -262,7 +274,7 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
                             Prête
                           </button>
                         )}
-                        {canCancel && (
+                        {r.order.status !== 'pending' && canCancel && (
                           <button
                             type="button"
                             disabled={busy}
@@ -282,6 +294,17 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
           </table>
         )}
       </div>
+
+      {confirmRow && (
+        <OrderConfirmPanel
+          row={confirmRow}
+          onClose={() => setConfirmRow(null)}
+          onDone={() => {
+            setConfirmRow(null);
+            refetch();
+          }}
+        />
+      )}
     </div>
   );
 }
