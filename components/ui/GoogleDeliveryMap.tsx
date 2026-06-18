@@ -7,8 +7,8 @@
 import { useEffect, useRef } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 
-// La Villa — Av. Hassan II, Ville Nouvelle, Fès (delivery origin).
-const ORIGIN = { lat: 34.0331, lng: -4.9998 };
+// La Villa — 117 Av. Mohammed Bahnini, Ville Nouvelle, Fès (delivery origin).
+const ORIGIN = { lat: 34.0261, lng: -5.014 };
 // Fallback destination if the address can't be geocoded (matches the SVG route end).
 const FALLBACK_DEST = { lat: 34.041, lng: -4.9897 };
 

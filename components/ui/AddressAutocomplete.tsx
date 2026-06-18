@@ -8,7 +8,8 @@
 'use client';
 import { useRef, useState } from 'react';
 
-const FES = { latitude: 34.033, longitude: -4.999 };
+// La Villa — 117 Av. Mohammed Bahnini, Fès: bias suggestions around the shop.
+const FES = { latitude: 34.0261, longitude: -5.014 };
 const KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 export interface PlaceResult {
