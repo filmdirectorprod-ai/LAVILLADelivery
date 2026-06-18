@@ -8,8 +8,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 import type { DriverPosition } from '@/lib/admin-overview';
 
-// La Villa — Av. Hassan II, Ville Nouvelle, Fès (delivery origin).
-const ORIGIN = { lat: 34.0331, lng: -4.9998 };
+// La Villa — 117 Av. Mohammed Bahnini, Ville Nouvelle, Fès (delivery origin).
+const ORIGIN = { lat: 34.0261, lng: -5.014 };
 
 export interface LiveDriverMapProps {
   apiKey: string | undefined;

@@ -5,13 +5,13 @@ import { useState } from 'react';
 import { SAFE_BOTTOM } from '@/lib/layout';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Icon } from '@/components/ui/Icon';
+import { LA_VILLA_BRANCHES } from '@/lib/branches';
 
 // Coordonnées La Villa — à ajuster avec les vraies infos de la maison.
 const PHONE_DISPLAY = '+212 5 35 00 00 00';
 const PHONE_TEL = '+212535000000';
 const WHATSAPP = '212600000000';
 const EMAIL = 'contact@lavilla.ma';
-const ADDRESS = 'La Villa — Av. Hassan II, Ville Nouvelle, Fès';
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -92,10 +92,15 @@ export function HelpScreen({ email = EMAIL }: HelpScreenProps) {
             <Icon name="clock" size={18} color="var(--brand)" />
             <span style={{ fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--ink)', fontWeight: 500 }}>Tous les jours · 8h – 22h</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginTop: 11 }}>
-            <Icon name="pin" size={18} color="var(--brand)" />
-            <span style={{ fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--ink)', fontWeight: 500 }}>{ADDRESS}</span>
-          </div>
+          {LA_VILLA_BRANCHES.map((b) => (
+            <div key={b.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, marginTop: 11 }}>
+              <Icon name="pin" size={18} color="var(--brand)" />
+              <span style={{ fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--ink)', fontWeight: 500, lineHeight: 1.4 }}>
+                <strong>{b.name}</strong><br />
+                {b.address}
+              </span>
+            </div>
+          ))}
         </div>
 
         {/* FAQ */}

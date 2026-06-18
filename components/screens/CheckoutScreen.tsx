@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import type { Address, Product, Profile, Zone } from '@/lib/types';
 import { formatDH } from '@/lib/format';
 import { computeOrder, REDEEM_PALIERS } from '@/lib/pricing';
+import { LA_VILLA_BRANCHES, DEFAULT_BRANCH, findBranch, branchPickupLabel } from '@/lib/branches';
 import { useCart } from '@/lib/cart-store';
 import { useOrderMode } from '@/lib/order-store';
 import { useToast } from '@/lib/toast-store';
@@ -77,6 +78,7 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
   const defaultAddressId = addresses[0]?.id ?? null;
   const [addressId, setAddressId] = useState<string | null>(defaultAddressId);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickupBranchId, setPickupBranchId] = useState(DEFAULT_BRANCH.id);
   const selectedAddress = useMemo(
     () => addresses.find((a) => a.id === addressId) ?? null,
     [addresses, addressId],
@@ -135,7 +137,7 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
           mode,
           address:
             mode === 'retrait'
-              ? 'Retrait boutique — La Villa, Av. Hassan II, Fès'
+              ? branchPickupLabel(findBranch(pickupBranchId))
               : selectedAddress
                 ? formatAddress(selectedAddress)
                 : '',
@@ -268,24 +270,39 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
           </h3>
 
           {mode === 'retrait' ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                background: '#fff',
-                border: '1px solid var(--line)',
-                borderRadius: 16,
-                padding: '14px 15px',
-              }}
-            >
-              <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(19,124,139,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Icon name="store" size={20} color="var(--brand)" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>La Villa — Av. Hassan II</div>
-                <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>Fès, ouvert jusqu&apos;à 23h</div>
-              </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {LA_VILLA_BRANCHES.map((b) => {
+                const sel = b.id === pickupBranchId;
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => setPickupBranchId(b.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      width: '100%',
+                      textAlign: 'left',
+                      background: '#fff',
+                      border: sel ? '1.5px solid var(--brand)' : '1px solid var(--line)',
+                      borderRadius: 16,
+                      padding: '14px 15px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(19,124,139,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon name="store" size={20} color="var(--brand)" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>{b.name}</div>
+                      <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>{b.address}</div>
+                    </div>
+                    <span style={{ width: 20, height: 20, borderRadius: 999, border: sel ? 'none' : '1.5px solid var(--line)', background: sel ? 'var(--brand)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {sel && <Icon name="check" size={13} color="#fff" strokeWidth={2.4} />}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           ) : addresses.length === 0 ? (
             // No saved address — prompt the user to add one.
