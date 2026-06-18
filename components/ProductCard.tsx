@@ -66,6 +66,13 @@ export function ProductCard({ p, onOpen, fav, onFav, onAdd }: ProductCardProps) 
             <Badge gold>{goldTag}</Badge>
           </div>
         )}
+        {!p.in_stock && (
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 700, color: '#fff', background: '#d24b4b', borderRadius: 999, padding: '5px 14px' }}>
+              Rupture de stock
+            </span>
+          </div>
+        )}
       </div>
       <div
         style={{
@@ -110,19 +117,21 @@ export function ProductCard({ p, onOpen, fav, onFav, onAdd }: ProductCardProps) 
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onAdd?.();
+              if (p.in_stock) onAdd?.();
             }}
+            disabled={!p.in_stock}
+            title={p.in_stock ? 'Ajouter au panier' : 'Rupture de stock'}
             style={{
               width: 32,
               height: 32,
               borderRadius: 10,
-              background: 'var(--brand)',
+              background: p.in_stock ? 'var(--brand)' : 'var(--line)',
               border: 'none',
-              cursor: 'pointer',
+              cursor: p.in_stock ? 'pointer' : 'not-allowed',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 6px 14px -6px var(--brand)',
+              boxShadow: p.in_stock ? '0 6px 14px -6px var(--brand)' : 'none',
             }}
           >
             <Icon name="plus" size={17} color="#fff" strokeWidth={2.2} />

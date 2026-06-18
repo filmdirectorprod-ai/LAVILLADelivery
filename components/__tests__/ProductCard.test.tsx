@@ -21,6 +21,7 @@ const product: Product = {
   tags: ['Chef', 'Fait maison'],
   is_signature: true,
   active: true,
+  in_stock: true,
   created_at: '2026-01-01T00:00:00Z',
 };
 

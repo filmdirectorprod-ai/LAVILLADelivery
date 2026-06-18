@@ -14,10 +14,13 @@ export interface ProductCardProps {
   busy: boolean;
   onToggleActive: (product: Product) => void;
   onToggleSignature: (product: Product) => void;
+  onToggleStock: (product: Product) => void;
   onSavePrice: (product: Product, price: number) => void;
+  onEdit: (product: Product) => void;
+  onDelete: (product: Product) => void;
 }
 
-export function ProductCard({ product, busy, onToggleActive, onToggleSignature, onSavePrice }: ProductCardProps) {
+export function ProductCard({ product, busy, onToggleActive, onToggleSignature, onToggleStock, onSavePrice, onEdit, onDelete }: ProductCardProps) {
   const [price, setPrice] = useState(String(product.price_dh));
   const parsed = Number(price);
   const dirty = price.trim() !== '' && Number.isFinite(parsed) && parsed >= 0 && parsed !== product.price_dh;
@@ -54,6 +57,11 @@ export function ProductCard({ product, busy, onToggleActive, onToggleSignature, 
         <span style={{ position: 'absolute', top: 10, right: 10, fontFamily: 'var(--ui-font)', fontSize: 11, fontWeight: 600, color: product.active ? 'var(--brand-d)' : 'var(--muted)', background: product.active ? 'rgba(255,255,255,0.92)' : 'var(--soft)', borderRadius: 999, padding: '3px 9px' }}>
           {product.active ? 'En vente' : 'Masqué'}
         </span>
+        {!product.in_stock && (
+          <span style={{ position: 'absolute', bottom: 10, left: 10, fontFamily: 'var(--ui-font)', fontSize: 11, fontWeight: 700, color: '#fff', background: '#d24b4b', borderRadius: 999, padding: '3px 9px' }}>
+            Rupture de stock
+          </span>
+        )}
       </div>
 
       <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -105,6 +113,35 @@ export function ProductCard({ product, busy, onToggleActive, onToggleSignature, 
             style={{ flex: 1, border: 'none', borderRadius: 8, padding: '6px 10px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: product.active ? 'var(--brand-d)' : 'var(--muted)', background: product.active ? 'rgba(19,124,139,0.12)' : 'var(--soft)' }}
           >
             {product.active ? 'En vente' : 'Masqué'}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onToggleStock(product)}
+          style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '7px 10px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: product.in_stock ? '#2f9e6f' : '#d24b4b', background: product.in_stock ? 'rgba(47,158,111,0.12)' : 'rgba(210,75,75,0.12)' }}
+        >
+          <span style={{ width: 8, height: 8, borderRadius: 999, background: product.in_stock ? '#2f9e6f' : '#d24b4b' }} />
+          {product.in_stock ? 'En stock' : 'Rupture de stock'}
+        </button>
+
+        <div style={{ display: 'flex', gap: 8, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onEdit(product)}
+            style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '7px 10px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+          >
+            <Icon name="edit" size={13} color="var(--ink)" /> Modifier
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onDelete(product)}
+            style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '7px 10px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#C0392B', background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+          >
+            <Icon name="x" size={13} color="#C0392B" /> Supprimer
           </button>
         </div>
       </div>

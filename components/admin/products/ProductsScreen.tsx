@@ -14,12 +14,14 @@ import type { AdminProductsData } from '@/lib/queries';
 import type { Product, Category } from '@/lib/types';
 import { ProductCard } from './ProductCard';
 import { ProductForm, type ProductDraft } from './ProductForm';
+import { ProductEditModal } from './ProductEditModal';
 
 export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
   const [products, setProducts] = useState<Product[]>(initial.products);
   const [categories, setCategories] = useState<Category[]>(initial.categories);
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Product | null>(null);
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
@@ -44,7 +46,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
   }, [refetch]);
 
   const update = useCallback(
-    async (product: Product, patch: { active?: boolean; price_dh?: number; is_signature?: boolean }) => {
+    async (product: Product, patch: { active?: boolean; price_dh?: number; is_signature?: boolean; in_stock?: boolean }) => {
       setBusy(true);
       const supabase = createClient();
       await supabase.rpc('admin_update_product', {
@@ -52,9 +54,23 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
         p_active: patch.active ?? product.active,
         p_price_dh: patch.price_dh ?? product.price_dh,
         p_is_signature: patch.is_signature ?? product.is_signature,
+        p_in_stock: patch.in_stock ?? product.in_stock,
       });
       setBusy(false);
       refetch();
+    },
+    [refetch],
+  );
+
+  const onDelete = useCallback(
+    async (p: Product) => {
+      if (!window.confirm(`Supprimer « ${p.name} » du catalogue ? Cette action est irréversible.`)) return;
+      setBusy(true);
+      const supabase = createClient();
+      const { error } = await supabase.rpc('admin_delete_product', { p_product: p.id });
+      setBusy(false);
+      if (error) window.alert('Suppression échouée : ' + error.message);
+      else refetch();
     },
     [refetch],
   );
@@ -81,6 +97,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
 
   const onToggleActive = useCallback((p: Product) => update(p, { active: !p.active }), [update]);
   const onToggleSignature = useCallback((p: Product) => update(p, { is_signature: !p.is_signature }), [update]);
+  const onToggleStock = useCallback((p: Product) => update(p, { in_stock: !p.in_stock }), [update]);
   const onSavePrice = useCallback((p: Product, price_dh: number) => update(p, { price_dh }), [update]);
 
   const groups = useMemo(() => buildProductGroups(products, categories), [products, categories]);
@@ -131,12 +148,27 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
                   busy={busy}
                   onToggleActive={onToggleActive}
                   onToggleSignature={onToggleSignature}
+                  onToggleStock={onToggleStock}
                   onSavePrice={onSavePrice}
+                  onEdit={setEditing}
+                  onDelete={onDelete}
                 />
               ))}
             </div>
           </div>
         ))
+      )}
+
+      {editing && (
+        <ProductEditModal
+          product={editing}
+          categories={categories}
+          onClose={() => setEditing(null)}
+          onDone={() => {
+            setEditing(null);
+            refetch();
+          }}
+        />
       )}
     </div>
   );

@@ -380,12 +380,18 @@ export function ProductScreen({ product: p }: ProductScreenProps) {
           padding: `12px 18px ${SAFE_BOTTOM + 12}px`,
         }}
       >
-        <Btn full size="lg" onClick={addToCart}>
-          <span style={{ display: 'inline-flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Ajouter au panier</span>
-            <span style={{ fontWeight: 700 }}>{formatDH(total)}</span>
-          </span>
-        </Btn>
+        {p.in_stock ? (
+          <Btn full size="lg" onClick={addToCart}>
+            <span style={{ display: 'inline-flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Ajouter au panier</span>
+              <span style={{ fontWeight: 700 }}>{formatDH(total)}</span>
+            </span>
+          </Btn>
+        ) : (
+          <div style={{ textAlign: 'center', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: '#fff', background: '#d24b4b', borderRadius: 14, padding: '15px' }}>
+            Rupture de stock
+          </div>
+        )}
       </div>
     </div>
   );

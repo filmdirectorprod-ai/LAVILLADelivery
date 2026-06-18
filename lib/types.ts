@@ -46,6 +46,8 @@ export interface Product {
   tags: string[];
   is_signature: boolean;
   active: boolean;
+  /** In stock vs out of stock (0029). Distinct from `active` (listed for sale). */
+  in_stock: boolean;
   created_at: string;
 }
 

@@ -17,6 +17,7 @@ function product(over: Partial<Product> & { id: string; name: string; category: 
     tags: [],
     is_signature: false,
     active: true,
+    in_stock: true,
     created_at: '2026-06-07T10:00:00Z',
     ...over,
   };
