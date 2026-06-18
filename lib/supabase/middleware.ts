@@ -52,15 +52,23 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && !isPublic(pathname)) {
     const url = request.nextUrl.clone();
-    // Drivers get their own sign-in screen; everyone else, the customer onboarding.
-    url.pathname = pathname.startsWith('/driver') ? '/auth/livreur' : '/onboarding';
+    // Each surface has its own sign-in: admin, driver, else the customer onboarding.
+    url.pathname = pathname.startsWith('/admin')
+      ? '/auth/admin'
+      : pathname.startsWith('/driver')
+        ? '/auth/livreur'
+        : '/onboarding';
     return NextResponse.redirect(url);
   }
 
   if (user && isPublic(pathname)) {
     const url = request.nextUrl.clone();
-    // A signed-in user landing on the driver sign-in goes to the driver app.
-    url.pathname = pathname.startsWith('/auth/livreur') ? '/driver' : '/';
+    // Send a signed-in user from a surface's sign-in to that surface.
+    url.pathname = pathname.startsWith('/auth/admin')
+      ? '/admin'
+      : pathname.startsWith('/auth/livreur')
+        ? '/driver'
+        : '/';
     return NextResponse.redirect(url);
   }
 
