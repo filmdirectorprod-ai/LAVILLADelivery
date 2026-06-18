@@ -6,7 +6,8 @@
 // into an admin_create_product RPC (0019). A product published here is public-read
 // at once, so it shows up in the customer app immediately.
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { Icon } from '@/components/ui/Icon';
 import type { Category, Universe } from '@/lib/types';
 
 export interface ProductDraft {
@@ -17,6 +18,8 @@ export interface ProductDraft {
   photo_label: string;
   is_signature: boolean;
   active: boolean;
+  /** Optional photo chosen at creation; uploaded by the container after insert. */
+  imageFile: File | null;
 }
 
 export interface ProductFormProps {
@@ -46,6 +49,14 @@ export function ProductForm({ categories, busy, onCreate, onCancel }: ProductFor
   const [photoLabel, setPhotoLabel] = useState('');
   const [isSignature, setIsSignature] = useState(false);
   const [active, setActive] = useState(true);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  function pickImage(f: File | null) {
+    setImageFile(f);
+    setPreview(f ? URL.createObjectURL(f) : null);
+  }
 
   // Categories valid for the chosen universe ('all' categories show everywhere).
   const universeCategories = useMemo(
@@ -97,8 +108,26 @@ export function ProductForm({ categories, busy, onCreate, onCancel }: ProductFor
         </label>
       </div>
 
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+        <div style={{ width: 72, height: 72, borderRadius: 10, background: 'var(--soft)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="aperçu" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <Icon name="camera" size={22} color="var(--line)" />
+          )}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => pickImage(e.target.files?.[0] ?? null)} />
+          <button type="button" disabled={busy} onClick={() => fileRef.current?.click()} style={{ border: '1px solid var(--brand)', borderRadius: 9, padding: '7px 13px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--brand)', background: '#fff' }}>
+            {preview ? 'Changer la photo' : 'Ajouter une photo (optionnel)'}
+          </button>
+          {preview && <button type="button" onClick={() => pickImage(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12, color: '#C0392B', textAlign: 'left' }}>Retirer</button>}
+        </div>
+      </div>
+
       <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <span style={labelStyle}>Légende photo (optionnel)</span>
+        <span style={labelStyle}>Légende photo (si pas d&apos;image)</span>
         <input style={field} value={photoLabel} disabled={busy} onChange={(e) => setPhotoLabel(e.target.value)} placeholder="Fraises de Meknès, crème légère" />
       </label>
 
@@ -126,6 +155,7 @@ export function ProductForm({ categories, busy, onCreate, onCancel }: ProductFor
               photo_label: photoLabel.trim(),
               is_signature: isSignature,
               active,
+              imageFile,
             })
           }
           style={{ border: 'none', borderRadius: 10, padding: '9px 18px', cursor: busy || !valid ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: '#fff', background: 'var(--brand)', opacity: valid && !busy ? 1 : 0.5 }}

@@ -79,7 +79,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
     async (draft: ProductDraft) => {
       setBusy(true);
       const supabase = createClient();
-      await supabase.rpc('admin_create_product', {
+      const { data: newId } = await supabase.rpc('admin_create_product', {
         p_name: draft.name,
         p_universe: draft.universe,
         p_category: draft.category,
@@ -88,6 +88,19 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
         p_is_signature: draft.is_signature,
         p_active: draft.active,
       });
+      // Upload the chosen photo (if any) now that we have the product id.
+      if (draft.imageFile && typeof newId === 'string') {
+        const file = draft.imageFile;
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+        const path = `${newId}/${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from('product-images')
+          .upload(path, file, { upsert: true, contentType: file.type });
+        if (!upErr) {
+          const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+          await supabase.rpc('admin_set_product_image', { p_product: newId, p_image_url: data.publicUrl });
+        }
+      }
       setBusy(false);
       setShowForm(false);
       refetch();
