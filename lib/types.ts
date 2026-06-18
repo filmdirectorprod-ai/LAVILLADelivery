@@ -55,6 +55,8 @@ export interface Zone {
   fee_dh: number;
   eta_min: number;
   eta_max: number;
+  /** Neighbourhood boundary as a ring of [lng, lat] points (0025), or null. */
+  polygon: [number, number][] | null;
 }
 
 export interface Driver {
@@ -108,6 +110,9 @@ export interface Address {
   city: string;
   zone_id: string | null;
   details: string | null;
+  /** Geocoded coordinates from Places autocomplete (0025), or null. */
+  lat: number | null;
+  lng: number | null;
   is_default: boolean;
   created_at: string;
 }

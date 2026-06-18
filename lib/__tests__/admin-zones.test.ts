@@ -6,6 +6,7 @@ const zone = (over: Partial<Zone> & { id: string; name: string }): Zone => ({
   fee_dh: 10,
   eta_min: 20,
   eta_max: 40,
+  polygon: null,
   ...over,
 });
 

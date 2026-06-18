@@ -7,8 +7,10 @@ import type { Address, Zone } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/lib/toast-store';
 import { formatDH } from '@/lib/format';
+import { resolveZone } from '@/lib/geo';
 import { SAFE_BOTTOM } from '@/lib/layout';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 import { Btn } from '@/components/ui/Btn';
 import { Icon } from '@/components/ui/Icon';
 
@@ -47,6 +49,10 @@ type Draft = {
   recipient: string;
   phone: string;
   is_default: boolean;
+  lat: number | null;
+  lng: number | null;
+  /** True when the picked point fell outside every covered neighbourhood. */
+  outOfArea: boolean;
 };
 
 const emptyDraft = (isFirst: boolean, recipient = '', phone = ''): Draft => ({
@@ -58,6 +64,9 @@ const emptyDraft = (isFirst: boolean, recipient = '', phone = ''): Draft => ({
   recipient,
   phone,
   is_default: isFirst,
+  lat: null,
+  lng: null,
+  outOfArea: false,
 });
 
 const toDraft = (a: Address): Draft => ({
@@ -70,6 +79,9 @@ const toDraft = (a: Address): Draft => ({
   recipient: a.recipient ?? '',
   phone: a.phone ?? '',
   is_default: a.is_default,
+  lat: a.lat,
+  lng: a.lng,
+  outOfArea: false,
 });
 
 export interface AddressesScreenProps {
@@ -122,6 +134,8 @@ export function AddressesScreen({ addresses: initial, zones, defaultRecipient = 
         recipient: draft.recipient.trim() || null,
         phone: draft.phone.trim() || null,
         is_default: draft.is_default,
+        lat: draft.lat,
+        lng: draft.lng,
       };
 
       if (draft.id) {
@@ -179,7 +193,19 @@ export function AddressesScreen({ addresses: initial, zones, defaultRecipient = 
             <label style={labelStyle}>Adresse</label>
             <div style={fieldWrap}>
               <Icon name="pin" size={17} color="var(--muted)" />
-              <input value={draft.line1} onChange={(e) => set({ line1: e.target.value })} placeholder="Av. Hassan II, Rés. Les Jardins…" style={fieldStyle} />
+              <AddressAutocomplete
+                value={draft.line1}
+                onChange={(v) => set({ line1: v })}
+                onPlace={(p) => {
+                  const r = resolveZone(p.lat, p.lng, zones);
+                  set({ line1: p.formatted, lat: p.lat, lng: p.lng, zone_id: r.zone?.id ?? draft.zone_id, outOfArea: r.outOfArea });
+                }}
+                placeholder="Commencez à taper votre adresse…"
+                style={fieldStyle}
+              />
+            </div>
+            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>
+              Choisissez une suggestion pour détecter la zone automatiquement.
             </div>
           </div>
 
@@ -192,12 +218,12 @@ export function AddressesScreen({ addresses: initial, zones, defaultRecipient = 
           </div>
 
           <div style={{ marginTop: 14 }}>
-            <label style={labelStyle}>Zone de livraison</label>
+            <label style={labelStyle}>Zone de livraison {draft.lat != null && '(détectée automatiquement)'}</label>
             <div style={fieldWrap}>
               <Icon name="scooter" size={17} color="var(--muted)" />
               <select
                 value={draft.zone_id ?? ''}
-                onChange={(e) => set({ zone_id: e.target.value || null })}
+                onChange={(e) => set({ zone_id: e.target.value || null, outOfArea: false })}
                 style={{ ...fieldStyle, appearance: 'none' }}
               >
                 <option value="">Choisir une zone…</option>
@@ -209,6 +235,11 @@ export function AddressesScreen({ addresses: initial, zones, defaultRecipient = 
               </select>
               <Icon name="down" size={16} color="var(--muted)" />
             </div>
+            {draft.outOfArea && (
+              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: '#8a7a14', background: 'rgba(168,151,35,0.12)', borderRadius: 8, padding: '7px 10px', marginTop: 6 }}>
+                Hors quartier couvert — frais de livraison maximum appliqués. Vous pouvez ajuster la zone ci-dessus.
+              </div>
+            )}
           </div>
 
           <div style={{ marginTop: 14 }}>
