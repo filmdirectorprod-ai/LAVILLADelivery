@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isDriverOnline, countOnline, PRESENCE_TTL_MS } from '@/lib/admin-presence';
+import { isDriverOnline, countOnline, driverStatus, PRESENCE_TTL_MS } from '@/lib/admin-presence';
 
 const NOW = new Date('2026-06-16T12:00:00Z');
 const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
@@ -23,6 +23,20 @@ describe('isDriverOnline', () => {
   it('offline on missing/invalid data', () => {
     expect(isDriverOnline({}, NOW)).toBe(false);
     expect(isDriverOnline({ is_online: true, last_seen: 'nope' }, NOW)).toBe(false);
+  });
+});
+
+describe('driverStatus', () => {
+  it('is delivering when on a route (even if heartbeat lapsed)', () => {
+    expect(driverStatus({ is_online: false, last_seen: null }, true, NOW)).toBe('delivering');
+    expect(driverStatus({ is_online: true, last_seen: ago(30_000) }, true, NOW)).toBe('delivering');
+  });
+  it('is available when online and free', () => {
+    expect(driverStatus({ is_online: true, last_seen: ago(30_000) }, false, NOW)).toBe('available');
+  });
+  it('is offline when not online and no route', () => {
+    expect(driverStatus({ is_online: false, last_seen: ago(30_000) }, false, NOW)).toBe('offline');
+    expect(driverStatus({ is_online: true, last_seen: ago(PRESENCE_TTL_MS + 1000) }, false, NOW)).toBe('offline');
   });
 });
 

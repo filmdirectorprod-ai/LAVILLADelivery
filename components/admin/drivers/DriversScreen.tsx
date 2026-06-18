@@ -14,6 +14,7 @@ import type { AdminDriversData } from '@/lib/queries';
 import type { Driver } from '@/lib/types';
 import { DriverCard } from './DriverCard';
 import { DriverAccountModal } from './DriverAccountModal';
+import { DriverEditModal } from './DriverEditModal';
 
 type RawOrder = { id: string; status: string; delivery_fee_dh: number };
 type AccountModal = { mode: 'new' } | { mode: 'link'; driver: { id: string; name: string } };
@@ -23,6 +24,20 @@ type RawActive = { id: string; code: string; status: string };
 export function DriversScreen({ initial }: { initial: AdminDriversData }) {
   const [rows, setRows] = useState<AdminDriversData['rows']>(initial.rows);
   const [modal, setModal] = useState<AccountModal | null>(null);
+  const [editDriver, setEditDriver] = useState<Driver | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const onDelete = useCallback(
+    async (driver: Driver) => {
+      if (!window.confirm(`Supprimer le livreur « ${driver.name} » ? Son compte de connexion sera aussi supprimé. Cette action est irréversible.`)) return;
+      setBusy(true);
+      const supabase = createClient();
+      const { error } = await supabase.rpc('admin_delete_driver', { p_id: driver.id });
+      setBusy(false);
+      if (error) window.alert('Suppression échouée : ' + error.message);
+    },
+    [],
+  );
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
@@ -120,6 +135,8 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
               key={row.driver.id}
               row={row}
               onCreateAccess={() => setModal({ mode: 'link', driver: { id: row.driver.id, name: row.driver.name } })}
+              onEdit={() => setEditDriver(row.driver)}
+              onDelete={() => !busy && onDelete(row.driver)}
             />
           ))}
         </div>
@@ -132,6 +149,17 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
           onClose={() => setModal(null)}
           onDone={() => {
             setModal(null);
+            refetch();
+          }}
+        />
+      )}
+
+      {editDriver && (
+        <DriverEditModal
+          driver={editDriver}
+          onClose={() => setEditDriver(null)}
+          onDone={() => {
+            setEditDriver(null);
             refetch();
           }}
         />

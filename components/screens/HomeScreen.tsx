@@ -12,6 +12,7 @@ import { useOrderMode } from '@/lib/order-store';
 import { useToast } from '@/lib/toast-store';
 import { SAFE_TOP } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
+import { UserNotificationBell } from '@/components/ui/UserNotificationBell';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import { Chip } from '@/components/ui/Chip';
 import { Badge } from '@/components/ui/Badge';
@@ -29,7 +30,7 @@ export interface HomeScreenProps {
   defaultAddress: Address | null;
 }
 
-export function HomeScreen({ products, categories, zone, unread, profile, defaultAddress }: HomeScreenProps) {
+export function HomeScreen({ products, categories, zone, profile, defaultAddress }: HomeScreenProps) {
   const router = useRouter();
   const quickAddToCart = useCart((s) => s.quickAdd);
   const isFav = useFavorites((s) => s.isFav);
@@ -98,47 +99,7 @@ export function HomeScreen({ products, categories, zone, unread, profile, defaul
             )}
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button
-              onClick={() => router.push('/notifications')}
-              style={{
-                position: 'relative',
-                width: 42,
-                height: 42,
-                borderRadius: 999,
-                border: '1px solid var(--line)',
-                cursor: 'pointer',
-                background: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Icon name="bell" size={21} color="var(--ink)" />
-              {unread > 0 && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: 6,
-                    right: 7,
-                    minWidth: 16,
-                    height: 16,
-                    padding: '0 4px',
-                    borderRadius: 999,
-                    background: 'var(--gold)',
-                    color: '#fff',
-                    fontSize: 9.5,
-                    fontWeight: 700,
-                    fontFamily: 'var(--ui-font)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: '1.5px solid #fff',
-                  }}
-                >
-                  {unread}
-                </span>
-              )}
-            </button>
+            <UserNotificationBell />
             <button
               onClick={() => router.push('/profile')}
               style={{

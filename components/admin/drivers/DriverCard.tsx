@@ -4,8 +4,14 @@
 import { Icon } from '@/components/ui/Icon';
 import { formatDH } from '@/lib/format';
 import { orderStatusLabel } from '@/lib/order-status';
-import { isDriverOnline } from '@/lib/admin-presence';
+import { isDriverOnline, driverStatus, type DriverStatus } from '@/lib/admin-presence';
 import type { DriverRow } from '@/lib/admin-drivers';
+
+const STATUS_UI: Record<DriverStatus, { label: string; bg: string; fg: string; dot: string }> = {
+  delivering: { label: 'En livraison', bg: 'rgba(168,151,35,0.16)', fg: '#8a7a14', dot: 'var(--gold)' },
+  available: { label: 'Disponible', bg: 'rgba(47,158,111,0.14)', fg: '#2f9e6f', dot: '#2bb673' },
+  offline: { label: 'Hors ligne', bg: 'var(--soft)', fg: 'var(--muted)', dot: 'var(--muted)' },
+};
 
 function lastSeenLabel(iso: string | null | undefined): string {
   if (!iso) return 'Jamais vu en ligne';
@@ -21,11 +27,14 @@ export interface DriverCardProps {
   row: DriverRow;
   /** Open the "create login" modal for this driver (shown when it has no account). */
   onCreateAccess?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
-export function DriverCard({ row, onCreateAccess }: DriverCardProps) {
+export function DriverCard({ row, onCreateAccess, onEdit, onDelete }: DriverCardProps) {
   const { driver, deliveries, earnings, currentRoute } = row;
   const online = isDriverOnline(driver);
+  const status = STATUS_UI[driverStatus(driver, Boolean(currentRoute))];
   const hasAccount = Boolean(driver.user_id);
   return (
     <div
@@ -72,12 +81,13 @@ export function DriverCard({ row, onCreateAccess }: DriverCardProps) {
             display: 'inline-flex',
             alignItems: 'center',
             gap: 6,
-            background: online ? 'rgba(19,124,139,0.12)' : 'var(--soft)',
-            color: online ? 'var(--brand-d)' : 'var(--muted)',
+            background: status.bg,
+            color: status.fg,
+            whiteSpace: 'nowrap',
           }}
         >
-          <span style={{ width: 7, height: 7, borderRadius: 999, background: online ? '#2bb673' : 'var(--muted)' }} />
-          {online ? 'En ligne' : 'Hors ligne'}
+          <span style={{ width: 7, height: 7, borderRadius: 999, background: status.dot }} />
+          {status.label}
         </span>
       </div>
 
@@ -121,24 +131,46 @@ export function DriverCard({ row, onCreateAccess }: DriverCardProps) {
         )}
       </div>
 
-      <div style={{ borderTop: '1px solid var(--line)', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <div style={{ borderTop: '1px solid var(--line)', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         {hasAccount ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: '#2f9e6f' }}>
-            <Icon name="check" size={14} color="#2f9e6f" /> Accès livreur actif
+            <Icon name="check" size={14} color="#2f9e6f" /> Accès actif
           </span>
         ) : (
-          <>
-            <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)' }}>Pas encore d&apos;accès</span>
-            <button
-              type="button"
-              onClick={onCreateAccess}
-              style={{ border: '1px solid var(--brand)', borderRadius: 9, padding: '7px 13px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 12.5, color: 'var(--brand)', background: '#fff' }}
-            >
-              Créer un accès
-            </button>
-          </>
+          <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)' }}>Pas d&apos;accès</span>
         )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+          {!hasAccount && (
+            <button type="button" onClick={onCreateAccess} style={actionBtn('var(--brand)')}>
+              <Icon name="plus" size={13} color="var(--brand)" /> Accès
+            </button>
+          )}
+          <button type="button" onClick={onEdit} style={actionBtn('var(--ink)')}>
+            <Icon name="edit" size={13} color="var(--ink)" /> Modifier
+          </button>
+          <button type="button" onClick={onDelete} style={actionBtn('#C0392B')}>
+            <Icon name="x" size={13} color="#C0392B" /> Supprimer
+          </button>
+        </div>
       </div>
     </div>
   );
+}
+
+function actionBtn(color: string): React.CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    border: '1px solid var(--line)',
+    borderRadius: 9,
+    padding: '6px 10px',
+    cursor: 'pointer',
+    fontFamily: 'var(--ui-font)',
+    fontWeight: 600,
+    fontSize: 12,
+    color,
+    background: '#fff',
+  };
 }

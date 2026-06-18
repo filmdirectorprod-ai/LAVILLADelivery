@@ -14,6 +14,7 @@ import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
+import { UserNotificationBell } from '@/components/ui/UserNotificationBell';
 import { unreadFromStaff, SUPPORT_SEEN_KEY } from '@/lib/driver-support';
 import type { Driver, Order, OrderTracking, SupportMessage } from '@/lib/types';
 import type { DriverOrder } from '@/lib/queries';
@@ -160,6 +161,7 @@ export function DriverDashboard({
               Livreur · {driver.vehicle ?? 'Scooter'}
             </div>
           </div>
+          <UserNotificationBell color="#fff" />
           <button
             onClick={logout}
             aria-label="Déconnexion"

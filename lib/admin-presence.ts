@@ -25,3 +25,15 @@ export function isDriverOnline(driver: PresenceInput, now: Date = new Date()): b
 export function countOnline(drivers: PresenceInput[], now: Date = new Date()): number {
   return drivers.reduce((n, d) => n + (isDriverOnline(d, now) ? 1 : 0), 0);
 }
+
+export type DriverStatus = 'offline' | 'available' | 'delivering';
+
+/**
+ * Three-state status for the admin Livreurs card: a driver on an active route is
+ * "delivering" (even if their heartbeat lapsed); otherwise online → "available",
+ * else "offline".
+ */
+export function driverStatus(driver: PresenceInput, hasRoute: boolean, now: Date = new Date()): DriverStatus {
+  if (hasRoute) return 'delivering';
+  return isDriverOnline(driver, now) ? 'available' : 'offline';
+}
