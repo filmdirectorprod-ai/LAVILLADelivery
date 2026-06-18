@@ -21,6 +21,7 @@ import { KpiCard } from './KpiCard';
 import { HourlyChart } from './HourlyChart';
 import { InProgressTable, type InProgressRow } from './InProgressTable';
 import { LiveDriverMap } from './LiveDriverMap';
+import { BranchesInfo } from '@/components/ui/BranchesInfo';
 
 export function OverviewScreen({
   initial,
@@ -125,6 +126,8 @@ export function OverviewScreen({
         <LiveDriverMap apiKey={mapsKey} positions={positions} />
         <InProgressTable rows={inProgressRows} />
       </div>
+
+      <BranchesInfo />
     </div>
   );
 }

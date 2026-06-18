@@ -8,6 +8,7 @@ import { formatDH } from '@/lib/format';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
+import { BranchesInfo } from '@/components/ui/BranchesInfo';
 import type { Driver } from '@/lib/types';
 
 export function DriverProfileScreen({
@@ -75,6 +76,10 @@ export function DriverProfileScreen({
           />
           <NavRow icon="settings" label="Paramètres" onClick={() => router.push('/driver/settings')} chevron />
           <NavRow icon="logout" label="Déconnexion" onClick={logout} danger last />
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <BranchesInfo title="Points de retrait La Villa" />
         </div>
       </div>
     </div>
