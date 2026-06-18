@@ -1,19 +1,25 @@
 // components/ui/AddressAutocomplete.tsx
-// Google Places autocomplete for the delivery address, biased to Fès / restricted
-// to Morocco. On selection it reports the formatted address + coordinates so the
-// caller can auto-detect the delivery zone (lib/geo.ts). If the Maps key is missing
-// or Places fails to load, it degrades to a plain text input — address entry never
-// breaks. Loads via the shared @googlemaps/js-api-loader (places library).
+// Address autocomplete on Places API (New), biased to Fès / restricted to Morocco.
+// Calls the REST endpoints directly (autocomplete + place details) and renders its
+// own styled suggestion list, so it matches the form and avoids the deprecated
+// legacy JS widget. On selection it reports the formatted address + coordinates so
+// the caller can auto-detect the delivery zone (lib/geo.ts). Degrades to a plain
+// input when the key is missing or a request fails — address entry never breaks.
 'use client';
-import { useEffect, useRef } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
+import { useRef, useState } from 'react';
 
-const FES = { lat: 34.033, lng: -4.999 };
+const FES = { latitude: 34.033, longitude: -4.999 };
+const KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 export interface PlaceResult {
   formatted: string;
   lat: number;
   lng: number;
+}
+
+interface Suggestion {
+  placeId: string;
+  text: string;
 }
 
 export interface AddressAutocompleteProps {
@@ -24,55 +30,127 @@ export interface AddressAutocompleteProps {
   style?: React.CSSProperties;
 }
 
+function newToken(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Math.random());
+}
+
 export function AddressAutocomplete({ value, onChange, onPlace, placeholder, style }: AddressAutocompleteProps) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  // Keep the latest callbacks without re-initializing the Autocomplete widget.
-  const cbRef = useRef({ onChange, onPlace });
-  cbRef.current = { onChange, onPlace };
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [open, setOpen] = useState(false);
+  const tokenRef = useRef<string>(newToken());
+  const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (!apiKey || !inputRef.current) return;
-    let cancelled = false;
-
-    new Loader({ apiKey, version: 'weekly', libraries: ['places'] })
-      .load()
-      .then(() => {
-        if (cancelled || !inputRef.current) return;
-        const ac = new google.maps.places.Autocomplete(inputRef.current, {
-          componentRestrictions: { country: 'ma' },
-          fields: ['formatted_address', 'geometry'],
-          bounds: new google.maps.LatLngBounds(
-            { lat: FES.lat - 0.12, lng: FES.lng - 0.12 },
-            { lat: FES.lat + 0.12, lng: FES.lng + 0.12 },
-          ),
-        });
-        ac.addListener('place_changed', () => {
-          const place = ac.getPlace();
-          const loc = place.geometry?.location;
-          if (!loc) return;
-          const formatted = place.formatted_address ?? inputRef.current?.value ?? '';
-          cbRef.current.onChange(formatted);
-          cbRef.current.onPlace({ formatted, lat: loc.lat(), lng: loc.lng() });
-        });
-      })
-      .catch(() => {
-        /* Places unavailable → plain input fallback (already rendered). */
+  async function fetchSuggestions(input: string) {
+    if (!KEY || input.trim().length < 3) {
+      setSuggestions([]);
+      setOpen(false);
+      return;
+    }
+    try {
+      const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': KEY },
+        body: JSON.stringify({
+          input,
+          includedRegionCodes: ['ma'],
+          locationBias: { circle: { center: FES, radius: 25000 } },
+          sessionToken: tokenRef.current,
+        }),
       });
+      const data = await res.json();
+      const list: Suggestion[] = (data.suggestions ?? [])
+        .map((x: { placePrediction?: { placeId?: string; text?: { text?: string } } }) => ({
+          placeId: x.placePrediction?.placeId ?? '',
+          text: x.placePrediction?.text?.text ?? '',
+        }))
+        .filter((s: Suggestion) => s.placeId && s.text);
+      setSuggestions(list);
+      setOpen(list.length > 0);
+    } catch {
+      setSuggestions([]);
+      setOpen(false);
+    }
+  }
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  function onInput(v: string) {
+    onChange(v);
+    if (debRef.current) clearTimeout(debRef.current);
+    debRef.current = setTimeout(() => fetchSuggestions(v), 280);
+  }
+
+  async function choose(s: Suggestion) {
+    setOpen(false);
+    setSuggestions([]);
+    onChange(s.text);
+    if (!KEY) return;
+    try {
+      const res = await fetch(
+        `https://places.googleapis.com/v1/places/${s.placeId}?sessionToken=${tokenRef.current}`,
+        { headers: { 'X-Goog-Api-Key': KEY, 'X-Goog-FieldMask': 'formattedAddress,location' } },
+      );
+      const p = await res.json();
+      tokenRef.current = newToken(); // start a fresh session after a selection
+      const lat = p.location?.latitude;
+      const lng = p.location?.longitude;
+      if (typeof lat === 'number' && typeof lng === 'number') {
+        onPlace({ formatted: p.formattedAddress ?? s.text, lat, lng });
+      }
+    } catch {
+      /* keep the typed text; zone stays manual */
+    }
+  }
 
   return (
-    <input
-      ref={inputRef}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      autoComplete="off"
-      style={style}
-    />
+    <div style={{ position: 'relative', flex: 1 }}>
+      <input
+        value={value}
+        onChange={(e) => onInput(e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        style={style}
+      />
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: -30,
+            right: -10,
+            zIndex: 60,
+            background: '#fff',
+            border: '1px solid var(--line)',
+            borderRadius: 12,
+            boxShadow: '0 16px 36px -14px rgba(0,0,0,0.35)',
+            overflow: 'hidden',
+          }}
+        >
+          {suggestions.map((s) => (
+            <button
+              key={s.placeId}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => choose(s)}
+              style={{
+                display: 'block',
+                width: '100%',
+                textAlign: 'left',
+                border: 'none',
+                borderBottom: '1px solid var(--soft)',
+                background: '#fff',
+                cursor: 'pointer',
+                padding: '11px 14px',
+                fontFamily: 'var(--ui-font)',
+                fontSize: 13.5,
+                color: 'var(--ink)',
+              }}
+            >
+              {s.text}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
