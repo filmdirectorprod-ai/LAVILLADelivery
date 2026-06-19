@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Poppins, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { ToastViewport } from "@/components/Toast";
+import { PWARegister } from "@/components/PWARegister";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -20,6 +21,30 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "La Villa",
   description: "Commande La Villa — pâtisserie & restaurant à Fès",
+  // Default (customer) PWA identity. The driver and admin segments override the
+  // manifest + apple title via their own metadata exports.
+  applicationName: "La Villa",
+  manifest: "/manifest.client.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "La Villa",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/client-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/client-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/client-180.png", sizes: "180x180", type: "image/png" }],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#137c8b",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -32,6 +57,7 @@ export default function RootLayout({
           {children}
           <ToastViewport />
         </div>
+        <PWARegister />
       </body>
     </html>
   );

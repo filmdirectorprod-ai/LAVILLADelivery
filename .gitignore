@@ -39,6 +39,11 @@
 !/public/
 /public/*
 !/public/brand/
+!/public/icons/
+!/public/sw.js
+!/public/manifest.client.webmanifest
+!/public/manifest.driver.webmanifest
+!/public/manifest.admin.webmanifest
 
 # --- Never commit, even within allow-listed paths ---
 node_modules/
