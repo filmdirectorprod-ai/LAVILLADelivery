@@ -233,8 +233,9 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
               )}
             </div>
           </div>
-          <button
-            onClick={() => router.push(`/call/${order.id}`)}
+          <a
+            href={driver?.phone ? `tel:${driver.phone.replace(/[^0-9+]/g, '')}` : `/call/${order.id}`}
+            aria-label="Appeler le livreur"
             style={{
               width: 44,
               height: 44,
@@ -246,10 +247,11 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 6px 14px -6px var(--brand)',
+              textDecoration: 'none',
             }}
           >
             <Icon name="phone" size={20} color="#fff" fill />
-          </button>
+          </a>
           <button
             onClick={() => router.push(`/chat/${order.id}`)}
             style={{

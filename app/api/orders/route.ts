@@ -16,6 +16,7 @@ interface PlaceOrderBody {
   items: OrderItemInput[];
   mode: 'livraison' | 'retrait';
   address?: string | null;
+  phone?: string | null;
   zone_id?: string | null;
   promo?: boolean;
   redeem_pts?: number;
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
     p_promo: body.promo ?? false,
     p_redeem_pts: body.redeem_pts ?? 0,
     p_redeem_dh: body.redeem_dh ?? 0,
+    p_phone: body.phone ?? null,
   });
 
   if (error) {

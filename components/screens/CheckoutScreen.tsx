@@ -72,6 +72,9 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
   const [slot, setSlot] = useState('asap');
   const [redeem, setRedeem] = useState<number | null>(null); // palier pts
   const [busy, setBusy] = useState(false);
+  // Contact phone for this order — so the driver (and gérant) can call. Prefilled
+  // from the profile, else the default address.
+  const [phone, setPhone] = useState<string>(profile?.phone ?? addresses[0]?.phone ?? '');
 
   // Selected delivery address — defaults to the user's default (addresses are
   // already ordered default-first by the query), falling back to the first one.
@@ -113,6 +116,10 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
       toast('Choisissez une adresse de livraison.');
       return;
     }
+    if (phone.replace(/[^0-9]/g, '').length < 9) {
+      toast('Entrez un numéro de téléphone pour la livraison.');
+      return;
+    }
     setBusy(true);
     try {
       const payloadItems = items
@@ -141,6 +148,7 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
               : selectedAddress
                 ? formatAddress(selectedAddress)
                 : '',
+          phone: phone.trim(),
           zone_id: mode === 'retrait' ? null : zone?.id ?? null,
           promo,
           redeem_pts: palier?.pts ?? 0,
@@ -421,6 +429,40 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
               )}
             </>
           )}
+        </section>
+
+        {/* contact phone — so the driver and the gérant can reach the customer */}
+        <section>
+          <h3 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)', margin: '0 0 10px' }}>
+            Téléphone de contact
+          </h3>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <span style={{ position: 'absolute', left: 14, display: 'flex' }}>
+              <Icon name="phone" size={18} color="var(--muted)" />
+            </span>
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="06 12 34 56 78"
+              style={{
+                width: '100%',
+                padding: '13px 14px 13px 42px',
+                borderRadius: 14,
+                border: '1.5px solid var(--line)',
+                background: '#fff',
+                fontFamily: 'var(--ui-font)',
+                fontSize: 14.5,
+                color: 'var(--ink)',
+                outline: 'none',
+              }}
+            />
+          </div>
+          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', margin: '7px 2px 0' }}>
+            Le livreur pourra vous appeler à ce numéro.
+          </p>
         </section>
 
         {/* time slot */}
