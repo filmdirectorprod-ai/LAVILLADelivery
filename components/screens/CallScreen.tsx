@@ -8,6 +8,7 @@ import type { Driver, Order } from '@/lib/types';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
+import { createClient } from '@/lib/supabase/client';
 
 export interface CallScreenProps {
   order: Order;
@@ -24,6 +25,14 @@ export function CallScreen({ order, driver }: CallScreenProps) {
     const id = setInterval(() => setSec((s) => s + 1), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Ring the other party for real: a push "Appel entrant" (the voice UI itself is
+  // a mock, but this lets the driver know the customer is calling).
+  useEffect(() => {
+    createClient()
+      .rpc('ping_call', { p_order: order.id })
+      .then(() => {});
+  }, [order.id]);
 
   const mm = String(Math.floor(sec / 60)).padStart(2, '0');
   const ss = String(sec % 60).padStart(2, '0');

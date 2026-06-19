@@ -5,7 +5,7 @@
    - Same-origin static assets (icons, images, _next static): cache-first.
    - Never cache Supabase / API / auth callbacks (always go to network).
    Bump CACHE_VERSION to force-refresh clients. */
-const CACHE_VERSION = 'lavilla-v1';
+const CACHE_VERSION = 'lavilla-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 self.addEventListener('install', (event) => {
@@ -73,4 +73,62 @@ self.addEventListener('fetch', (event) => {
       })(),
     );
   }
+});
+
+/* ---- Web Push ---- */
+function targetUrl(d) {
+  if (!d || !d.order_id) return '/';
+  if (d.kind === 'call') return '/call/' + d.order_id;
+  if (d.kind === 'message') return '/chat/' + d.order_id;
+  return '/tracking/' + d.order_id; // order status → customer tracking
+}
+
+self.addEventListener('push', (event) => {
+  let d = {};
+  try {
+    d = event.data ? event.data.json() : {};
+  } catch {
+    d = { body: event.data ? event.data.text() : '' };
+  }
+  const title = d.title || 'La Villa';
+  const options = {
+    body: d.body || '',
+    icon: '/icons/client-192.png',
+    badge: '/icons/client-192.png',
+    data: { url: targetUrl(d), kind: d.kind, order_id: d.order_id },
+    vibrate: d.kind === 'call' ? [120, 60, 120, 60, 120] : [80, 40, 80],
+    tag: d.kind === 'call' ? 'lv-call' : undefined,
+    renotify: d.kind === 'call' || undefined,
+    requireInteraction: d.kind === 'call' || undefined,
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const d = event.notification.data || {};
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      if (all.length) {
+        const c = all[0];
+        // Route inside the already-installed app, by its role prefix.
+        let path = d.url || '/';
+        try {
+          const p = new URL(c.url).pathname;
+          if (p.startsWith('/admin')) path = '/admin/orders';
+          else if (p.startsWith('/driver')) path = d.order_id ? '/driver/order/' + d.order_id : '/driver';
+        } catch {
+          /* ignore */
+        }
+        try {
+          await c.navigate(path);
+        } catch {
+          /* navigation may be blocked — focus anyway */
+        }
+        return c.focus();
+      }
+      return self.clients.openWindow(d.url || '/');
+    })(),
+  );
 });

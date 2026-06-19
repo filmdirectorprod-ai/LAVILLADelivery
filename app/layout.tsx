@@ -3,6 +3,7 @@ import { Poppins, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { ToastViewport } from "@/components/Toast";
 import { PWARegister } from "@/components/PWARegister";
+import { EnablePush } from "@/components/EnablePush";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -58,6 +59,7 @@ export default function RootLayout({
           <ToastViewport />
         </div>
         <PWARegister />
+        <EnablePush />
       </body>
     </html>
   );
