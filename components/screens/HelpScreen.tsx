@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { SAFE_BOTTOM } from '@/lib/layout';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Icon } from '@/components/ui/Icon';
-import { LA_VILLA_BRANCHES, branchMapsUrl } from '@/lib/branches';
+import { LA_VILLA_BRANCHES, branchMapsUrl, branchTelHref } from '@/lib/branches';
 
 // Coordonnées La Villa — à ajuster avec les vraies infos de la maison.
 const PHONE_DISPLAY = '+212 5 35 00 00 00';
@@ -98,7 +98,8 @@ export function HelpScreen({ email = EMAIL }: HelpScreenProps) {
               <span style={{ fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--ink)', fontWeight: 500, lineHeight: 1.4 }}>
                 <strong>{b.name}</strong><br />
                 {b.address}<br />
-                <a href={branchMapsUrl(b)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 3, fontSize: 12.5, fontWeight: 600, color: 'var(--brand)', textDecoration: 'none' }}>
+                <a href={branchTelHref(b)} style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', textDecoration: 'none' }}>📞 {b.phone}</a>
+                <a href={branchMapsUrl(b)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 3, marginLeft: 12, fontSize: 12.5, fontWeight: 600, color: 'var(--brand)', textDecoration: 'none' }}>
                   Voir sur Maps
                 </a>
               </span>

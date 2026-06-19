@@ -5,6 +5,7 @@ export interface Branch {
   id: string;
   name: string;
   address: string;
+  phone: string;
   /** Google Plus Code, when that's the most precise reference. */
   plusCode?: string;
   lat: number;
@@ -13,9 +14,10 @@ export interface Branch {
 
 export const LA_VILLA_BRANCHES: Branch[] = [
   {
-    id: 'bahnini',
-    name: 'La Villa — Ville Nouvelle',
+    id: 'riad',
+    name: 'La Villa Riad — Ville Nouvelle',
     address: '117 Av. Mohammed Bahnini, Fès',
+    phone: '05 35 60 44 66',
     lat: 34.0261,
     lng: -5.014,
   },
@@ -23,6 +25,7 @@ export const LA_VILLA_BRANCHES: Branch[] = [
     id: 'badie',
     name: 'La Villa Badie — Saïss',
     address: 'XXQP+WJ8, Fès (Saïss)',
+    phone: '05 35 69 15 61',
     plusCode: 'XXQP+WJ8',
     lat: 33.9898,
     lng: -5.0134,
@@ -44,4 +47,9 @@ export function branchPickupLabel(b: Branch): string {
 /** Google Maps link to view / route to a shop (opens the precise coordinates). */
 export function branchMapsUrl(b: Branch): string {
   return `https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lng}`;
+}
+
+/** tel: href for a shop's phone (digits only). */
+export function branchTelHref(b: Branch): string {
+  return `tel:${b.phone.replace(/[^0-9+]/g, '')}`;
 }

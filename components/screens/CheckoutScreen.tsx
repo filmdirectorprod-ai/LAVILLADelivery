@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import type { Address, Product, Profile, Zone } from '@/lib/types';
 import { formatDH } from '@/lib/format';
 import { computeOrder, REDEEM_PALIERS } from '@/lib/pricing';
-import { LA_VILLA_BRANCHES, DEFAULT_BRANCH, findBranch, branchPickupLabel, branchMapsUrl } from '@/lib/branches';
+import { LA_VILLA_BRANCHES, DEFAULT_BRANCH, findBranch, branchPickupLabel, branchMapsUrl, branchTelHref } from '@/lib/branches';
 import { useCart } from '@/lib/cart-store';
 import { useOrderMode } from '@/lib/order-store';
 import { useToast } from '@/lib/toast-store';
@@ -297,9 +297,14 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>{b.name}</div>
                       <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>{b.address}</div>
-                      <a href={branchMapsUrl(b)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--brand)', textDecoration: 'none' }}>
-                        <Icon name="pin" size={12} color="var(--brand)" /> Voir sur Maps
-                      </a>
+                      <div style={{ display: 'flex', gap: 14, marginTop: 4 }}>
+                        <a href={branchTelHref(b)} onClick={(e) => e.stopPropagation()} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--ink)', textDecoration: 'none' }}>
+                          <Icon name="phone" size={12} color="var(--muted)" /> {b.phone}
+                        </a>
+                        <a href={branchMapsUrl(b)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--brand)', textDecoration: 'none' }}>
+                          <Icon name="pin" size={12} color="var(--brand)" /> Voir sur Maps
+                        </a>
+                      </div>
                     </div>
                     <span style={{ width: 20, height: 20, borderRadius: 999, border: sel ? 'none' : '1.5px solid var(--line)', background: sel ? 'var(--brand)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       {sel && <Icon name="check" size={13} color="#fff" strokeWidth={2.4} />}
