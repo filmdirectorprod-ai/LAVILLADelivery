@@ -40,3 +40,8 @@ export function findBranch(id: string | null | undefined): Branch {
 export function branchPickupLabel(b: Branch): string {
   return `Retrait boutique — ${b.name}, ${b.address}`;
 }
+
+/** Google Maps link to view / route to a shop (opens the precise coordinates). */
+export function branchMapsUrl(b: Branch): string {
+  return `https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lng}`;
+}

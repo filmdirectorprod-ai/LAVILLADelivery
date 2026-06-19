@@ -3,7 +3,7 @@
 // same addresses.
 'use client';
 import { Icon } from '@/components/ui/Icon';
-import { LA_VILLA_BRANCHES } from '@/lib/branches';
+import { LA_VILLA_BRANCHES, branchMapsUrl } from '@/lib/branches';
 
 export function BranchesInfo({ title = 'Nos boutiques' }: { title?: string }) {
   return (
@@ -18,6 +18,14 @@ export function BranchesInfo({ title = 'Nos boutiques' }: { title?: string }) {
             <div style={{ minWidth: 0 }}>
               <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: 'var(--ink)' }}>{b.name}</div>
               <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>{b.address}</div>
+              <a
+                href={branchMapsUrl(b)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--brand)', textDecoration: 'none' }}
+              >
+                <Icon name="pin" size={13} color="var(--brand)" /> Voir sur Maps
+              </a>
             </div>
           </div>
         ))}
