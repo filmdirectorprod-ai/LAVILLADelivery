@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ADMIN_NAV, isActiveNav } from '@/lib/admin-nav';
 
 describe('admin nav', () => {
-  it('exposes the eleven sidebar sections in order', () => {
+  it('exposes the twelve sidebar sections in order', () => {
     expect(ADMIN_NAV.map((n) => n.href)).toEqual([
       '/admin',
       '/admin/orders',
@@ -14,6 +14,7 @@ describe('admin nav', () => {
       '/admin/support',
       '/admin/incidents',
       '/admin/planning',
+      '/admin/promotions',
       '/admin/managers',
     ]);
   });

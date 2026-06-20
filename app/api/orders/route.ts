@@ -20,6 +20,7 @@ interface PlaceOrderBody {
   branch_slug?: string | null;
   zone_id?: string | null;
   promo?: boolean;
+  promo_code?: string | null;
   redeem_pts?: number;
   redeem_dh?: number;
 }
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
     p_redeem_dh: body.redeem_dh ?? 0,
     p_phone: body.phone ?? null,
     p_branch_slug: body.branch_slug ?? null,
+    p_promo_code: body.promo_code ?? null,
   });
 
   if (error) {

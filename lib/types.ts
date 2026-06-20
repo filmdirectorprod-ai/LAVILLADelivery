@@ -63,6 +63,22 @@ export interface Zone {
   branch_id?: string | null;
 }
 
+/** A promo code (0037). `branch_id` null = valid at every agency. */
+export interface Promotion {
+  id: string;
+  code: string;
+  type: 'percent' | 'fixed';
+  value: number;
+  min_order_dh: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  max_uses: number | null;
+  max_uses_per_user: number | null;
+  branch_id: string | null;
+  active: boolean;
+  created_at: string;
+}
+
 /** A La Villa agency / branch (0033). */
 export interface Branch {
   id: string;

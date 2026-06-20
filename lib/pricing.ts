@@ -37,6 +37,9 @@ export interface ComputeOrderInput {
   /** Selected delivery-zone fee; defaults to 18 when omitted. */
   zoneFee?: number;
   promo: boolean;
+  /** Explicit promo-code discount in DH (0035 promotions). When provided it
+   *  replaces the blanket `promo` rate. Capped at the subtotal. */
+  promoDiscount?: number;
   /** Chosen redemption palier points (0 = none). */
   redeemPts?: number;
   /** Chosen palier DH value (must pair with redeemPts to be honoured). */
@@ -72,6 +75,7 @@ export function computeOrder(input: ComputeOrderInput): ComputeOrderResult {
     mode,
     zoneFee = DEFAULT_ZONE_FEE,
     promo,
+    promoDiscount,
     redeemPts = 0,
     redeemDh = 0,
     pointsBalance,
@@ -84,7 +88,12 @@ export function computeOrder(input: ComputeOrderInput): ComputeOrderResult {
   const deliveryFee =
     mode === 'retrait' || subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : zoneFee;
 
-  const discount = promo ? Math.round(subtotal * PROMO_RATE) : 0;
+  const discount =
+    promoDiscount != null
+      ? Math.min(Math.max(0, Math.round(promoDiscount)), subtotal)
+      : promo
+        ? Math.round(subtotal * PROMO_RATE)
+        : 0;
 
   const baseTotal = round2(subtotal + deliveryFee - discount);
 
