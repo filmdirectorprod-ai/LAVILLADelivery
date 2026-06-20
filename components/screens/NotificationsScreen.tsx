@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Notification, ProfileSettings } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
-import { isNotificationEnabled } from '@/lib/notifications';
+import { isNotificationEnabled, isKindVisibleTo } from '@/lib/notifications';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 
@@ -42,7 +42,7 @@ export function NotificationsScreen({ notifications, settings }: NotificationsSc
   const router = useRouter();
   // Honour the user's notification preferences from Paramètres: hide muted kinds.
   const [list, setList] = useState<Notification[]>(() =>
-    notifications.filter((n) => isNotificationEnabled(n.kind, settings)),
+    notifications.filter((n) => isNotificationEnabled(n.kind, settings) && isKindVisibleTo(n.kind, 'client')),
   );
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export function NotificationsScreen({ notifications, settings }: NotificationsSc
       .channel('notifications-feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
         const n = payload.new as Notification;
-        if (!isNotificationEnabled(n.kind, settings)) return; // muted kind
+        if (!isNotificationEnabled(n.kind, settings) || !isKindVisibleTo(n.kind, 'client')) return; // muted / not for client
         setList((prev) => (prev.some((x) => x.id === n.id) ? prev : [n, ...prev]));
       })
       .subscribe();

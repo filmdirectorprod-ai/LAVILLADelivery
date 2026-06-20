@@ -111,8 +111,9 @@ export function StatsScreen({ orders, items, branches }: { orders: StatOrder[]; 
         ) : (
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 160, overflowX: 'auto' }}>
             {series.map((s) => (
-              <div key={s.day} title={`${s.day} · ${formatDH(s.revenue)}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, minWidth: 26 }}>
-                <div style={{ width: 22, height: Math.max(3, Math.round((s.revenue / maxDay) * 130)), background: 'var(--brand)', borderRadius: '5px 5px 0 0' }} />
+              <div key={s.day} title={`${s.day} · ${formatDH(s.revenue)}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, minWidth: 30 }}>
+                <span style={{ fontFamily: 'var(--ui-font)', fontSize: 9.5, fontWeight: 700, color: 'var(--brand)', whiteSpace: 'nowrap' }}>{Math.round(s.revenue)}</span>
+                <div style={{ width: 22, height: Math.max(3, Math.round((s.revenue / maxDay) * 120)), background: 'var(--brand)', borderRadius: '5px 5px 0 0' }} />
                 <span style={{ fontFamily: 'var(--ui-font)', fontSize: 9.5, color: 'var(--muted)', writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>{s.day.slice(5)}</span>
               </div>
             ))}

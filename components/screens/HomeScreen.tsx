@@ -99,7 +99,7 @@ export function HomeScreen({ products, categories, zone, profile, defaultAddress
             )}
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <UserNotificationBell />
+            <UserNotificationBell audience="client" />
             <button
               onClick={() => router.push('/profile')}
               style={{

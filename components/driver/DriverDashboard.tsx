@@ -162,7 +162,7 @@ export function DriverDashboard({
               Livreur · {driver.vehicle ?? 'Scooter'}
             </div>
           </div>
-          <UserNotificationBell color="#fff" />
+          <UserNotificationBell color="#fff" audience="driver" />
           <button
             onClick={logout}
             aria-label="Déconnexion"
