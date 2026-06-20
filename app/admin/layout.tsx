@@ -5,6 +5,7 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { getMyStaff } from '@/lib/queries';
+import { createServerSupabase } from '@/lib/supabase/server';
 import { AdminGate } from '@/components/admin/AdminGate';
 import { AdminChrome } from '@/components/admin/AdminChrome';
 
@@ -25,5 +26,18 @@ export const viewport: Viewport = { themeColor: '#1c2a37' };
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const staff = await getMyStaff();
   if (!staff) return <AdminGate />;
-  return <AdminChrome managerName={staff.full_name || 'Gérant'}>{children}</AdminChrome>;
+
+  // Agency label for the sidebar: the gérant's branch, or "Super-admin".
+  let agencyLabel = 'Super-admin';
+  if (staff.branch_id) {
+    const supabase = await createServerSupabase();
+    const { data: branch } = await supabase.from('branches').select('name').eq('id', staff.branch_id).maybeSingle();
+    agencyLabel = (branch as { name: string } | null)?.name?.replace(/ —.*$/, '') ?? 'Agence';
+  }
+
+  return (
+    <AdminChrome managerName={staff.full_name || 'Gérant'} agencyLabel={agencyLabel}>
+      {children}
+    </AdminChrome>
+  );
 }

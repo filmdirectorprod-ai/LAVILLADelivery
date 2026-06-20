@@ -132,6 +132,10 @@ export interface Profile {
   loyalty_tier: LoyaltyTier;
   settings: ProfileSettings;
   created_at: string;
+  /** Staff member's agency (0033) — null = super-admin. */
+  branch_id?: string | null;
+  /** Internal CRM note (0039). */
+  crm_note?: string | null;
 }
 
 /** A saved delivery address (owner-scoped). */
