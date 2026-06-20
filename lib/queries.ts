@@ -10,6 +10,7 @@ import { buildReviewRows, type ReviewRow } from '@/lib/admin-reviews';
 import { buildIncidentRows, type IncidentRow } from '@/lib/admin-incidents';
 import { buildShiftWeek, mondayOf, isoDate, type ShiftWeek } from '@/lib/admin-planning';
 import { buildSupportThreads, type SupportThread, type RawSupportDriver } from '@/lib/admin-support';
+import type { StatOrder, StatItem } from '@/lib/admin-stats';
 import { loadKitchenBoard } from '@/lib/kitchen-data';
 import type { KitchenBoard } from '@/lib/kitchen';
 import type {
@@ -30,6 +31,7 @@ import type {
   Reward,
   Notification,
   LoyaltyLedgerEntry,
+  Branch,
 } from '@/lib/types';
 
 export async function getCategories(): Promise<Category[]> {
@@ -606,4 +608,38 @@ export async function getAdminSupportData(): Promise<AdminSupportData> {
 export async function getKitchenBoard(): Promise<KitchenBoard> {
   const supabase = await createServerSupabase();
   return loadKitchenBoard(supabase);
+}
+
+export interface AdminStatsData {
+  orders: StatOrder[];
+  items: StatItem[];
+  branches: Branch[];
+}
+
+/**
+ * Last-90-days orders + their items + branches for the Statistiques screen. RLS
+ * scopes the orders to the caller's branch (super-admin sees all), so the figures
+ * are automatically per-agency for a branch gérant. The client filters by the
+ * chosen date range and aggregates via lib/admin-stats.
+ */
+export async function getAdminStatsData(): Promise<AdminStatsData> {
+  const supabase = await createServerSupabase();
+  const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, status, total_dh, placed_at, branch_id')
+    .gte('placed_at', since)
+    .order('placed_at', { ascending: false });
+  const ids = (orders ?? []).map((o) => (o as { id: string }).id);
+  const [itemsRes, branchesRes] = await Promise.all([
+    ids.length
+      ? supabase.from('order_items').select('order_id, name_snapshot, qty, price_snapshot').in('order_id', ids)
+      : Promise.resolve({ data: [] as StatItem[] }),
+    supabase.from('branches').select('*').order('slug'),
+  ]);
+  return {
+    orders: (orders ?? []) as StatOrder[],
+    items: (itemsRes.data ?? []) as StatItem[],
+    branches: (branchesRes.data ?? []) as Branch[],
+  };
 }
