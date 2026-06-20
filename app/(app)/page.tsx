@@ -8,8 +8,7 @@ import { isNotificationEnabled } from '@/lib/notifications';
 import { HomeScreen } from '@/components/screens/HomeScreen';
 
 export default async function HomePage() {
-  const [products, categories, zones, notifications, profile, addresses] = await Promise.all([
-    getProducts(),
+  const [categories, zones, notifications, profile, addresses] = await Promise.all([
     getCategories(),
     getZones(),
     getMyNotifications(),
@@ -20,6 +19,8 @@ export default async function HomePage() {
   // Default delivery address (query returns default-first) drives the header.
   const defaultAddress = addresses[0] ?? null;
   const zone = zones.find((z) => z.id === defaultAddress?.zone_id) ?? zones[0] ?? null;
+  // Catalogue availability reflects the agency that serves the customer's zone.
+  const products = await getProducts(zone?.branch_id);
   // Unread badge counts only kinds the user opted into (in sync with Paramètres).
   const unread = notifications.filter(
     (n) => !n.read && isNotificationEnabled(n.kind, profile?.settings),

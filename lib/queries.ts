@@ -38,14 +38,24 @@ export async function getCategories(): Promise<Category[]> {
   return data ?? [];
 }
 
-export async function getProducts(): Promise<Product[]> {
+export async function getProducts(branchId?: string | null): Promise<Product[]> {
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from('products')
     .select('*')
     .eq('active', true)
     .order('created_at');
-  return data ?? [];
+  const products = (data ?? []) as Product[];
+  // Per-branch stock (0035): override the global in_stock with the viewer's branch
+  // availability, so the catalogue's "Rupture" badge reflects the serving agency.
+  if (!branchId) return products;
+  const { data: overrides } = await supabase
+    .from('product_branch')
+    .select('product_id, in_stock')
+    .eq('branch_id', branchId);
+  if (!overrides || overrides.length === 0) return products;
+  const map = new Map(overrides.map((o) => [(o as { product_id: string }).product_id, (o as { in_stock: boolean }).in_stock]));
+  return products.map((p) => (map.has(p.id) ? { ...p, in_stock: map.get(p.id)! } : p));
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
