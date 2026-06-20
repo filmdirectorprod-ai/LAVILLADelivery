@@ -2,11 +2,10 @@
 // PANIER — cart. Ported from the prototype (screens-order.jsx Cart), adapted to
 // the cart store + fetched product/zone data. The delivery-fee + promo preview
 // here is purely cosmetic; the server re-derives the authoritative total.
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Product, Zone } from '@/lib/types';
 import { formatDH } from '@/lib/format';
-import { FREE_DELIVERY_THRESHOLD, DEFAULT_ZONE_FEE, PROMO_RATE } from '@/lib/pricing';
+import { FREE_DELIVERY_THRESHOLD, DEFAULT_ZONE_FEE } from '@/lib/pricing';
 import { useCart } from '@/lib/cart-store';
 import { useOrderMode } from '@/lib/order-store';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
@@ -67,10 +66,6 @@ export function CartScreen({ products, zone }: CartScreenProps) {
   const setQty = useCart((s) => s.setQty);
   const removeAt = useCart((s) => s.removeAt);
   const mode = useOrderMode((s) => s.mode);
-  const promoApplied = useOrderMode((s) => s.promo);
-  const setPromoApplied = useOrderMode((s) => s.setPromo);
-
-  const [promo, setPromo] = useState('');
 
   const byId = new Map(products.map((p) => [p.id, p]));
   const lines = items.map((it, idx) => ({ ...it, idx, product: byId.get(it.productId) ?? null }));
@@ -78,8 +73,8 @@ export function CartScreen({ products, zone }: CartScreenProps) {
   const sub = items.reduce((n, it) => n + it.opts.unit * it.qty, 0);
   const zoneFee = zone ? zone.fee_dh : DEFAULT_ZONE_FEE;
   const delivery = mode === 'retrait' ? 0 : sub >= FREE_DELIVERY_THRESHOLD ? 0 : zoneFee;
-  const discount = promoApplied ? Math.round(sub * PROMO_RATE) : 0;
-  const total = sub + delivery - discount;
+  // Promo codes are entered + validated at checkout (real validate_promo), not here.
+  const total = sub + delivery;
 
   if (items.length === 0) {
     return (
@@ -176,46 +171,14 @@ export function CartScreen({ products, zone }: CartScreenProps) {
         ))}
       </div>
 
-      {/* promo */}
+      {/* promo hint — the real code field is on the checkout step */}
       <div style={{ padding: '16px 18px 0' }}>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 9,
-              background: '#fff',
-              border: `1.5px solid ${promoApplied ? 'var(--gold)' : 'var(--line)'}`,
-              borderRadius: 13,
-              padding: '12px 13px',
-            }}
-          >
-            <Icon name="tag" size={18} color={promoApplied ? 'var(--gold)' : 'var(--muted)'} />
-            <input
-              value={promo}
-              onChange={(e) => setPromo(e.target.value.toUpperCase())}
-              placeholder="Code promo"
-              style={{
-                flex: 1,
-                border: 'none',
-                outline: 'none',
-                fontFamily: 'var(--ui-font)',
-                fontSize: 14,
-                color: 'var(--ink)',
-              }}
-            />
-            {promoApplied && <Icon name="check" size={18} color="var(--gold)" strokeWidth={2.4} />}
-          </div>
-          <Btn variant={promoApplied ? 'gold' : 'ghost'} onClick={() => setPromoApplied(!!promo)}>
-            {promoApplied ? 'Appliqué' : 'Valider'}
-          </Btn>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#fff', border: '1.5px solid var(--line)', borderRadius: 13, padding: '12px 13px' }}>
+          <Icon name="tag" size={18} color="var(--muted)" />
+          <span style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>
+            Vous avez un code promo ? Saisissez-le à l&apos;étape paiement.
+          </span>
         </div>
-        {promoApplied && (
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--gold)', fontWeight: 600, marginTop: 8 }}>
-            ✓ Code « {promo || 'PROMO'} » — 15 % de remise appliqués
-          </div>
-        )}
       </div>
 
       {/* summary */}
@@ -238,7 +201,6 @@ export function CartScreen({ products, zone }: CartScreenProps) {
               Plus que {formatDH(FREE_DELIVERY_THRESHOLD - sub)} pour la livraison offerte
             </div>
           )}
-          {discount > 0 && <Row label="Remise (-15 %)" value={`– ${formatDH(discount)}`} gold />}
           <div style={{ height: 1, background: 'var(--line)', margin: '10px 0' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>Total</span>

@@ -65,8 +65,6 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
   const items = useCart((s) => s.items);
   const clearCart = useCart((s) => s.clear);
   const mode = useOrderMode((s) => s.mode);
-  const promo = useOrderMode((s) => s.promo);
-  const setPromo = useOrderMode((s) => s.setPromo);
   const toast = useToast((s) => s.show);
 
   const [pay, setPay] = useState<Pay>('cmi');
@@ -109,7 +107,7 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
     items: items.map((it) => ({ price: it.opts.unit, qty: it.qty })),
     mode,
     zoneFee: zone?.fee_dh,
-    promo,
+    promo: false,
     promoDiscount: appliedPromo?.discount,
     redeemPts: palier?.pts ?? 0,
     redeemDh: palier?.dh ?? 0,
@@ -187,7 +185,7 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
           phone: phone.trim(),
           branch_slug: mode === 'retrait' ? pickupBranchId : null,
           zone_id: mode === 'retrait' ? null : zone?.id ?? null,
-          promo,
+          promo: false,
           promo_code: appliedPromo?.code ?? null,
           redeem_pts: palier?.pts ?? 0,
           redeem_dh: palier?.dh ?? 0,
@@ -203,7 +201,7 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
 
       const { order_id } = (await res.json()) as { order_id: string };
       clearCart();
-      setPromo(false);
+      clearPromo();
       setRedeem(null);
       router.replace(`/tracking/${order_id}`);
     } catch (e) {
