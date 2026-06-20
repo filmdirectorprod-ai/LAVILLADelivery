@@ -198,13 +198,15 @@ export interface DriverOrder {
  * visibility via orders_driver_read). The caller splits the two by
  * tracking.driver_id / tracking.manual.
  */
-export async function getDriverBoard(): Promise<DriverOrder[]> {
+export async function getDriverBoard(branchId?: string | null): Promise<DriverOrder[]> {
   const supabase = await createServerSupabase();
-  const { data } = await supabase
+  let q = supabase
     .from('orders')
     .select('*, order_tracking(*)')
-    .in('status', DRIVER_POOL_STATUSES)
-    .order('placed_at', { ascending: false });
+    .in('status', DRIVER_POOL_STATUSES);
+  // Multi-agences (0033): a driver only sees their own branch's orders.
+  if (branchId) q = q.eq('branch_id', branchId);
+  const { data } = await q.order('placed_at', { ascending: false });
   return (data ?? []).map((row) => {
     const { order_tracking, ...order } = row as Order & {
       order_tracking: OrderTracking | OrderTracking[] | null;

@@ -82,13 +82,14 @@ export function DriverDashboard({
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    const { data } = await supabase
+    let q = supabase
       .from('orders')
       .select('*, order_tracking(*)')
-      .in('status', DRIVER_POOL_STATUSES)
-      .order('placed_at', { ascending: false });
+      .in('status', DRIVER_POOL_STATUSES);
+    if (driver.branch_id) q = q.eq('branch_id', driver.branch_id); // only this driver's agency
+    const { data } = await q.order('placed_at', { ascending: false });
     setBoard(mapBoard(data ?? []));
-  }, []);
+  }, [driver.branch_id]);
 
   useEffect(() => {
     const supabase = createClient();

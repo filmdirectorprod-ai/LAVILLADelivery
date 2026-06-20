@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import { orderStatusLabel, orderStatusPill } from '@/lib/order-status';
+import { useBranches } from '@/lib/use-branches';
 import {
   buildAdminOrderRows,
   filterAdminOrdersByTab,
@@ -43,6 +44,8 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
   const [drivers, setDrivers] = useState<Driver[]>(initial.drivers);
   const [tab, setTab] = useState<OrderTab>('toconfirm');
   const [query, setQuery] = useState('');
+  const [branchFilter, setBranchFilter] = useState<string>(''); // '' = all agencies
+  const branches = useBranches();
   const [busy, setBusy] = useState(false);
   const [autoAssign, setAutoAssign] = useState(false);
   const [confirmRow, setConfirmRow] = useState<AdminOrderRow | null>(null);
@@ -88,7 +91,10 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
   }, [refetch]);
 
   const counts = useMemo(() => countOrdersByTab(rows), [rows]);
-  const visible = useMemo(() => filterAdminOrdersByTab(rows, tab, query), [rows, tab, query]);
+  const visible = useMemo(() => {
+    const byTab = filterAdminOrdersByTab(rows, tab, query);
+    return branchFilter ? byTab.filter((r) => r.order.branch_id === branchFilter) : byTab;
+  }, [rows, tab, query, branchFilter]);
 
   const runRpc = useCallback(
     async (fn: string, params: Record<string, unknown>) => {
@@ -193,11 +199,27 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
             );
           })}
         </div>
+        {branches.length > 1 && (
+          <div style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
+            {[{ id: '', name: 'Toutes les agences' }, ...branches].map((b) => {
+              const active = branchFilter === b.id;
+              return (
+                <button
+                  key={b.id || 'all'}
+                  onClick={() => setBranchFilter(b.id)}
+                  style={{ border: `1px solid ${active ? 'var(--brand)' : 'var(--line)'}`, borderRadius: 999, padding: '7px 13px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, background: active ? 'rgba(19,124,139,0.08)' : '#fff', color: active ? 'var(--brand)' : 'var(--muted)' }}
+                >
+                  {b.name.replace(/ —.*$/, '')}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Rechercher un code…"
-          style={{ marginLeft: 'auto', border: '1px solid var(--line)', borderRadius: 12, padding: '9px 14px', fontFamily: 'var(--ui-font)', fontSize: 14, minWidth: 220 }}
+          style={{ marginLeft: branches.length > 1 ? 0 : 'auto', border: '1px solid var(--line)', borderRadius: 12, padding: '9px 14px', fontFamily: 'var(--ui-font)', fontSize: 14, minWidth: 220 }}
         />
       </div>
 

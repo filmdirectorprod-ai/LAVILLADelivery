@@ -39,7 +39,7 @@ function timeAgo(iso: string): string {
   return `Il y a ${h} h`;
 }
 
-export function DriverRequestsScreen({ initialBoard }: { initialBoard: DriverOrder[] }) {
+export function DriverRequestsScreen({ initialBoard, branchId }: { initialBoard: DriverOrder[]; branchId?: string | null }) {
   const router = useRouter();
   const toast = useToast((s) => s.show);
   const [board, setBoard] = useState<DriverOrder[]>(initialBoard);
@@ -49,13 +49,14 @@ export function DriverRequestsScreen({ initialBoard }: { initialBoard: DriverOrd
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    const { data } = await supabase
+    let q = supabase
       .from('orders')
       .select('*, order_tracking(*)')
-      .in('status', DRIVER_POOL_STATUSES)
-      .order('placed_at', { ascending: false });
+      .in('status', DRIVER_POOL_STATUSES);
+    if (branchId) q = q.eq('branch_id', branchId); // only this driver's agency
+    const { data } = await q.order('placed_at', { ascending: false });
     setBoard(mapBoard(data ?? []));
-  }, []);
+  }, [branchId]);
 
   useEffect(() => {
     const supabase = createClient();

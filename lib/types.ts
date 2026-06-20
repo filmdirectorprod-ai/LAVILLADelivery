@@ -59,6 +59,21 @@ export interface Zone {
   eta_max: number;
   /** Neighbourhood boundary as a ring of [lng, lat] points (0025), or null. */
   polygon: [number, number][] | null;
+  /** Owning agency (0033) — the branch that fulfils this zone's deliveries. */
+  branch_id?: string | null;
+}
+
+/** A La Villa agency / branch (0033). */
+export interface Branch {
+  id: string;
+  slug: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  plus_code: string | null;
+  lat: number | null;
+  lng: number | null;
+  is_active: boolean;
 }
 
 export interface Driver {
@@ -73,6 +88,8 @@ export interface Driver {
   /** Presence (0014) — set by the driver app on login/logout. */
   is_online?: boolean;
   last_seen?: string | null;
+  /** Owning agency (0033). */
+  branch_id?: string | null;
 }
 
 export interface Reward {
@@ -149,7 +166,11 @@ export interface Order {
   status: OrderStatus;
   mode: OrderMode;
   address: string | null;
+  /** Contact phone captured at checkout (0031). */
+  phone?: string | null;
   zone_id: string | null;
+  /** Fulfilling agency (0033). */
+  branch_id?: string | null;
   subtotal_dh: number;
   delivery_fee_dh: number;
   discount_dh: number;
