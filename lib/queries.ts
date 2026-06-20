@@ -12,6 +12,7 @@ import { buildShiftWeek, mondayOf, isoDate, type ShiftWeek } from '@/lib/admin-p
 import { buildSupportThreads, type SupportThread, type RawSupportDriver } from '@/lib/admin-support';
 import type { StatOrder, StatItem } from '@/lib/admin-stats';
 import { buildCustomerRows, type CrmOrder, type CrmProfile, type CustomerRow } from '@/lib/admin-crm';
+import type { LoyaltyMember } from '@/lib/admin-loyalty';
 import { loadKitchenBoard } from '@/lib/kitchen-data';
 import type { KitchenBoard } from '@/lib/kitchen';
 import type {
@@ -664,4 +665,17 @@ export async function getAdminCrmData(): Promise<AdminCrmData> {
   const orders = (ordersRes.data ?? []) as CrmOrder[];
   const profiles = (profilesRes.data ?? []) as CrmProfile[];
   return { rows: buildCustomerRows(orders, profiles), orders };
+}
+
+/** Loyalty members (one per profile) for the admin Fidélité overview. */
+export async function getAdminLoyaltyMembers(): Promise<LoyaltyMember[]> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, full_name, loyalty_points, loyalty_tier')
+    .order('loyalty_points', { ascending: false });
+  return (data ?? []).map((p) => {
+    const r = p as { id: string; full_name: string | null; loyalty_points: number | null; loyalty_tier: string | null };
+    return { id: r.id, name: r.full_name?.trim() || 'Client', points: r.loyalty_points ?? 0, tier: r.loyalty_tier };
+  });
 }
