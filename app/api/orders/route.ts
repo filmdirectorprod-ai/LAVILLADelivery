@@ -17,6 +17,7 @@ interface PlaceOrderBody {
   mode: 'livraison' | 'retrait';
   address?: string | null;
   phone?: string | null;
+  branch_slug?: string | null;
   zone_id?: string | null;
   promo?: boolean;
   redeem_pts?: number;
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
     p_redeem_pts: body.redeem_pts ?? 0,
     p_redeem_dh: body.redeem_dh ?? 0,
     p_phone: body.phone ?? null,
+    p_branch_slug: body.branch_slug ?? null,
   });
 
   if (error) {

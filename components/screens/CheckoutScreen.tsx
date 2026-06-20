@@ -149,6 +149,7 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
                 ? formatAddress(selectedAddress)
                 : '',
           phone: phone.trim(),
+          branch_slug: mode === 'retrait' ? pickupBranchId : null,
           zone_id: mode === 'retrait' ? null : zone?.id ?? null,
           promo,
           redeem_pts: palier?.pts ?? 0,
