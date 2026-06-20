@@ -88,10 +88,24 @@ export function CrmScreen({ rows, orders }: { rows: CustomerRow[]; orders: CrmOr
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 46, height: 46, borderRadius: 999, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--ui-font)', fontWeight: 700, color: 'var(--brand)', fontSize: 18 }}>{active.name.slice(0, 1).toUpperCase()}</div>
-                <div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 17, color: 'var(--ink)' }}>{active.name}</div>
                   <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>{active.phone ?? 'Sans téléphone'} · <span style={{ color: SEGMENT_COLOR[active.segment], fontWeight: 700 }}>{active.segment}</span></div>
                 </div>
+                {active.phone && (() => {
+                  const digits = active.phone.replace(/[^0-9]/g, '');
+                  const wa = digits.startsWith('0') ? '212' + digits.slice(1) : digits;
+                  return (
+                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                      <a href={`tel:${active.phone.replace(/[^0-9+]/g, '')}`} aria-label="Appeler" style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(19,124,139,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                        <Icon name="phone" size={17} color="var(--brand)" />
+                      </a>
+                      <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(37,211,102,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                        <Icon name="message" size={17} color="#1f9d57" />
+                      </a>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>

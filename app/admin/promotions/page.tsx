@@ -7,15 +7,24 @@ import type { Branch, Promotion } from '@/lib/types';
 
 export default async function PromotionsPage() {
   const supabase = await createServerSupabase();
-  const [{ data: promos }, { data: branches }] = await Promise.all([
+  const [{ data: promos }, { data: branches }, { data: reds }] = await Promise.all([
     supabase.from('promotions').select('*').order('created_at', { ascending: false }),
     supabase.from('branches').select('*').eq('is_active', true).order('slug'),
+    supabase.from('promo_redemptions').select('promotion_id'),
   ]);
+
+  // Usage count per promo, for the "N utilisations" + auto status.
+  const uses: Record<string, number> = {};
+  for (const r of reds ?? []) {
+    const id = (r as { promotion_id: string }).promotion_id;
+    uses[id] = (uses[id] ?? 0) + 1;
+  }
 
   return (
     <PromotionsScreen
       initial={(promos ?? []) as Promotion[]}
       branches={(branches ?? []) as Branch[]}
+      uses={uses}
     />
   );
 }

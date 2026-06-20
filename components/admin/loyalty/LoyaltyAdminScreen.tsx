@@ -61,7 +61,12 @@ export function LoyaltyAdminScreen({ members: initial }: { members: LoyaltyMembe
 
       {/* Tier distribution */}
       <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
-        <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 16 }}>Répartition par palier</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>Répartition par palier</div>
+          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)' }}>
+            Seuils (pts cumulés) : Gourmand 0 · Connaisseur 500 · Gourmet 1000 · Cercle Villa 1500
+          </div>
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {LOYALTY_TIERS.map((t) => (
             <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

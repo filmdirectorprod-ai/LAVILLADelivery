@@ -43,7 +43,15 @@ function toDraft(p: Promotion): Draft {
   };
 }
 
-export function PromotionsScreen({ initial, branches }: { initial: Promotion[]; branches: Branch[] }) {
+type PromoStatus = { label: string; color: string; bg: string };
+function promoStatus(p: Promotion, uses: number): PromoStatus {
+  if (!p.active) return { label: 'Inactif', color: 'var(--muted)', bg: 'rgba(0,0,0,0.06)' };
+  if (p.ends_at && new Date(p.ends_at).getTime() < Date.now()) return { label: 'Expiré', color: '#b45309', bg: 'rgba(180,83,9,0.1)' };
+  if (p.max_uses != null && uses >= p.max_uses) return { label: 'Épuisé', color: '#b45309', bg: 'rgba(180,83,9,0.1)' };
+  return { label: 'Actif', color: '#1f7a49', bg: 'rgba(35,158,111,0.12)' };
+}
+
+export function PromotionsScreen({ initial, branches, uses = {} }: { initial: Promotion[]; branches: Branch[]; uses?: Record<string, number> }) {
   const [promos, setPromos] = useState<Promotion[]>(initial);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
@@ -191,13 +199,18 @@ export function PromotionsScreen({ initial, branches }: { initial: Promotion[]; 
                 <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
                   {p.type === 'percent' ? `${p.value} %` : formatDH(p.value)}
                   {p.min_order_dh > 0 ? ` · min ${formatDH(p.min_order_dh)}` : ''}
-                  {p.max_uses != null ? ` · ${p.max_uses} max` : ''}
+                  {` · ${uses[p.id] ?? 0}${p.max_uses != null ? `/${p.max_uses}` : ''} util.`}
                   {p.branch_id ? ` · ${branchName.get(p.branch_id) ?? 'agence'}` : ' · toutes agences'}
                 </div>
               </div>
-              <span style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: p.active ? 'rgba(35,158,111,0.12)' : 'rgba(0,0,0,0.06)', color: p.active ? '#1f7a49' : 'var(--muted)' }}>
-                {p.active ? 'Actif' : 'Inactif'}
-              </span>
+              {(() => {
+                const st = promoStatus(p, uses[p.id] ?? 0);
+                return (
+                  <span style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: st.bg, color: st.color }}>
+                    {st.label}
+                  </span>
+                );
+              })()}
               <button onClick={() => toggleActive(p)} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '7px 11px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', background: '#fff' }}>
                 {p.active ? 'Désactiver' : 'Activer'}
               </button>

@@ -26,11 +26,18 @@ function rangeBounds(days: number): { from: string; to: string } {
   return { from: from.toISOString(), to: new Date(to.getTime() + 1000).toISOString() };
 }
 
-function Kpi({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Kpi({ label, value, accent, delta }: { label: string; value: string; accent?: boolean; delta?: number | null }) {
   return (
     <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: '16px 18px', flex: 1, minWidth: 150 }}>
       <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>{label}</div>
-      <div style={{ fontFamily: 'var(--ui-font)', fontSize: 24, fontWeight: 700, color: accent ? 'var(--brand)' : 'var(--ink)', marginTop: 6 }}>{value}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
+        <div style={{ fontFamily: 'var(--ui-font)', fontSize: 24, fontWeight: 700, color: accent ? 'var(--brand)' : 'var(--ink)' }}>{value}</div>
+        {delta != null && (
+          <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 700, color: delta >= 0 ? '#1f7a49' : '#c0392b' }}>
+            {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)}%
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -45,6 +52,13 @@ export function StatsScreen({ orders, items, branches }: { orders: StatOrder[]; 
   const scopedItems = useMemo(() => items.filter((it) => scopedIds.has(it.order_id)), [items, scopedIds]);
 
   const kpis = useMemo(() => summarize(scoped), [scoped]);
+  // Same-length window immediately before, for the revenue trend.
+  const prevRevenue = useMemo(() => {
+    const days = RANGES.find((r) => r.key === range)!.days;
+    const prevFrom = new Date(Date.parse(from) - days * 24 * 60 * 60 * 1000).toISOString();
+    return summarize(filterOrders(orders, prevFrom, from)).revenue;
+  }, [orders, from, range]);
+  const revenueDelta = prevRevenue > 0 ? Math.round(((kpis.revenue - prevRevenue) / prevRevenue) * 100) : null;
   const series = useMemo(() => revenueByDay(scoped), [scoped]);
   const top = useMemo(() => topProducts(scopedItems), [scopedItems]);
   const byBranch = useMemo(() => revenueByBranch(scoped), [scoped]);
@@ -83,7 +97,7 @@ export function StatsScreen({ orders, items, branches }: { orders: StatOrder[]; 
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <Kpi label="Chiffre d'affaires" value={formatDH(kpis.revenue)} accent />
+        <Kpi label="Chiffre d'affaires" value={formatDH(kpis.revenue)} accent delta={revenueDelta} />
         <Kpi label="Commandes" value={String(kpis.orders)} />
         <Kpi label="Panier moyen" value={formatDH(kpis.avgBasket)} />
         <Kpi label="Livrées" value={String(kpis.delivered)} />
