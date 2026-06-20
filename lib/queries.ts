@@ -11,6 +11,7 @@ import { buildIncidentRows, type IncidentRow } from '@/lib/admin-incidents';
 import { buildShiftWeek, mondayOf, isoDate, type ShiftWeek } from '@/lib/admin-planning';
 import { buildSupportThreads, type SupportThread, type RawSupportDriver } from '@/lib/admin-support';
 import type { StatOrder, StatItem } from '@/lib/admin-stats';
+import { buildCustomerRows, type CrmOrder, type CrmProfile, type CustomerRow } from '@/lib/admin-crm';
 import { loadKitchenBoard } from '@/lib/kitchen-data';
 import type { KitchenBoard } from '@/lib/kitchen';
 import type {
@@ -642,4 +643,25 @@ export async function getAdminStatsData(): Promise<AdminStatsData> {
     items: (itemsRes.data ?? []) as StatItem[],
     branches: (branchesRes.data ?? []) as Branch[],
   };
+}
+
+export interface AdminCrmData {
+  rows: CustomerRow[];
+  orders: CrmOrder[];
+}
+
+/**
+ * Customer directory: one row per customer who has ordered (RLS-scoped orders, so a
+ * branch gérant only sees their agency's customers), enriched with profile + a note.
+ * Also returns the raw orders so the screen can show a customer's history.
+ */
+export async function getAdminCrmData(): Promise<AdminCrmData> {
+  const supabase = await createServerSupabase();
+  const [ordersRes, profilesRes] = await Promise.all([
+    supabase.from('orders').select('id, user_id, code, status, total_dh, placed_at').order('placed_at', { ascending: false }),
+    supabase.from('profiles').select('id, full_name, phone, loyalty_points, loyalty_tier, crm_note'),
+  ]);
+  const orders = (ordersRes.data ?? []) as CrmOrder[];
+  const profiles = (profilesRes.data ?? []) as CrmProfile[];
+  return { rows: buildCustomerRows(orders, profiles), orders };
 }

@@ -19,6 +19,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/incidents', label: 'Incidents', icon: 'info' },
   { href: '/admin/planning', label: 'Planning', icon: 'calendar' },
   { href: '/admin/stats', label: 'Statistiques', icon: 'star' },
+  { href: '/admin/customers', label: 'Clients', icon: 'user' },
   { href: '/admin/promotions', label: 'Promotions', icon: 'tag' },
   { href: '/admin/managers', label: 'Gérants', icon: 'user' },
 ];
