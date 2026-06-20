@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
+import { useBeep } from '@/lib/use-beep';
 import { SUPPORT_SEEN_KEY } from '@/lib/driver-support';
 import type { Driver, SupportMessage } from '@/lib/types';
 
@@ -40,6 +41,7 @@ export function DriverSupportScreen({
   const [messages, setMessages] = useState<SupportMessage[]>(initialMessages);
   const [draft, setDraft] = useState('');
   const scroller = useRef<HTMLDivElement>(null);
+  const { beep } = useBeep();
 
   // Viewing the thread counts as reading it — stamp on open and whenever a new
   // message lands while the screen is open.
@@ -56,6 +58,7 @@ export function DriverSupportScreen({
         { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `driver_id=eq.${driver.id}` },
         (payload) => {
           const msg = payload.new as SupportMessage;
+          if (msg.sender === 'staff') beep(); // the gérant just replied
           setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
         },
       )
@@ -63,7 +66,7 @@ export function DriverSupportScreen({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [driver.id]);
+  }, [driver.id, beep]);
 
   useEffect(() => {
     if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;

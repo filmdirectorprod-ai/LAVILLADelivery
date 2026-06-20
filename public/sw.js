@@ -5,7 +5,7 @@
    - Same-origin static assets (icons, images, _next static): cache-first.
    - Never cache Supabase / API / auth callbacks (always go to network).
    Bump CACHE_VERSION to force-refresh clients. */
-const CACHE_VERSION = 'lavilla-v2';
+const CACHE_VERSION = 'lavilla-v3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 self.addEventListener('install', (event) => {
@@ -77,6 +77,8 @@ self.addEventListener('fetch', (event) => {
 
 /* ---- Web Push ---- */
 function targetUrl(d) {
+  if (d && d.kind === 'support_staff') return '/admin/support'; // driver wrote → gérant
+  if (d && d.kind === 'support_driver') return '/driver/support'; // gérant replied → livreur
   if (!d || !d.order_id) return '/';
   if (d.kind === 'call') return '/call/' + d.order_id;
   if (d.kind === 'message') return '/chat/' + d.order_id;
@@ -114,9 +116,11 @@ self.addEventListener('notificationclick', (event) => {
         const c = all[0];
         // Route inside the already-installed app, by its role prefix.
         let path = d.url || '/';
+        const isSupport = d.kind === 'support_staff' || d.kind === 'support_driver';
         try {
           const p = new URL(c.url).pathname;
-          if (p.startsWith('/admin')) path = '/admin/orders';
+          if (isSupport) path = d.url; // support already targets the right section
+          else if (p.startsWith('/admin')) path = '/admin/orders';
           else if (p.startsWith('/driver')) path = d.order_id ? '/driver/order/' + d.order_id : '/driver';
         } catch {
           /* ignore */
