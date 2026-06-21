@@ -83,14 +83,12 @@ export default function DriverAuthPage() {
     >
       {/* Brand + role header */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-        <div style={{ background: '#fff', borderRadius: 14, padding: '10px 14px', boxShadow: '0 8px 22px -12px rgba(0,0,0,0.6)' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/brand/logo.png"
-            alt="La Villa — Maison de Qualité, depuis 2007"
-            style={{ width: 150, height: 'auto', display: 'block' }}
-          />
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/logo-ondark.png"
+          alt="La Villa — Maison de Qualité, depuis 2007"
+          style={{ width: 220, height: 'auto', display: 'block' }}
+        />
         <div
           style={{
             width: 64,
@@ -166,9 +164,9 @@ export default function DriverAuthPage() {
         </div>
       </div>
 
-      {/* Footer: link back to the customer app */}
+      {/* Footer: driver sign-in */}
       <button
-        onClick={() => router.push('/auth')}
+        onClick={() => router.push('/auth/livreur')}
         style={{
           background: 'none',
           border: 'none',
@@ -180,8 +178,8 @@ export default function DriverAuthPage() {
           textAlign: 'center',
         }}
       >
-        Vous êtes client ?{' '}
-        <span style={{ color: 'var(--gold)', fontWeight: 700 }}>Connexion client</span>
+        Vous êtes livreur ?{' '}
+        <span style={{ color: 'var(--gold)', fontWeight: 700 }}>Connexion livreur</span>
       </button>
     </div>
   );
