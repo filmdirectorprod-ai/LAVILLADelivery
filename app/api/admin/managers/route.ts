@@ -86,3 +86,41 @@ export async function POST(request: NextRequest) {
     { status: 201 },
   );
 }
+
+// DELETE /api/admin/managers — super-admin removes a branch gérant (auth user +
+// profile). Only branch gérants can be deleted (never a super-admin or yourself).
+export async function DELETE(request: NextRequest) {
+  let body: { user_id?: string };
+  try {
+    body = (await request.json()) as { user_id?: string };
+  } catch {
+    return NextResponse.json({ error: 'Requête invalide' }, { status: 400 });
+  }
+  if (!body.user_id) return NextResponse.json({ error: 'Gérant manquant.' }, { status: 400 });
+
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+  const { data: isStaff } = await supabase.rpc('lv_is_staff');
+  if (!isStaff) return NextResponse.json({ error: 'Accès réservé au staff.' }, { status: 403 });
+  const { data: callerBranch } = await supabase.rpc('lv_staff_branch');
+  if (callerBranch) return NextResponse.json({ error: 'Réservé au super-admin.' }, { status: 403 });
+  if (body.user_id === user.id) return NextResponse.json({ error: 'Vous ne pouvez pas vous supprimer.' }, { status: 400 });
+
+  const svc = createServiceSupabase();
+  // Only delete an actual branch gérant (is_staff with a branch).
+  const { data: target } = await svc.from('profiles').select('is_staff, branch_id').eq('id', body.user_id).maybeSingle();
+  const t = target as { is_staff: boolean; branch_id: string | null } | null;
+  if (!t || !t.is_staff || !t.branch_id) {
+    return NextResponse.json({ error: 'Gérant introuvable.' }, { status: 404 });
+  }
+
+  const { error: dErr } = await svc.auth.admin.deleteUser(body.user_id);
+  if (dErr) return NextResponse.json({ error: dErr.message }, { status: 400 });
+  // Clean the profile in case it wasn't cascaded.
+  await svc.from('profiles').delete().eq('id', body.user_id);
+
+  return NextResponse.json({ ok: true }, { status: 200 });
+}

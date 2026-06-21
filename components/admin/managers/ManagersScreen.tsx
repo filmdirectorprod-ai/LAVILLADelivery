@@ -2,6 +2,7 @@
 // Super-admin screen: create a branch gérant (identifiant → <id>@gerant.lavilla.ma
 // + password + agency) via POST /api/admin/managers, and list existing gérants.
 import { useMemo, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/ui/Icon';
 import { generatePassword, validateIdentifiant, validateDriverPassword, GERANT_EMAIL_DOMAIN } from '@/lib/driver-credentials';
 import type { Branch } from '@/lib/types';
@@ -20,8 +21,54 @@ export function ManagersScreen({ branches, managers: initial }: { branches: Bran
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ identifiant: string; email: string } | null>(null);
+  // Row edit / delete state.
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editBranch, setEditBranch] = useState('');
+  const [rowBusy, setRowBusy] = useState(false);
 
   const branchName = useMemo(() => new Map(branches.map((b) => [b.id, b.name])), [branches]);
+
+  async function refetchManagers() {
+    const { data } = await createClient()
+      .from('profiles')
+      .select('id, full_name, branch_id')
+      .eq('is_staff', true)
+      .not('branch_id', 'is', null);
+    setManagers((data ?? []) as Manager[]);
+  }
+
+  function startEdit(m: Manager) {
+    setEditId(m.id);
+    setEditName(m.full_name ?? '');
+    setEditBranch(m.branch_id ?? branches[0]?.id ?? '');
+  }
+
+  async function saveEdit() {
+    if (!editId || !editName.trim() || !editBranch) return;
+    setRowBusy(true);
+    await createClient().rpc('admin_update_manager', { p_user: editId, p_name: editName.trim(), p_branch: editBranch });
+    setRowBusy(false);
+    setEditId(null);
+    refetchManagers();
+  }
+
+  async function deleteManager(m: Manager) {
+    if (!confirm(`Supprimer le gérant ${m.full_name || ''} ? Son accès sera révoqué.`)) return;
+    setRowBusy(true);
+    const res = await fetch('/api/admin/managers', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: m.id }),
+    });
+    setRowBusy(false);
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      alert(j.error ?? 'Suppression échouée.');
+      return;
+    }
+    setManagers((list) => list.filter((x) => x.id !== m.id));
+  }
 
   async function create() {
     setError(null);
@@ -42,7 +89,7 @@ export function ManagersScreen({ branches, managers: initial }: { branches: Bran
     setBusy(false);
     if (!res.ok || !json.ok) return setError(json.error ?? 'Création échouée.');
     setDone({ identifiant: json.identifiant!, email: json.email! });
-    setManagers((m) => [...m, { id: json.email!, full_name: name.trim(), branch_id: branchId }]);
+    refetchManagers();
     setIdentifiant('');
     setName('');
     setPassword(generatePassword());
@@ -112,12 +159,34 @@ export function ManagersScreen({ branches, managers: initial }: { branches: Bran
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {managers.map((m) => (
-              <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 12 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 999, background: 'rgba(19,124,139,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="user" size={17} color="var(--brand)" />
+              <div key={m.id} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: '10px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 999, background: 'rgba(19,124,139,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon name="user" size={17} color="var(--brand)" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.full_name || '—'}</div>
+                  <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--brand)', fontWeight: 600 }}>{branchName.get(m.branch_id ?? '')?.replace(/ —.*$/, '') ?? '—'}</div>
+                  <button onClick={() => (editId === m.id ? setEditId(null) : startEdit(m))} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 11px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--brand)', background: '#fff' }}>
+                    Modifier
+                  </button>
+                  <button onClick={() => deleteManager(m)} disabled={rowBusy} aria-label="Supprimer" style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 9px', cursor: 'pointer', background: '#fff' }}>
+                    <Icon name="x" size={15} color="#C0392B" />
+                  </button>
                 </div>
-                <div style={{ flex: 1, fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{m.full_name || '—'}</div>
-                <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--brand)', fontWeight: 600 }}>{branchName.get(m.branch_id ?? '') ?? '—'}</div>
+                {editId === m.id && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Nom" style={{ ...field, flex: 1, minWidth: 160, width: 'auto' }} />
+                    <select value={editBranch} onChange={(e) => setEditBranch(e.target.value)} style={{ ...field, width: 'auto', cursor: 'pointer' }}>
+                      {branches.map((b) => <option key={b.id} value={b.id}>{b.name.replace(/ —.*$/, '')}</option>)}
+                    </select>
+                    <button onClick={saveEdit} disabled={rowBusy} style={{ border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 13, color: '#fff', background: 'var(--brand)', opacity: rowBusy ? 0.6 : 1 }}>
+                      {rowBusy ? '…' : 'Enregistrer'}
+                    </button>
+                    <button onClick={() => setEditId(null)} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--ink)', background: '#fff' }}>
+                      Annuler
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
