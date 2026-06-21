@@ -3,9 +3,9 @@
 //   • Livraison en cours — the order this driver has claimed (rich card)
 //   • Disponibles        — the unclaimed pool any driver can accept
 // Subscribes to Realtime on `orders` and `order_tracking` and re-pulls the
-// RLS-scoped board on any change. The online/offline switch is a device-local
-// preference (there's no is_online column yet): when offline we hide the
-// available pool so the driver stops seeing new requests.
+// RLS-scoped board on any change. The online/offline switch (useDriverOnline)
+// drives the driver's REAL presence (DriverPresence heartbeats it to the admin)
+// and also hides the available pool locally when offline.
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -16,6 +16,7 @@ import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import { UserNotificationBell } from '@/components/ui/UserNotificationBell';
 import { unreadFromStaff, SUPPORT_SEEN_KEY } from '@/lib/driver-support';
+import { useDriverOnline } from '@/lib/driver-online-store';
 import type { Driver, Order, OrderTracking, SupportMessage } from '@/lib/types';
 import type { DriverOrder } from '@/lib/queries';
 
@@ -26,8 +27,6 @@ const STAGE_LABEL: Record<number, string> = {
   3: 'En route',
   4: 'Livrée',
 };
-
-const ONLINE_KEY = 'lv-driver-online';
 
 function mapBoard(rows: unknown[]): DriverOrder[] {
   return (rows ?? []).map((r) => {
@@ -60,25 +59,11 @@ export function DriverDashboard({
 }) {
   const router = useRouter();
   const [board, setBoard] = useState<DriverOrder[]>(initialBoard);
-  const [online, setOnline] = useState(true);
+  // Availability switch — shared with DriverPresence, which heartbeats real
+  // presence to the admin based on it (+ persisted to localStorage).
+  const online = useDriverOnline((s) => s.online);
+  const toggleOnline = useDriverOnline((s) => s.toggle);
   const [supportUnread, setSupportUnread] = useState(0);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(ONLINE_KEY);
-    if (stored !== null) setOnline(stored === '1');
-  }, []);
-
-  const toggleOnline = () => {
-    setOnline((v) => {
-      const next = !v;
-      try {
-        localStorage.setItem(ONLINE_KEY, next ? '1' : '0');
-      } catch {
-        /* storage unavailable */
-      }
-      return next;
-    });
-  };
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
