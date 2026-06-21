@@ -2,7 +2,7 @@
 // Admin promo-code management: create / edit / activate / delete codes via the
 // admin_upsert_promo + admin_delete_promo RPCs. A branch gérant only sees and
 // manages their own agency's codes (RLS + RPC enforced).
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import { Icon } from '@/components/ui/Icon';
@@ -51,9 +51,29 @@ function promoStatus(p: Promotion, uses: number): PromoStatus {
   return { label: 'Actif', color: '#1f7a49', bg: 'rgba(35,158,111,0.12)' };
 }
 
-export function PromotionsScreen({ initial, branches, uses = {} }: { initial: Promotion[]; branches: Branch[]; uses?: Record<string, number> }) {
+export function PromotionsScreen({ initial, branches, uses: initialUses = {} }: { initial: Promotion[]; branches: Branch[]; uses?: Record<string, number> }) {
   const [promos, setPromos] = useState<Promotion[]>(initial);
+  const [uses, setUses] = useState<Record<string, number>>(initialUses);
   const [draft, setDraft] = useState<Draft | null>(null);
+
+  // Live usage counts + promo edits (promo_redemptions / promotions published).
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel('admin-promotions')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'promo_redemptions' }, (payload) => {
+        const id = (payload.new as { promotion_id: string }).promotion_id;
+        setUses((u) => ({ ...u, [id]: (u[id] ?? 0) + 1 }));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'promotions' }, async () => {
+        const { data } = await supabase.from('promotions').select('*').order('created_at', { ascending: false });
+        if (data) setPromos(data as Promotion[]);
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const branchName = useMemo(() => new Map(branches.map((b) => [b.id, b.name.replace(/ —.*$/, '')])), [branches]);

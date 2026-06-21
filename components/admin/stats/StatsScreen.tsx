@@ -2,7 +2,8 @@
 // Admin Statistiques: a date-range report over the last 90 days of orders. KPIs,
 // daily revenue bars, top products, per-agency split, and CSV export. All figures
 // come from the pure lib/admin-stats helpers; the rows are already RLS-scoped.
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import {
   filterOrders, summarize, revenueByDay, topProducts, revenueByBranch, statsToCsv,
@@ -42,9 +43,39 @@ function Kpi({ label, value, accent, delta }: { label: string; value: string; ac
   );
 }
 
-export function StatsScreen({ orders, items, branches }: { orders: StatOrder[]; items: StatItem[]; branches: Branch[] }) {
+export function StatsScreen({ orders: initialOrders, items: initialItems, branches }: { orders: StatOrder[]; items: StatItem[]; branches: Branch[] }) {
   const [range, setRange] = useState<RangeKey>('30d');
+  const [orders, setOrders] = useState<StatOrder[]>(initialOrders);
+  const [items, setItems] = useState<StatItem[]>(initialItems);
   const branchName = useMemo(() => new Map(branches.map((b) => [b.id, b.name.replace(/ —.*$/, '')])), [branches]);
+
+  // Live: re-pull the 90-day window whenever an order changes (RLS-scoped).
+  const refetch = useCallback(async () => {
+    const supabase = createClient();
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: ords } = await supabase
+      .from('orders')
+      .select('id, status, total_dh, placed_at, branch_id')
+      .gte('placed_at', since)
+      .order('placed_at', { ascending: false });
+    const ids = (ords ?? []).map((o) => (o as { id: string }).id);
+    const { data: its } = ids.length
+      ? await supabase.from('order_items').select('order_id, name_snapshot, qty, price_snapshot').in('order_id', ids)
+      : { data: [] as StatItem[] };
+    setOrders((ords ?? []) as StatOrder[]);
+    setItems((its ?? []) as StatItem[]);
+  }, []);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel('admin-stats')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refetch)
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
 
   const { from, to } = useMemo(() => rangeBounds(RANGES.find((r) => r.key === range)!.days), [range]);
   const scoped = useMemo(() => filterOrders(orders, from, to), [orders, from, to]);

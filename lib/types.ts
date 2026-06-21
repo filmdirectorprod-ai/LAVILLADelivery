@@ -136,6 +136,10 @@ export interface Profile {
   branch_id?: string | null;
   /** Internal CRM note (0039). */
   crm_note?: string | null;
+  /** Shareable referral code (0048). */
+  referral_code?: string | null;
+  /** Who referred this customer (0048). */
+  referred_by?: string | null;
 }
 
 /** A saved delivery address (owner-scoped). */
