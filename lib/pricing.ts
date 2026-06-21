@@ -20,6 +20,7 @@ export const PROMO_RATE = 0.15;
 
 /** Discrete loyalty redemption paliers (pts -> DH off). */
 export const REDEEM_PALIERS: { pts: number; dh: number }[] = [
+  { pts: 100, dh: 10 },
   { pts: 250, dh: 25 },
   { pts: 500, dh: 60 },
   { pts: 1000, dh: 130 },

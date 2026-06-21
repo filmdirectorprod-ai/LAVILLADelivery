@@ -2,7 +2,9 @@
 // PROGRAMME DE FIDÉLITÉ — paliers de statut + paliers de paiement + récompenses
 // + historique. Ported from the prototype (screens-account.jsx Loyalty), driven
 // by the real profile balance, the rewards catalog, and the loyalty ledger.
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import type { LoyaltyLedgerEntry, Profile, Reward } from '@/lib/types';
 import { LOYALTY_TIERS, LOYALTY_BENEFITS, REDEEM_OPTIONS, tierFor, nextTierFor } from '@/lib/constants';
 import { useToast } from '@/lib/toast-store';
@@ -33,7 +35,31 @@ function ledgerIcon(e: LoyaltyLedgerEntry): string {
 export function LoyaltyScreen({ profile, rewards, ledger, reviewOrderId }: LoyaltyScreenProps) {
   const router = useRouter();
   const toast = useToast((s) => s.show);
-  const pts = profile?.loyalty_points ?? 0;
+
+  // Live points + activity: profiles & loyalty_ledger are published to Realtime
+  // (0047), so a new order / admin adjustment / review bonus reflects instantly.
+  const [liveProfile, setLiveProfile] = useState<Profile | null>(profile);
+  const [liveLedger, setLiveLedger] = useState<LoyaltyLedgerEntry[]>(ledger);
+  useEffect(() => {
+    const uid = profile?.id;
+    if (!uid) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel('loyalty-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${uid}` }, (payload) => {
+        setLiveProfile((p) => ({ ...(p as Profile), ...(payload.new as Partial<Profile>) }));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'loyalty_ledger', filter: `user_id=eq.${uid}` }, (payload) => {
+        const e = payload.new as LoyaltyLedgerEntry;
+        setLiveLedger((l) => (l.some((x) => x.id === e.id) ? l : [e, ...l]));
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]);
+
+  const pts = liveProfile?.loyalty_points ?? 0;
   const tier = tierFor(pts);
   const next = nextTierFor(pts);
   const toNext = next ? next.min - pts : 0;
@@ -188,12 +214,12 @@ export function LoyaltyScreen({ profile, rewards, ledger, reviewOrderId }: Loyal
         </div>
 
         {/* historique */}
-        {ledger.length > 0 && (
+        {liveLedger.length > 0 && (
           <div style={{ padding: '22px 18px 0' }}>
             <SectionHead title="Activité des points" />
             <div style={{ marginTop: 8 }}>
-              {ledger.map((h, i) => (
-                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 2px', borderBottom: i < ledger.length - 1 ? '1px solid var(--line)' : 'none' }}>
+              {liveLedger.map((h, i) => (
+                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 2px', borderBottom: i < liveLedger.length - 1 ? '1px solid var(--line)' : 'none' }}>
                   <div style={{ width: 34, height: 34, borderRadius: 999, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Icon name={ledgerIcon(h)} size={16} color={h.delta_pts < 0 ? 'var(--muted)' : 'var(--brand)'} />
                   </div>
