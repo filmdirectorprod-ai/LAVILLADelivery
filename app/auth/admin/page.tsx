@@ -1,10 +1,9 @@
 'use client';
 // Admin (gérant) sign-in — a dedicated, full-width two-column screen, distinct from
 // the customer (/auth) and driver (/auth/livreur) logins. Left: the login form
-// (email/password + Google, since the gérant account is a Gmail). Right: a branded
-// La Villa panel. Renders full-width via .lv-admin-root (globals.css lifts the phone
-// frame). On success the gérant lands on /admin; middleware routes unauthenticated
-// /admin/* here.
+// (email/password only). Right: a branded La Villa panel. Renders full-width via
+// .lv-admin-root (globals.css lifts the phone frame). On success the gérant lands on
+// /admin; middleware routes unauthenticated /admin/* here.
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -59,18 +58,6 @@ export default function AdminAuthPage() {
     }
   }
 
-  async function google() {
-    setBusy(true);
-    const { error } = await getSupabase().auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/admin` },
-    });
-    if (error) {
-      setBusy(false);
-      setError(error.message);
-    }
-  }
-
   async function forgot() {
     setError(null);
     setInfo(null);
@@ -121,18 +108,11 @@ export default function AdminAuthPage() {
           {error && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 16 }}>{error}</div>}
           {info && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#2f9e6f', fontWeight: 600, marginTop: 16 }}>{info}</div>}
 
-          <div style={{ display: 'flex', gap: 12, marginTop: 22 }}>
-            <button onClick={submit} disabled={busy} style={{ flex: 1, border: 'none', borderRadius: 4, padding: '14px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, letterSpacing: 1, color: '#fff', background: 'var(--brand-d)', opacity: busy ? 0.6 : 1 }}>
+          <div style={{ marginTop: 22 }}>
+            <button onClick={submit} disabled={busy} style={{ width: '100%', border: 'none', borderRadius: 4, padding: '14px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, letterSpacing: 1, color: '#fff', background: 'var(--brand-d)', opacity: busy ? 0.6 : 1 }}>
               {busy ? '…' : 'CONNEXION'}
             </button>
-            <button onClick={google} disabled={busy} style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 4, padding: '14px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, letterSpacing: 0.5, color: 'var(--ink)', background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <span style={{ fontWeight: 800, fontSize: 16, color: '#4285F4' }}>G</span> Google
-            </button>
           </div>
-
-          <button onClick={() => router.push('/auth')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)', marginTop: 22 }}>
-            Vous êtes client ou livreur ? <span style={{ color: 'var(--brand)', fontWeight: 600 }}>Autre connexion</span>
-          </button>
         </div>
       </div>
 
