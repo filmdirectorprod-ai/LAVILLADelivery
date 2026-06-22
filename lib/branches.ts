@@ -44,8 +44,13 @@ export function branchPickupLabel(b: Branch): string {
   return `Retrait boutique — ${b.name}, ${b.address}`;
 }
 
-/** Google Maps link to view / route to a shop (opens the precise coordinates). */
+/** Google Maps link to a shop. Prefer the Plus Code when we have one (it's the
+ *  authoritative address — Google resolves it to the exact point); otherwise fall
+ *  back to the stored coordinates. */
 export function branchMapsUrl(b: Branch): string {
+  if (b.plusCode) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${b.plusCode} Fès, Maroc`)}`;
+  }
   return `https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lng}`;
 }
 
