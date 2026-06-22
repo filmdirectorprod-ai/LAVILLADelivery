@@ -15,6 +15,6 @@ describe('branches', () => {
   });
   it('branchPickupLabel includes the name and address', () => {
     expect(branchPickupLabel(findBranch('badie'))).toContain('La Villa Badie');
-    expect(branchPickupLabel(findBranch('badie'))).toContain('XXQP+WJ8');
+    expect(branchPickupLabel(findBranch('badie'))).toContain('Aïn Chkef');
   });
 });

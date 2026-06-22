@@ -23,8 +23,8 @@ export const LA_VILLA_BRANCHES: Branch[] = [
   },
   {
     id: 'badie',
-    name: 'La Villa Badie — Saïss',
-    address: 'XXQP+WJ8, Fès (Saïss)',
+    name: 'La Villa Badie — Aïn Chkef',
+    address: 'Rocade Sud, Jardin Al Badie, Lotissement, Aïn Chkef, Fès 30000',
     phone: '05 35 69 15 61',
     plusCode: 'XXQP+WJ8',
     lat: 33.9898,
