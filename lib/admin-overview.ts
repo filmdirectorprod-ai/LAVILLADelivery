@@ -104,3 +104,27 @@ export function latestDriverPositions(
   }
   return out;
 }
+
+/** How recent a driver's streamed position must be to count as "live". */
+export const LOCATION_TTL_MS = 2 * 60 * 1000; // 2 minutes
+
+export interface LocatedDriver {
+  id: string;
+  name: string;
+  is_online?: boolean;
+  lat?: number | null;
+  lng?: number | null;
+  position_at?: string | null;
+}
+
+/** Live positions for EVERY online driver with a fresh streamed GPS fix (0049),
+ *  whether or not they're on a delivery. */
+export function driversToPositions(drivers: LocatedDriver[], now: Date = new Date()): DriverPosition[] {
+  const out: DriverPosition[] = [];
+  for (const d of drivers) {
+    if (!d.is_online || d.lat == null || d.lng == null || !d.position_at) continue;
+    if (now.getTime() - Date.parse(d.position_at) > LOCATION_TTL_MS) continue;
+    out.push({ id: d.id, name: d.name, lat: d.lat, lng: d.lng });
+  }
+  return out;
+}

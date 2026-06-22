@@ -12,7 +12,7 @@ import { isInProgressOrderStatus } from '@/lib/order-status';
 import {
   bucketOrdersByHour,
   computeOverviewKpis,
-  latestDriverPositions,
+  driversToPositions,
   startOfTodayISO,
 } from '@/lib/admin-overview';
 import type { AdminOverviewData } from '@/lib/queries';
@@ -72,10 +72,9 @@ export function OverviewScreen({
     [data],
   );
   const buckets = useMemo(() => bucketOrdersByHour(data.orders), [data.orders]);
-  const positions = useMemo(
-    () => latestDriverPositions(data.drivers, data.tracking),
-    [data.drivers, data.tracking],
-  );
+  // Every online driver with a fresh GPS fix (streamed while online, not only
+  // during a delivery). 0049.
+  const positions = useMemo(() => driversToPositions(data.drivers), [data.drivers]);
 
   const inProgressRows: InProgressRow[] = useMemo(() => {
     const driverNameById = (id: string | null) =>

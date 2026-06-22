@@ -1,17 +1,20 @@
 // components/driver/DriverGeoStream.tsx
-// Streams the driver's GPS to their active delivery the whole time the driver app
-// is open — not just on the order screen — so the admin live map always shows a
-// delivering driver. Finds the driver's current order (assigned + ready/en_route),
-// then watchPosition → driver_update_position (throttled). Renders nothing.
+// Streams the driver's GPS the whole time they are ONLINE (the dashboard switch),
+// so the admin live map shows every connected driver — not only those delivering.
+// Each fix: driver_update_location (the driver's own live position) + when a
+// delivery is active, driver_update_position (the customer's live tracking). The
+// driver's order is resolved in the background and kept fresh via Realtime. Throttled.
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useDriverOnline } from '@/lib/driver-online-store';
 
 export function DriverGeoStream() {
-  const [orderId, setOrderId] = useState<string | null>(null);
+  const online = useDriverOnline((s) => s.online);
+  const orderIdRef = useRef<string | null>(null);
   const lastPush = useRef(0);
 
-  // Resolve the driver's active delivery, and keep it fresh on realtime changes.
+  // Resolve the driver's active delivery, kept fresh on realtime changes.
   useEffect(() => {
     const supabase = createClient();
     let cancelled = false;
@@ -29,7 +32,7 @@ export function DriverGeoStream() {
         .eq('driver_id', drv.id)
         .in('orders.status', ['ready', 'en_route'])
         .limit(1);
-      if (!cancelled) setOrderId((data?.[0]?.order_id as string | undefined) ?? null);
+      if (!cancelled) orderIdRef.current = (data?.[0]?.order_id as string | undefined) ?? null;
     }
 
     findActive();
@@ -44,21 +47,28 @@ export function DriverGeoStream() {
     };
   }, []);
 
-  // Stream the position while there is an active delivery.
+  // Stream GPS while online.
   useEffect(() => {
-    if (!orderId || typeof navigator === 'undefined' || !navigator.geolocation) return;
+    if (!online || typeof navigator === 'undefined' || !navigator.geolocation) return;
     const id = navigator.geolocation.watchPosition(
       async (pos) => {
         const now = Date.now();
-        if (now - lastPush.current < 4000) return; // ~1 / 4s
+        if (now - lastPush.current < 5000) return; // ~1 / 5s
         lastPush.current = now;
         const supabase = createClient();
-        await supabase.rpc('driver_update_position', {
-          p_order: orderId,
-          p_lat: pos.coords.latitude,
-          p_lng: pos.coords.longitude,
-          p_progress: null,
-        });
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        // The driver's own live position (shown on the admin map for every online driver).
+        await supabase.rpc('driver_update_location', { p_lat: lat, p_lng: lng });
+        // The active delivery's tracking (the customer's live map), when delivering.
+        if (orderIdRef.current) {
+          await supabase.rpc('driver_update_position', {
+            p_order: orderIdRef.current,
+            p_lat: lat,
+            p_lng: lng,
+            p_progress: null,
+          });
+        }
       },
       () => {
         /* permission denied / unavailable — silent */
@@ -66,7 +76,7 @@ export function DriverGeoStream() {
       { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 },
     );
     return () => navigator.geolocation.clearWatch(id);
-  }, [orderId]);
+  }, [online]);
 
   return null;
 }

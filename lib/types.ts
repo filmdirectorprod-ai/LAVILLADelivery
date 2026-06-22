@@ -106,6 +106,10 @@ export interface Driver {
   last_seen?: string | null;
   /** Owning agency (0033). */
   branch_id?: string | null;
+  /** Last streamed GPS position while online (0049). */
+  lat?: number | null;
+  lng?: number | null;
+  position_at?: string | null;
 }
 
 export interface Reward {

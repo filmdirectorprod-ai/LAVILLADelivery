@@ -4,6 +4,7 @@ import {
   bucketOrdersByHour,
   computeOverviewKpis,
   latestDriverPositions,
+  driversToPositions,
 } from '@/lib/admin-overview';
 
 describe('startOfTodayISO', () => {
@@ -105,5 +106,19 @@ describe('latestDriverPositions', () => {
     const drivers = [{ id: 'd1', name: 'Karim', is_online: true }];
     const tracking = [{ driver_id: 'd1', lat: null, lng: null, updated_at: '2026-06-07T10:00:00Z' }];
     expect(latestDriverPositions(drivers, tracking)).toEqual([]);
+  });
+});
+
+describe('driversToPositions', () => {
+  const now = new Date('2026-06-20T12:00:00Z');
+  const base = { lat: 34.02, lng: -5.01 };
+  it('keeps online drivers with a fresh fix; drops offline / stale / no-coords', () => {
+    const drivers = [
+      { id: 'a', name: 'En ligne récent', is_online: true, ...base, position_at: '2026-06-20T11:59:00Z' },
+      { id: 'b', name: 'Hors ligne', is_online: false, ...base, position_at: '2026-06-20T11:59:00Z' },
+      { id: 'c', name: 'Position périmée', is_online: true, ...base, position_at: '2026-06-20T11:50:00Z' },
+      { id: 'd', name: 'Sans coords', is_online: true, lat: null, lng: null, position_at: '2026-06-20T11:59:30Z' },
+    ];
+    expect(driversToPositions(drivers, now).map((p) => p.id)).toEqual(['a']);
   });
 });
