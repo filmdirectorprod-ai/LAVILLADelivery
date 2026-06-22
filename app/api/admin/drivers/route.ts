@@ -20,6 +20,7 @@ interface Body {
   name?: string;
   phone?: string | null;
   vehicle?: string | null;
+  branch_id?: string | null;
 }
 
 export async function POST(request: NextRequest) {
@@ -51,8 +52,23 @@ export async function POST(request: NextRequest) {
   const { data: isStaff } = await supabase.rpc('lv_is_staff');
   if (!isStaff) return NextResponse.json({ error: 'Accès réservé au staff.' }, { status: 403 });
 
+  // Multi-agences: a new driver must belong to exactly one branch so they only ever
+  // see that agency's orders. A branch gérant can only create drivers for their own
+  // agency (forced server-side); a super-admin picks the agency in the modal.
+  const { data: callerBranch } = await supabase.rpc('lv_staff_branch');
+  const branchId = (callerBranch as string | null) ?? (body.branch_id || null);
+  if (!linking && !branchId) {
+    return NextResponse.json({ error: 'Choisissez une agence pour le livreur.' }, { status: 400 });
+  }
+
   const email = identifiantToEmail(body.identifiant);
   const svc = createServiceSupabase();
+
+  // Branch must exist (when one applies).
+  if (branchId) {
+    const { data: branch } = await svc.from('branches').select('id').eq('id', branchId).maybeSingle();
+    if (!branch) return NextResponse.json({ error: 'Agence introuvable.' }, { status: 400 });
+  }
 
   // ── Create the auth account ──
   const { data: created, error: cErr } = await svc.auth.admin.createUser({
@@ -89,6 +105,7 @@ export async function POST(request: NextRequest) {
       phone: body.phone?.trim() || null,
       vehicle: body.vehicle?.trim() || null,
       user_id: userId,
+      branch_id: branchId,
     });
     if (error) writeErr = error.message;
   }

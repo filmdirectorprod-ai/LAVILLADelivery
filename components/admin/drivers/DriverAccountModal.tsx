@@ -5,8 +5,9 @@
 // Posts to /api/admin/drivers (staff-gated, service-role server side). On success
 // it shows the credentials once so the admin can pass them to the driver.
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
+import { useBranches } from '@/lib/use-branches';
 import {
   validateIdentifiant,
   validateDriverPassword,
@@ -31,9 +32,17 @@ export function DriverAccountModal({ mode, driver, onClose, onDone }: DriverAcco
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [vehicle, setVehicle] = useState('');
+  const [branchId, setBranchId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ identifiant: string; password: string } | null>(null);
+  const branches = useBranches();
+
+  // Default the agency to the first one once loaded (a branch gérant's choice is
+  // forced server-side; this picker matters for a super-admin creating drivers).
+  useEffect(() => {
+    if (!branchId && branches.length > 0) setBranchId(branches[0].id);
+  }, [branches, branchId]);
 
   async function submit() {
     setError(null);
@@ -55,6 +64,7 @@ export function DriverAccountModal({ mode, driver, onClose, onDone }: DriverAcco
           name: mode === 'new' ? name : undefined,
           phone: mode === 'new' ? phone : undefined,
           vehicle: mode === 'new' ? vehicle : undefined,
+          branch_id: mode === 'new' ? branchId : undefined,
         }),
       });
       const data = await res.json();
@@ -147,16 +157,35 @@ export function DriverAccountModal({ mode, driver, onClose, onDone }: DriverAcco
             </div>
 
             {mode === 'new' && (
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={label}>Téléphone</label>
-                  <div style={wrap}><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="06 12 34 56 78" style={input} /></div>
+              <>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={label}>Téléphone</label>
+                    <div style={wrap}><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="06 12 34 56 78" style={input} /></div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={label}>Véhicule</label>
+                    <div style={wrap}><input value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder="Scooter" style={input} /></div>
+                  </div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={label}>Véhicule</label>
-                  <div style={wrap}><input value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder="Scooter" style={input} /></div>
-                </div>
-              </div>
+
+                {branches.length > 1 && (
+                  <div>
+                    <label style={label}>Agence</label>
+                    <div style={wrap}>
+                      <Icon name="store" size={16} color="var(--muted)" />
+                      <select value={branchId} onChange={(e) => setBranchId(e.target.value)} style={{ ...input, cursor: 'pointer' }}>
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', marginTop: 5 }}>
+                      Le livreur ne verra que les commandes de cette agence.
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {error && (
