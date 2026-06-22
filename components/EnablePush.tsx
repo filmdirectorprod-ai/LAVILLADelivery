@@ -20,23 +20,58 @@ export function EnablePush() {
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  // Subscribe (if needed) and persist the subscription. Assumes permission granted.
+  // Idempotent: re-saving an existing subscription self-heals a lost DB row, which is
+  // exactly what restores push after a reinstall / service-worker swap.
+  const subscribeAndSave = useCallback(async () => {
+    const reg = await navigator.serviceWorker.ready;
+    const res = await fetch('/api/push/public-key');
+    const { publicKey } = await res.json();
+    if (!publicKey) throw new Error('no key');
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(publicKey) as BufferSource,
+      });
+    }
+    const json = sub.toJSON();
+    await createClient().rpc('save_push_subscription', {
+      p_endpoint: sub.endpoint,
+      p_p256dh: json.keys?.p256dh ?? '',
+      p_auth: json.keys?.auth ?? '',
+    });
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       if (typeof window === 'undefined') return;
       if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
-      if (Notification.permission !== 'default') return; // granted or denied → don't nag
-      if (sessionStorage.getItem('lv-push-dismissed') === '1') return;
       const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!cancelled && user) setShow(true);
+      if (cancelled || !user) return;
+
+      if (Notification.permission === 'granted') {
+        // Already allowed → silently (re)create + persist the subscription so push
+        // keeps working after a reinstall / SW update (no prompt, no user gesture).
+        try {
+          await subscribeAndSave();
+        } catch {
+          /* will retry next app open */
+        }
+        return;
+      }
+      if (Notification.permission === 'default' && sessionStorage.getItem('lv-push-dismissed') !== '1') {
+        setShow(true);
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [subscribeAndSave]);
 
   const enable = useCallback(async () => {
     setBusy(true);
@@ -46,31 +81,14 @@ export function EnablePush() {
         setShow(false);
         return;
       }
-      const reg = await navigator.serviceWorker.ready;
-      const res = await fetch('/api/push/public-key');
-      const { publicKey } = await res.json();
-      if (!publicKey) throw new Error('no key');
-      let sub = await reg.pushManager.getSubscription();
-      if (!sub) {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlB64ToUint8Array(publicKey) as BufferSource,
-        });
-      }
-      const json = sub.toJSON();
-      const supabase = createClient();
-      await supabase.rpc('save_push_subscription', {
-        p_endpoint: sub.endpoint,
-        p_p256dh: json.keys?.p256dh ?? '',
-        p_auth: json.keys?.auth ?? '',
-      });
+      await subscribeAndSave();
       setShow(false);
     } catch {
       /* user can retry later from the same prompt next session */
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [subscribeAndSave]);
 
   if (!show) return null;
 
