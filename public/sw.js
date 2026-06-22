@@ -5,7 +5,7 @@
    - Same-origin static assets (icons, images, _next static): cache-first.
    - Never cache Supabase / API / auth callbacks (always go to network).
    Bump CACHE_VERSION to force-refresh clients. */
-const CACHE_VERSION = 'lavilla-v3';
+const CACHE_VERSION = 'lavilla-v4';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 self.addEventListener('install', (event) => {
