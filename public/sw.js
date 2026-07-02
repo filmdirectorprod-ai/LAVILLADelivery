@@ -4,8 +4,11 @@
    - Navigations (HTML): network-first → fall back to cache only when offline.
    - Same-origin static assets (icons, images, _next static): cache-first.
    - Never cache Supabase / API / auth callbacks (always go to network).
+   - Redirected navigations (auth middleware → /onboarding, /admin, …) are rebuilt
+     into a plain response: a Response with `redirected === true` cannot be returned
+     to a navigation — the browser fails it and shows a BLANK page.
    Bump CACHE_VERSION to force-refresh clients. */
-const CACHE_VERSION = 'lavilla-v4';
+const CACHE_VERSION = 'lavilla-v5';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 self.addEventListener('install', (event) => {
@@ -48,12 +51,27 @@ self.addEventListener('fetch', (event) => {
       (async () => {
         try {
           const fresh = await fetch(request);
+          // If the fetch followed a redirect (the auth middleware sends an
+          // unauthenticated visitor to /onboarding, or a signed-in user from a
+          // sign-in page to their surface), `fresh.redirected` is true. Returning
+          // such a response to a NAVIGATION makes the browser fail the load and
+          // show a blank page — which is exactly what every installed app hit,
+          // because each start_url redirects in a common auth state. Rebuild it
+          // into a plain response (clears the flag) and don't cache redirects.
+          if (fresh.redirected) {
+            const headers = new Headers(fresh.headers);
+            headers.delete('content-encoding'); // body below is already decoded
+            headers.delete('content-length');
+            const body = await fresh.arrayBuffer();
+            return new Response(body, { status: fresh.status, statusText: fresh.statusText, headers });
+          }
           const cache = await caches.open(STATIC_CACHE);
-          cache.put(request, fresh.clone());
+          // Never let a cache write break the navigation (e.g. Vary: *).
+          cache.put(request, fresh.clone()).catch(() => {});
           return fresh;
         } catch {
           const cached = await caches.match(request);
-          return cached || caches.match('/');
+          return cached || (await caches.match('/')) || Response.error();
         }
       })(),
     );
