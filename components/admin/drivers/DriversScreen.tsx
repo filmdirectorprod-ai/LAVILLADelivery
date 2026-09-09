@@ -42,7 +42,7 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    const since = startOfTodayISO(); // shared UTC boundary — matches the server paint
+    const since = startOfTodayISO(); // agency-midnight boundary — matches the server paint
     const [driversRes, ordersRes, trackingRes, activeRes] = await Promise.all([
       supabase.from('drivers').select('*').order('name'),
       supabase

@@ -8,31 +8,36 @@ import {
 } from '@/lib/admin-overview';
 
 describe('startOfTodayISO', () => {
-  it('returns UTC midnight of the ref day (timezone-independent)', () => {
-    // Constructed in UTC so the assertion holds in any runtime timezone — the
-    // helper must produce the same boundary on a UTC server and a UTC+1 browser.
-    const ref = new Date('2026-06-07T14:30:00.000Z');
-    expect(startOfTodayISO(ref)).toBe('2026-06-07T00:00:00.000Z');
+  // Midnight in Fès (UTC+1) is 23:00 UTC the day before. Asserted as an instant,
+  // so it holds in any runtime timezone — the server paint and the browser must
+  // agree on the boundary.
+  it('returns agency midnight of the ref day', () => {
+    expect(startOfTodayISO(new Date('2026-06-07T14:30:00.000Z'))).toBe('2026-06-06T23:00:00.000Z');
   });
 
-  it('rolls to the correct UTC day for an evening UTC timestamp', () => {
-    const ref = new Date('2026-06-07T23:59:59.000Z');
-    expect(startOfTodayISO(ref)).toBe('2026-06-07T00:00:00.000Z');
+  it('files an order just after agency midnight under the new day', () => {
+    // 23:30 UTC on the 6th is already 00:30 on the 7th in Fès.
+    expect(startOfTodayISO(new Date('2026-06-06T23:30:00.000Z'))).toBe('2026-06-06T23:00:00.000Z');
+  });
+
+  it('still counts an order just before agency midnight as the old day', () => {
+    expect(startOfTodayISO(new Date('2026-06-06T22:30:00.000Z'))).toBe('2026-06-05T23:00:00.000Z');
   });
 });
 
 describe('bucketOrdersByHour', () => {
-  it('counts orders into 24 hour buckets by placed_at local hour', () => {
+  it('buckets by the hour in the agency timezone (UTC+1), not the runtime one', () => {
     const orders = [
-      { placed_at: new Date(2026, 5, 7, 9, 5).toISOString() },
-      { placed_at: new Date(2026, 5, 7, 9, 50).toISOString() },
-      { placed_at: new Date(2026, 5, 7, 13, 1).toISOString() },
+      { placed_at: '2026-06-07T08:05:00.000Z' }, // 09 h in Fès
+      { placed_at: '2026-06-07T08:50:00.000Z' }, // 09 h
+      { placed_at: '2026-06-07T12:01:00.000Z' }, // 13 h
+      { placed_at: '2026-06-06T23:30:00.000Z' }, // 00 h 30 in Fès
     ];
     const buckets = bucketOrdersByHour(orders);
     expect(buckets).toHaveLength(24);
     expect(buckets[9]).toBe(2);
     expect(buckets[13]).toBe(1);
-    expect(buckets[0]).toBe(0);
+    expect(buckets[0]).toBe(1);
   });
 
   it('returns 24 zeros for no orders', () => {

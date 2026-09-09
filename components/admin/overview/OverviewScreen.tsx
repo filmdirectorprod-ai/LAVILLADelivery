@@ -41,7 +41,7 @@ export function OverviewScreen({
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    const since = startOfTodayISO(); // shared UTC boundary — matches the server paint
+    const since = startOfTodayISO(); // agency-midnight boundary — matches the server paint
     const [ordersRes, driversRes, reviewsRes, trackingRes] = await Promise.all([
       supabase.from('orders').select('*').gte('placed_at', since).order('placed_at', { ascending: false }).limit(500),
       supabase.from('drivers').select('*'),

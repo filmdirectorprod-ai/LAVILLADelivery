@@ -4,22 +4,25 @@
 // testable. No React, no I/O.
 
 import { isInProgressOrderStatus } from '@/lib/order-status';
+import { startOfBusinessDay, hourInZone } from '@/lib/timezone';
 
-/** UTC midnight of `ref` (default: now) as an ISO string — the lower bound for
- *  "today's" orders. Computed in UTC (not the runtime's local time) so the
+/** Start of "today" as an ISO string — midnight in the AGENCY's timezone
+ *  (lib/timezone.ts), which is what the gérant means by today. It used to be UTC
+ *  midnight, so "aujourd'hui" began at 01 h 00 in Fès and the first hour of
+ *  trading was filed under the previous day. Still an absolute instant, so the
  *  server first-paint and the client realtime refetch agree on the boundary
- *  regardless of where each runs; otherwise a UTC server and a UTC+1 browser
- *  would disagree about "today" for an hour around midnight. */
+ *  wherever each runs — the property the UTC version was chosen for. */
 export function startOfTodayISO(ref: Date = new Date()): string {
-  const d = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate()));
-  return d.toISOString();
+  return startOfBusinessDay(ref).toISOString();
 }
 
-/** Count orders into 24 buckets keyed by the local hour of `placed_at`. */
+/** Count orders into 24 buckets keyed by the hour `placed_at` falls on in the
+ *  agency's timezone. Previously the runtime's local hour, so a server paint
+ *  (UTC) and the gérant's browser (UTC+1) bucketed the same order differently. */
 export function bucketOrdersByHour(orders: { placed_at: string }[]): number[] {
   const buckets = new Array(24).fill(0);
   for (const o of orders) {
-    const h = new Date(o.placed_at).getHours();
+    const h = hourInZone(new Date(o.placed_at));
     if (h >= 0 && h < 24) buckets[h] += 1;
   }
   return buckets;

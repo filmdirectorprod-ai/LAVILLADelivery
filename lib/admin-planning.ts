@@ -1,7 +1,8 @@
 // Pure, side-effect-free helpers for the admin Planning screen. The weekly shift
 // roster is laid out as a driver × day grid here so the same logic serves the
 // server first-paint and the client realtime refetch, and stays unit testable.
-// All day boundaries are computed in UTC (like lib/admin-overview's startOfTodayISO)
+// Week boundaries here are computed in UTC (a roster grid, not a revenue day —
+// unlike lib/admin-overview's startOfTodayISO, which cuts on the agency's midnight)
 // so a UTC server and a UTC+1 browser agree on which day a shift falls in. No React,
 // no I/O.
 

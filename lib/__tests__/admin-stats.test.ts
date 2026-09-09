@@ -13,12 +13,16 @@ describe('admin-stats', () => {
     expect(Date.parse(w.to)).toBeGreaterThan(now.getTime()); // `to` is exclusive
   });
 
-  it('starts "today" at local midnight', () => {
+  // Fès is UTC+1, so its midnight is 23:00 UTC the day before. Asserted as an
+  // instant, not with getHours(), so the test does not depend on the runner's TZ.
+  it('starts "today" at midnight in the agency timezone', () => {
+    expect(rangeWindow('today', now).from).toBe('2026-06-11T23:00:00.000Z');
+  });
+
+  it('keeps the previous window the same length as the current one', () => {
     const w = rangeWindow('today', now);
-    const from = new Date(w.from);
-    expect(from.getHours()).toBe(0);
-    expect(from.getMinutes()).toBe(0);
-    expect(from.getDate()).toBe(now.getDate());
+    const span = Date.parse(w.from) - Date.parse(w.prevFrom);
+    expect(span).toBe(24 * 60 * 60 * 1000);
   });
 
   it('maps range keys to day counts', () => {

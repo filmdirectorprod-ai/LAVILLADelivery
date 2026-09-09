@@ -5,6 +5,11 @@
 // them on the device, which grew without bound and — past PostgREST's 1000-row
 // cap — silently reported wrong figures. What is left here is the range maths
 // and the CSV export: no React, no I/O.
+//
+// Days are cut in the agency's timezone (lib/timezone.ts), matching the
+// `at time zone 'Africa/Casablanca'` the SQL groups by (0052).
+
+import { startOfBusinessDay } from '@/lib/timezone';
 
 export type RangeKey = 'today' | '7d' | '30d' | '90d';
 
@@ -32,16 +37,15 @@ export interface RangeWindow {
 }
 
 /**
- * Bounds for a range key. 'today' starts at local midnight; the others span the
- * last N days. `prevFrom` goes one further window back so a single query can
- * return both the period and its predecessor.
+ * Bounds for a range key. 'today' starts when midnight struck in the agency's
+ * timezone — not on the device, so the figure is the same on the gérant's phone
+ * and in a server render. The others span the last N days. `prevFrom` goes one
+ * further window back so a single query returns the period and its predecessor.
  */
 export function rangeWindow(range: RangeKey, now: Date = new Date()): RangeWindow {
   const days = daysFor(range);
   const to = new Date(now.getTime() + 1000);
-  const from = new Date(now);
-  if (days === 1) from.setHours(0, 0, 0, 0);
-  else from.setTime(now.getTime() - days * 24 * 60 * 60 * 1000);
+  const from = days === 1 ? startOfBusinessDay(now) : new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   const prevFrom = new Date(from.getTime() - days * 24 * 60 * 60 * 1000);
   return { from: from.toISOString(), to: to.toISOString(), prevFrom: prevFrom.toISOString() };
 }
