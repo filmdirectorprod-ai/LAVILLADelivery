@@ -16,7 +16,7 @@ import type { RawSupportDriver } from '@/lib/admin-support';
 import type { SupportMessage } from '@/lib/types';
 import { useBeep } from '@/lib/use-beep';
 import { Icon } from '@/components/ui/Icon';
-import { useRealtime } from '@/lib/use-realtime';
+import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
 import Image from 'next/image';
 
 function timeLabel(iso: string): string {
@@ -101,7 +101,7 @@ export function SupportScreen({ initial }: { initial: AdminSupportData }) {
     'admin-support',
     [{ table: 'support_messages' }, { table: 'drivers' }],
     useCallback(
-      (payload) => {
+      (payload: RealtimeChangePayload) => {
         if (payload.table === 'support_messages' && payload.eventType === 'INSERT' && (payload.new as SupportMessage)?.sender === 'driver') {
           beep();
         }

@@ -7,10 +7,8 @@
 // notification and a short beep. All formatting is in lib/admin-notifications.ts.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/ui/Icon';
 import {
-import { useRealtime } from '@/lib/use-realtime';
   orderNotification,
   incidentNotification,
   prependNotification,
@@ -18,6 +16,7 @@ import { useRealtime } from '@/lib/use-realtime';
   relativeTime,
   type AdminNotification,
 } from '@/lib/admin-notifications';
+import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
 
 export function NotificationBell() {
   const [items, setItems] = useState<AdminNotification[]>([]);
@@ -79,7 +78,7 @@ export function NotificationBell() {
       { table: 'incidents', event: 'INSERT' },
     ],
     useCallback(
-      (payload) => {
+      (payload: RealtimeChangePayload) => {
         if (payload.table === 'orders') {
           notify(orderNotification(payload.new as { id: string; code: string | null; placed_at: string | null }));
         } else {

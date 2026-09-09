@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { isNotificationEnabled, isKindVisibleTo } from '@/lib/notifications';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
-import { useRealtime } from '@/lib/use-realtime';
+import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
 
 export interface NotificationsScreenProps {
   notifications: Notification[];
@@ -54,7 +54,7 @@ export function NotificationsScreen({ notifications, settings, userId }: Notific
     'notifications-feed',
     [userId ? { table: 'notifications', event: 'INSERT' as const, filter: `user_id=eq.${userId}` } : null],
     useCallback(
-      (payload) => {
+      (payload: RealtimeChangePayload) => {
         const n = payload.new as Notification;
         if (!isNotificationEnabled(n.kind, settings) || !isKindVisibleTo(n.kind, 'client')) return; // muted / not for client
         setList((prev) => (prev.some((x) => x.id === n.id) ? prev : [n, ...prev]));

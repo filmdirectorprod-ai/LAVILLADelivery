@@ -26,7 +26,11 @@ export interface RealtimeSub {
   filter?: string;
 }
 
-type Payload = RealtimePostgresChangesPayload<Record<string, unknown>>;
+/** The change payload handlers receive. Exported so a call site that wraps its
+ *  handler in useCallback can annotate the parameter — inside useCallback there
+ *  is no contextual type, and `strict` rejects the implicit any. */
+export type RealtimeChangePayload = RealtimePostgresChangesPayload<Record<string, unknown>>;
+type Payload = RealtimeChangePayload;
 
 let seq = 0;
 
@@ -78,9 +82,13 @@ export function useRealtime(
     seq += 1;
     let channel = supabase.channel(`${name}-${seq}`);
     for (const sub of list) {
-      channel = channel.on(
+      // supabase-js overloads postgres_changes on a LITERAL `event`, which a
+      // config assembled at runtime cannot satisfy. The shape is guaranteed by
+      // RealtimeSub above, so the cast is the narrow, deliberate escape hatch.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      channel = (channel as any).on(
         'postgres_changes',
-        { event: sub.event ?? '*', schema: 'public', table: sub.table, ...(sub.filter ? { filter: sub.filter } : {}) } as never,
+        { event: sub.event ?? '*', schema: 'public', table: sub.table, ...(sub.filter ? { filter: sub.filter } : {}) },
         fire,
       );
     }
