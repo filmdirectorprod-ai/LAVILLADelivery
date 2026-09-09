@@ -2,18 +2,21 @@
 // CENTRE DE NOTIFICATIONS — ported from the prototype (screens-account.jsx
 // Notifications). Live: subscribes to notifications INSERTs via Supabase
 // Realtime. Order notifications deep-link to tracking and are marked read on tap.
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Notification, ProfileSettings } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { isNotificationEnabled, isKindVisibleTo } from '@/lib/notifications';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
+import { useRealtime } from '@/lib/use-realtime';
 
 export interface NotificationsScreenProps {
   notifications: Notification[];
   /** User's notification preferences (from Paramètres) — gate the feed. */
   settings?: ProfileSettings | null;
+  /** Signed-in user id — scopes the Realtime stream to this user's rows. */
+  userId?: string | null;
 }
 
 function iconFor(kind: string): string {
@@ -38,27 +41,28 @@ function whenLabel(iso: string): string {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 }
 
-export function NotificationsScreen({ notifications, settings }: NotificationsScreenProps) {
+export function NotificationsScreen({ notifications, settings, userId }: NotificationsScreenProps) {
   const router = useRouter();
   // Honour the user's notification preferences from Paramètres: hide muted kinds.
   const [list, setList] = useState<Notification[]>(() =>
     notifications.filter((n) => isNotificationEnabled(n.kind, settings) && isKindVisibleTo(n.kind, 'client')),
   );
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('notifications-feed')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
+  // Scoped to this user: the stream used to carry every notification INSERT on
+  // the platform, with the filtering done after delivery on the device.
+  useRealtime(
+    'notifications-feed',
+    [userId ? { table: 'notifications', event: 'INSERT' as const, filter: `user_id=eq.${userId}` } : null],
+    useCallback(
+      (payload) => {
         const n = payload.new as Notification;
         if (!isNotificationEnabled(n.kind, settings) || !isKindVisibleTo(n.kind, 'client')) return; // muted / not for client
         setList((prev) => (prev.some((x) => x.id === n.id) ? prev : [n, ...prev]));
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [settings]);
+      },
+      [settings],
+    ),
+    { debounceMs: 0 },
+  );
 
   const open = async (n: Notification) => {
     if (!n.read) {

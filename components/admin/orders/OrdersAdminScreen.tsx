@@ -26,6 +26,7 @@ import {
 import type { AdminOrdersData } from '@/lib/queries';
 import type { Driver, Order, OrderItem, OrderTracking } from '@/lib/types';
 import { OrderConfirmPanel } from './OrderConfirmPanel';
+import { useRealtime } from '@/lib/use-realtime';
 
 const TABS: { value: OrderTab; label: string }[] = [
   { value: 'toconfirm', label: 'À confirmer' },
@@ -77,18 +78,7 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
     );
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_tracking' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  useRealtime('admin-orders', [{ table: 'orders' }, { table: 'order_items' }, { table: 'order_tracking' }], refetch);
 
   const counts = useMemo(() => countOrdersByTab(rows), [rows]);
   const visible = useMemo(() => {

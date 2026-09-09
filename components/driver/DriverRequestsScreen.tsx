@@ -7,7 +7,7 @@
 // The driver earns the delivery fee (delivery_fee_dh). There's no per-order
 // distance or duration in the schema, so — unlike the mockup — we don't fake
 // "3.2 km / ~28 min"; we surface the real money (gain + order total) instead.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/lib/toast-store';
@@ -16,6 +16,7 @@ import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import { Btn } from '@/components/ui/Btn';
 import { Badge } from '@/components/ui/Badge';
+import { useRealtime } from '@/lib/use-realtime';
 import type { Order, OrderTracking } from '@/lib/types';
 import type { DriverOrder } from '@/lib/queries';
 
@@ -58,17 +59,16 @@ export function DriverRequestsScreen({ initialBoard, branchId }: { initialBoard:
     setBoard(mapBoard(data ?? []));
   }, [branchId]);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('driver-requests')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_tracking' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  // Only this agency's orders reach this device; the debounce collapses the
+  // order+tracking burst a claim produces into one refetch.
+  useRealtime(
+    'driver-requests',
+    [
+      { table: 'orders', filter: branchId ? `branch_id=eq.${branchId}` : undefined },
+      { table: 'order_tracking' },
+    ],
+    refetch,
+  );
 
   const available = useMemo(() => {
     const list = board.filter((b) => !b.tracking?.manual && !dismissed.has(b.order.id));

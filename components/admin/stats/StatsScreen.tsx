@@ -2,7 +2,7 @@
 // Admin Statistiques: a date-range report over the last 90 days of orders. KPIs,
 // daily revenue bars, top products, per-agency split, and CSV export. All figures
 // come from the pure lib/admin-stats helpers; the rows are already RLS-scoped.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import {
@@ -10,6 +10,7 @@ import {
   type StatOrder, type StatItem,
 } from '@/lib/admin-stats';
 import type { Branch } from '@/lib/types';
+import { useRealtime } from '@/lib/use-realtime';
 
 type RangeKey = 'today' | '7d' | '30d' | '90d';
 const RANGES: { key: RangeKey; label: string; days: number }[] = [
@@ -66,16 +67,9 @@ export function StatsScreen({ orders: initialOrders, items: initialItems, branch
     setItems((its ?? []) as StatItem[]);
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-stats')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  // Stats are a 90-day aggregate: a 2 s debounce is plenty, and it stops a busy
+  // dinner service from re-running the whole aggregation on every order event.
+  useRealtime('admin-stats', [{ table: 'orders' }], refetch, { debounceMs: 2000 });
 
   const { from, to } = useMemo(() => rangeBounds(RANGES.find((r) => r.key === range)!.days), [range]);
   const scoped = useMemo(() => filterOrders(orders, from, to), [orders, from, to]);

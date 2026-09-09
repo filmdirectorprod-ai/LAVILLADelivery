@@ -8,7 +8,7 @@
 // read (support_messages staff RLS, 0018), so the driver app sees replies in real
 // time and the unread badge clears.
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { buildSupportThreads, driverInitials, threadPreview, type SupportDriver } from '@/lib/admin-support';
 import type { AdminSupportData } from '@/lib/queries';
@@ -16,6 +16,7 @@ import type { RawSupportDriver } from '@/lib/admin-support';
 import type { SupportMessage } from '@/lib/types';
 import { useBeep } from '@/lib/use-beep';
 import { Icon } from '@/components/ui/Icon';
+import { useRealtime } from '@/lib/use-realtime';
 
 function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -93,21 +94,22 @@ export function SupportScreen({ initial }: { initial: AdminSupportData }) {
     setThreads(buildSupportThreads((messagesRes.data ?? []) as SupportMessage[], drivers.current));
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-support')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_messages' }, (payload) => {
-        if (payload.eventType === 'INSERT' && (payload.new as SupportMessage)?.sender === 'driver') beep();
+  // Immediate (no debounce): the beep must fire on the message that triggered it.
+  // `drivers` keeps the online/offline dots live.
+  useRealtime(
+    'admin-support',
+    [{ table: 'support_messages' }, { table: 'drivers' }],
+    useCallback(
+      (payload) => {
+        if (payload.table === 'support_messages' && payload.eventType === 'INSERT' && (payload.new as SupportMessage)?.sender === 'driver') {
+          beep();
+        }
         refetch();
-      })
-      // Live presence: refresh the online/offline dots the moment a driver's status changes.
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch, beep]);
+      },
+      [beep, refetch],
+    ),
+    { debounceMs: 0 },
+  );
 
   const markRead = useCallback(async (driverId: string) => {
     const supabase = createClient();

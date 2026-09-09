@@ -5,12 +5,13 @@
 // (0018): add a shift, delete a shift. The grid is built by lib/admin-planning.ts
 // (UTC day buckets) so server and client agree.
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { buildShiftWeek, isoDate, type ShiftRow } from '@/lib/admin-planning';
 import type { AdminPlanningData } from '@/lib/queries';
 import type { DriverShift } from '@/lib/types';
 import { ShiftForm, type ShiftDraft } from './ShiftForm';
+import { useRealtime } from '@/lib/use-realtime';
 
 function mondayFromISO(weekStart: string): Date {
   return new Date(`${weekStart}T00:00:00Z`);
@@ -46,16 +47,8 @@ export function PlanningScreen({ initial }: { initial: AdminPlanningData }) {
     [drivers],
   );
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-planning')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_shifts' }, () => refetch(weekStart))
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch, weekStart]);
+  const refetchWeek = useCallback(() => refetch(weekStart), [refetch, weekStart]);
+  useRealtime('admin-planning', [{ table: 'driver_shifts' }], refetchWeek);
 
   const shiftWeek = useCallback(
     (deltaDays: number) => {

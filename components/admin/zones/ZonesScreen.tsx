@@ -5,13 +5,14 @@
 // admin_delete_zone RPCs (0017). Sorting comes from lib/admin-zones.ts. Because
 // zones feed the customer checkout fee/ETA, edits here reach the client app live.
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import { sortZones, type ZoneDraft } from '@/lib/admin-zones';
 import type { AdminZonesData } from '@/lib/queries';
 import type { Zone } from '@/lib/types';
 import { ZoneEditor } from './ZoneEditor';
+import { useRealtime } from '@/lib/use-realtime';
 
 type EditState = { mode: 'new' } | { mode: 'edit'; zone: Zone } | null;
 
@@ -26,16 +27,7 @@ export function ZonesScreen({ initial }: { initial: AdminZonesData }) {
     setZones((data ?? []) as Zone[]);
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-zones')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_zones' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  useRealtime('admin-zones', [{ table: 'delivery_zones' }], refetch);
 
   const onSave = useCallback(
     async (draft: ZoneDraft, id: string | null) => {

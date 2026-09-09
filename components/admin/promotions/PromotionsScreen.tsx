@@ -2,11 +2,12 @@
 // Admin promo-code management: create / edit / activate / delete codes via the
 // admin_upsert_promo + admin_delete_promo RPCs. A branch gérant only sees and
 // manages their own agency's codes (RLS + RPC enforced).
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import { Icon } from '@/components/ui/Icon';
 import type { Branch, Promotion } from '@/lib/types';
+import { useRealtime } from '@/lib/use-realtime';
 
 const field: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 14, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 9, color: 'var(--ink)', width: '100%', background: '#fff' };
 const label: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' };
@@ -57,23 +58,26 @@ export function PromotionsScreen({ initial, branches, uses: initialUses = {} }: 
   const [draft, setDraft] = useState<Draft | null>(null);
 
   // Live usage counts + promo edits (promo_redemptions / promotions published).
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-promotions')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'promo_redemptions' }, (payload) => {
+  // Redemptions are applied incrementally from the payload — no refetch at all —
+  // so a busy evening costs one counter bump per code used.
+  useRealtime(
+    'admin-promotions',
+    [
+      { table: 'promo_redemptions', event: 'INSERT' },
+      { table: 'promotions' },
+    ],
+    useCallback(async (payload) => {
+      if (payload.table === 'promo_redemptions') {
         const id = (payload.new as { promotion_id: string }).promotion_id;
         setUses((u) => ({ ...u, [id]: (u[id] ?? 0) + 1 }));
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'promotions' }, async () => {
-        const { data } = await supabase.from('promotions').select('*').order('created_at', { ascending: false });
-        if (data) setPromos(data as Promotion[]);
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+        return;
+      }
+      const supabase = createClient();
+      const { data } = await supabase.from('promotions').select('*').order('created_at', { ascending: false });
+      if (data) setPromos(data as Promotion[]);
+    }, []),
+    { debounceMs: 0 },
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const branchName = useMemo(() => new Map(branches.map((b) => [b.id, b.name.replace(/ —.*$/, '')])), [branches]);

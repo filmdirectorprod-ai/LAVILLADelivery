@@ -5,7 +5,7 @@
 // pattern used by DriverRequestsScreen. All derived numbers come from
 // lib/admin-overview.ts so server and client agree.
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import { isInProgressOrderStatus } from '@/lib/order-status';
@@ -22,6 +22,7 @@ import { HourlyChart } from './HourlyChart';
 import { InProgressTable, type InProgressRow } from './InProgressTable';
 import { LiveDriverMap } from './LiveDriverMap';
 import { BranchesInfo } from '@/components/ui/BranchesInfo';
+import { useRealtime } from '@/lib/use-realtime';
 
 export function OverviewScreen({
   initial,
@@ -53,19 +54,9 @@ export function OverviewScreen({
     });
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-overview')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_tracking' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  // The overview aggregates four tables; without the debounce every driver GPS
+  // fix (one per 5 s per driver) re-pulled all four.
+  useRealtime('admin-overview', [{ table: 'orders' }, { table: 'order_tracking' }, { table: 'drivers' }, { table: 'reviews' }], refetch);
 
   const kpis = useMemo(
     () => computeOverviewKpis({ orders: data.orders, drivers: data.drivers, ratings: data.ratings }),

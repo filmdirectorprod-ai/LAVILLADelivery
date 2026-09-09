@@ -5,47 +5,55 @@
 // delivery is active, driver_update_position (the customer's live tracking). The
 // driver's order is resolved in the background and kept fresh via Realtime. Throttled.
 'use client';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useDriverOnline } from '@/lib/driver-online-store';
+import { useRealtime } from '@/lib/use-realtime';
 
 export function DriverGeoStream() {
   const online = useDriverOnline((s) => s.online);
   const orderIdRef = useRef<string | null>(null);
   const lastPush = useRef(0);
 
-  // Resolve the driver's active delivery, kept fresh on realtime changes.
-  useEffect(() => {
-    const supabase = createClient();
-    let cancelled = false;
+  // Resolve the driver's active delivery, kept fresh on realtime changes. The
+  // drivers row is resolved once and held in state (not a ref) so the
+  // subscription below can narrow to this driver as soon as the id is known.
+  const [driverId, setDriverId] = useState<string | null>(null);
 
-    async function findActive() {
+  const findActive = useCallback(async () => {
+    const supabase = createClient();
+    let id = driverId;
+    if (!id) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
       const { data: drv } = await supabase.from('drivers').select('id').eq('user_id', user.id).maybeSingle();
       if (!drv) return;
-      const { data } = await supabase
-        .from('order_tracking')
-        .select('order_id, orders!inner(status)')
-        .eq('driver_id', drv.id)
-        .in('orders.status', ['ready', 'en_route'])
-        .limit(1);
-      if (!cancelled) orderIdRef.current = (data?.[0]?.order_id as string | undefined) ?? null;
+      id = drv.id as string;
+      setDriverId(id);
     }
+    const { data } = await supabase
+      .from('order_tracking')
+      .select('order_id, orders!inner(status)')
+      .eq('driver_id', id)
+      .in('orders.status', ['ready', 'en_route'])
+      .limit(1);
+    orderIdRef.current = (data?.[0]?.order_id as string | undefined) ?? null;
+  }, [driverId]);
 
+  useEffect(() => {
     findActive();
-    const channel = supabase
-      .channel('driver-geo')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, findActive)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_tracking' }, findActive)
-      .subscribe();
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, []);
+  }, [findActive]);
+
+  // Only the tracking rows assigned to this driver matter here — previously every
+  // order change in the whole city re-ran the lookup on every driver's phone.
+  useRealtime(
+    'driver-geo',
+    [{ table: 'order_tracking', filter: driverId ? `driver_id=eq.${driverId}` : undefined }],
+    findActive,
+    { enabled: online },
+  );
 
   // Stream GPS while online.
   useEffect(() => {

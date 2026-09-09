@@ -7,7 +7,7 @@
 // lib/admin-products.ts so server and client agree. Real-time: a price/visibility
 // change or a new product here propagates to the customer app instantly.
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { buildProductGroups, catalogueStats } from '@/lib/admin-products';
 import type { AdminProductsData } from '@/lib/queries';
@@ -15,6 +15,7 @@ import type { Product, Category } from '@/lib/types';
 import { ProductCard } from './ProductCard';
 import { ProductForm, type ProductDraft } from './ProductForm';
 import { ProductEditModal } from './ProductEditModal';
+import { useRealtime } from '@/lib/use-realtime';
 
 export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
   const [products, setProducts] = useState<Product[]>(initial.products);
@@ -33,17 +34,9 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
     setCategories((categoriesRes.data ?? []) as Category[]);
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-products')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  // Editing a product fires one event per changed row; debounced, the catalogue
+  // reloads once.
+  useRealtime('admin-products', [{ table: 'products' }, { table: 'categories' }], refetch);
 
   const update = useCallback(
     async (product: Product, patch: { active?: boolean; price_dh?: number; is_signature?: boolean; in_stock?: boolean }) => {

@@ -17,6 +17,7 @@ import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import { UserNotificationBell } from '@/components/ui/UserNotificationBell';
 import { unreadFromStaff, SUPPORT_SEEN_KEY } from '@/lib/driver-support';
 import { useDriverOnline } from '@/lib/driver-online-store';
+import { useRealtime } from '@/lib/use-realtime';
 import type { Driver, Order, OrderTracking, SupportMessage } from '@/lib/types';
 import type { DriverOrder } from '@/lib/queries';
 
@@ -76,24 +77,24 @@ export function DriverDashboard({
     setBoard(mapBoard(data ?? []));
   }, [driver.branch_id]);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('driver-board')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_tracking' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  // Scoped to this driver's agency: a change in another branch no longer wakes
+  // this device. order_tracking has no branch_id, so it stays broad — the
+  // debounce keeps a claim burst down to one refetch.
+  useRealtime(
+    'driver-board',
+    [
+      { table: 'orders', filter: driver.branch_id ? `branch_id=eq.${driver.branch_id}` : undefined },
+      { table: 'order_tracking' },
+    ],
+    refetch,
+  );
 
   // Support badge: count staff replies newer than this device's last visit.
   const refreshSupport = useCallback(async () => {
     const supabase = createClient();
     const { data } = await supabase
       .from('support_messages')
-      .select('*')
+      .select('id, driver_id, sender, created_at')
       .eq('driver_id', driver.id)
       .order('created_at');
     let lastSeen: string | null = null;
@@ -107,19 +108,13 @@ export function DriverDashboard({
 
   useEffect(() => {
     refreshSupport();
-    const supabase = createClient();
-    const channel = supabase
-      .channel('driver-support-badge')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `driver_id=eq.${driver.id}` },
-        refreshSupport,
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [driver.id, refreshSupport]);
+  }, [refreshSupport]);
+
+  useRealtime(
+    'driver-support-badge',
+    [{ table: 'support_messages', event: 'INSERT', filter: `driver_id=eq.${driver.id}` }],
+    refreshSupport,
+  );
 
   const mine = board.filter((b) => b.tracking?.driver_id === driver.id && b.tracking?.manual);
   const available = board.filter((b) => !b.tracking?.manual);

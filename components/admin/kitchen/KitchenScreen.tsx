@@ -9,13 +9,14 @@
 //   preparing → admin_mark_order_ready     (→ ready)
 //   ready     → admin_handoff_to_driver    (→ en_route)
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { loadKitchenBoard } from '@/lib/kitchen-data';
 import { STATION_LABEL, type KitchenBoard, type KitchenTicket } from '@/lib/kitchen';
 import { Icon } from '@/components/ui/Icon';
 import { StationLoadCard } from './StationLoadCard';
 import { KitchenTicketCard, type KitchenAction } from './KitchenTicketCard';
+import { useRealtime } from '@/lib/use-realtime';
 
 const EMPTY: KitchenBoard = { preparing: [], ready: [], stations: [], lateCodes: [] };
 
@@ -33,17 +34,9 @@ export function KitchenScreen({ initial }: { initial: KitchenBoard }) {
     setBoard(await loadKitchenBoard(supabase));
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-kitchen')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  // A new order lands as an orders row + N order_items rows; debounced, that is
+  // a single board refetch instead of N+1.
+  useRealtime('admin-kitchen', [{ table: 'orders' }, { table: 'order_items' }], refetch);
 
   const callRpc = useCallback(
     (fn: string) => async (orderId: string) => {
