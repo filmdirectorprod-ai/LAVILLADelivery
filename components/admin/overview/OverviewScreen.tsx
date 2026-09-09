@@ -43,7 +43,7 @@ export function OverviewScreen({
     const supabase = createClient();
     const since = startOfTodayISO(); // shared UTC boundary — matches the server paint
     const [ordersRes, driversRes, reviewsRes, trackingRes] = await Promise.all([
-      supabase.from('orders').select('*').gte('placed_at', since).order('placed_at', { ascending: false }),
+      supabase.from('orders').select('*').gte('placed_at', since).order('placed_at', { ascending: false }).limit(500),
       supabase.from('drivers').select('*'),
       supabase.from('reviews').select('rating'),
       supabase

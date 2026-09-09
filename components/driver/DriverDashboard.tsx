@@ -73,7 +73,7 @@ export function DriverDashboard({
       .select('*, order_tracking(*)')
       .in('status', DRIVER_POOL_STATUSES);
     if (driver.branch_id) q = q.eq('branch_id', driver.branch_id); // only this driver's agency
-    const { data } = await q.order('placed_at', { ascending: false });
+    const { data } = await q.order('placed_at', { ascending: false }).limit(100);
     setBoard(mapBoard(data ?? []));
   }, [driver.branch_id]);
 
@@ -96,7 +96,8 @@ export function DriverDashboard({
       .from('support_messages')
       .select('id, driver_id, sender, created_at')
       .eq('driver_id', driver.id)
-      .order('created_at');
+      .order('created_at', { ascending: false })
+      .limit(200);
     let lastSeen: string | null = null;
     try {
       lastSeen = localStorage.getItem(SUPPORT_SEEN_KEY);

@@ -27,6 +27,7 @@ import type { AdminOrdersData } from '@/lib/queries';
 import type { Driver, Order, OrderItem, OrderTracking } from '@/lib/types';
 import { OrderConfirmPanel } from './OrderConfirmPanel';
 import { useRealtime } from '@/lib/use-realtime';
+import { fetchAllIn } from '@/lib/fetch-in-chunks';
 
 const TABS: { value: OrderTab; label: string }[] = [
   { value: 'toconfirm', label: 'À confirmer' },
@@ -61,8 +62,9 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
     const list = (orders ?? []) as Order[];
     const ids = list.map((o) => o.id);
     const [itemsRes, trackingRes, driversRes, profilesRes] = await Promise.all([
-      ids.length ? supabase.from('order_items').select('*').in('order_id', ids) : Promise.resolve({ data: [] as OrderItem[] }),
-      ids.length ? supabase.from('order_tracking').select('*').in('order_id', ids) : Promise.resolve({ data: [] as OrderTracking[] }),
+      // Chunked: 200 orders' line items otherwise cross Supabase's silent row cap.
+      fetchAllIn<OrderItem>(supabase, 'order_items', '*', 'order_id', ids),
+      fetchAllIn<OrderTracking>(supabase, 'order_tracking', '*', 'order_id', ids),
       supabase.from('drivers').select('*').order('name'),
       supabase.from('profiles').select('id, full_name'),
     ]);
@@ -70,8 +72,8 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
     setRows(
       buildAdminOrderRows(
         list,
-        (itemsRes.data ?? []) as OrderItem[],
-        (trackingRes.data ?? []) as OrderTracking[],
+        itemsRes,
+        trackingRes,
         (driversRes.data ?? []) as Driver[],
         (profilesRes.data ?? []) as { id: string; full_name: string | null }[],
       ),

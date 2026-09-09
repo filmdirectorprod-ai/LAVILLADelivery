@@ -55,7 +55,7 @@ export function DriverRequestsScreen({ initialBoard, branchId }: { initialBoard:
       .select('*, order_tracking(*)')
       .in('status', DRIVER_POOL_STATUSES);
     if (branchId) q = q.eq('branch_id', branchId); // only this driver's agency
-    const { data } = await q.order('placed_at', { ascending: false });
+    const { data } = await q.order('placed_at', { ascending: false }).limit(100);
     setBoard(mapBoard(data ?? []));
   }, [branchId]);
 

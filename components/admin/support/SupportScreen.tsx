@@ -88,7 +88,7 @@ export function SupportScreen({ initial }: { initial: AdminSupportData }) {
   const refetch = useCallback(async () => {
     const supabase = createClient();
     const [messagesRes, driversRes] = await Promise.all([
-      supabase.from('support_messages').select('*').order('created_at'),
+      supabase.from('support_messages').select('*').order('created_at', { ascending: false }).limit(500),
       supabase.from('drivers').select('id, name, avatar_url, is_online').order('name'),
     ]);
     drivers.current = (driversRes.data ?? []) as RawSupportDriver[];

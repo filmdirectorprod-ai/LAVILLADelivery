@@ -28,7 +28,8 @@ export function ReviewsScreen({ initial }: { initial: AdminReviewsData }) {
     const { data: reviews } = await supabase
       .from('reviews')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
     const list = (reviews ?? []) as Review[];
     const [profilesRes, ordersRes, trackingRes, driversRes] = await Promise.all([
       supabase.from('profiles').select('id, full_name'),
