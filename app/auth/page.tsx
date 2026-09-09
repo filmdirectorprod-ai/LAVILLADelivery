@@ -10,6 +10,7 @@ import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import { Btn } from '@/components/ui/Btn';
 import { Icon } from '@/components/ui/Icon';
 import { SAFE_TOP } from '@/lib/layout';
+import Image from 'next/image';
 
 type Mode = 'signin' | 'signup';
 
@@ -161,10 +162,12 @@ export default function AuthPage() {
           overflow: 'auto',
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src="/brand/logo-client.png"
           alt="La Villa — Maison de Qualité, depuis 2007"
+          width={210}
+          height={106}
+          priority
           style={{ width: 210, height: 'auto', display: 'block', margin: '0 auto' }}
         />
 

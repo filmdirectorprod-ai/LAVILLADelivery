@@ -7,6 +7,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import Image from 'next/image';
 
 const field: React.CSSProperties = {
   width: '100%',
@@ -76,8 +77,7 @@ export default function AdminAuthPage() {
       {/* Left — form */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 28px' }}>
         <div style={{ width: '100%', maxWidth: 420 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/logo-client.png" alt="La Villa" style={{ width: 180, height: 'auto', display: 'block', marginBottom: 28 }} />
+          <Image src="/brand/logo-client.png" alt="La Villa" width={180} height={91} priority style={{ width: 180, height: 'auto', display: 'block', marginBottom: 28 }} />
 
           <h1 className="font-display" style={{ fontSize: 40, fontWeight: 700, color: 'var(--brand)', margin: '0 0 10px', lineHeight: 1.05 }}>
             Espace gérant
@@ -121,8 +121,7 @@ export default function AdminAuthPage() {
         className="lv-admin-visual"
         style={{ flex: 1, background: 'linear-gradient(155deg, var(--brand), var(--brand-d))', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18, padding: 40, position: 'relative', overflow: 'hidden' }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/logo.png" alt="La Villa" style={{ width: 'min(360px, 70%)', height: 'auto', display: 'block' }} />
+        <Image src="/brand/logo.png" alt="La Villa" width={360} height={182} priority style={{ width: 'min(360px, 70%)', height: 'auto', display: 'block' }} />
         <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--gold)' }}>
           Administration
         </div>

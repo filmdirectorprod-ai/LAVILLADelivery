@@ -17,6 +17,7 @@ import type { SupportMessage } from '@/lib/types';
 import { useBeep } from '@/lib/use-beep';
 import { Icon } from '@/components/ui/Icon';
 import { useRealtime } from '@/lib/use-realtime';
+import Image from 'next/image';
 
 function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -37,6 +38,7 @@ function Avatar({ driver, size }: { driver: SupportDriver; size: number }) {
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       <div
         style={{
+          position: 'relative', // <Image fill> anchors to this box
           width: size,
           height: size,
           borderRadius: 999,
@@ -53,8 +55,7 @@ function Avatar({ driver, size }: { driver: SupportDriver; size: number }) {
         }}
       >
         {driver.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={driver.avatarUrl} alt={driver.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <Image src={driver.avatarUrl} alt={driver.name} fill sizes="44px" style={{ objectFit: 'cover' }} />
         ) : (
           driverInitials(driver.name)
         )}

@@ -135,6 +135,7 @@ export function CartScreen({ products, zone }: CartScreenProps) {
               label={it.product?.photo_label ?? it.product?.name ?? 'article'}
               src={it.product?.image_url}
               style={{ width: 78, height: 78, borderRadius: 13, flexShrink: 0 }}
+              sizes="78px"
             />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>

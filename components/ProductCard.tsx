@@ -37,7 +37,7 @@ export function ProductCard({ p, onOpen, fav, onFav, onAdd }: ProductCardProps) 
       }}
     >
       <div style={{ position: 'relative' }}>
-        <PhotoSlot label={p.photo_label ?? p.name} src={p.image_url} style={{ height: 118 }} />
+        <PhotoSlot label={p.photo_label ?? p.name} src={p.image_url} style={{ height: 118 }} sizes="(max-width: 480px) 50vw, 240px" />
         <button
           onClick={(e) => {
             e.stopPropagation();

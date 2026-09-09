@@ -107,6 +107,8 @@ export function ProductEditModal({ product, categories, onClose, onDone }: { pro
         <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
           <div style={{ width: 110, height: 110, borderRadius: 12, background: 'var(--soft)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {imageUrl ? (
+              // Upload preview: the src can be an object URL, which next/image
+              // cannot optimise — a plain <img> is the right tool here.
               // eslint-disable-next-line @next/next/no-img-element
               <img src={imageUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (

@@ -9,6 +9,7 @@ import { ADMIN_NAV, isActiveNav } from '@/lib/admin-nav';
 import { createClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/ui/Icon';
 import { NotificationBell } from '@/components/admin/NotificationBell';
+import Image from 'next/image';
 
 export function AdminChrome({ children, managerName, agencyLabel = 'Gérant' }: { children: ReactNode; managerName: string; agencyLabel?: string }) {
   const pathname = usePathname();
@@ -33,10 +34,12 @@ export function AdminChrome({ children, managerName, agencyLabel = 'Gérant' }: 
       >
         <div style={{ padding: '0 10px 18px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 2px' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src="/brand/logo.png"
               alt="La Villa — Maison de Qualité, depuis 2007"
+              width={190}
+              height={96}
+              priority
               style={{ width: '100%', maxWidth: 190, height: 'auto', display: 'block' }}
             />
           </div>

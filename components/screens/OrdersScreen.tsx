@@ -84,6 +84,7 @@ export function OrdersScreen({ orders, products }: OrdersScreenProps) {
                       label={it.name_snapshot}
                       src={it.product_id ? byId.get(it.product_id)?.image_url : null}
                       style={{ width: 48, height: 48, borderRadius: 11, marginLeft: i ? -14 : 0, border: '2px solid #fff' }}
+                      sizes="48px"
                     />
                   ))}
                 </div>

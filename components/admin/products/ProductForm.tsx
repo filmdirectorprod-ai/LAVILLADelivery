@@ -111,6 +111,8 @@ export function ProductForm({ categories, busy, onCreate, onCancel }: ProductFor
       <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
         <div style={{ width: 72, height: 72, borderRadius: 10, background: 'var(--soft)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {preview ? (
+            // Upload preview: the src can be an object URL, which next/image
+            // cannot optimise — a plain <img> is the right tool here.
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="aperçu" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (

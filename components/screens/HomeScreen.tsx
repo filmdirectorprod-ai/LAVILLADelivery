@@ -113,7 +113,7 @@ export function HomeScreen({ products, categories, zone, profile, defaultAddress
                 overflow: 'hidden',
               }}
             >
-              <PhotoSlot label={profile?.full_name ?? 'avatar'} src={profile?.avatar_url} style={{ width: '100%', height: '100%', borderRadius: 999 }} dim />
+              <PhotoSlot label={profile?.full_name ?? 'avatar'} src={profile?.avatar_url} style={{ width: '100%', height: '100%', borderRadius: 999 }} sizes="44px" dim />
             </button>
           </div>
         </div>
@@ -204,7 +204,7 @@ export function HomeScreen({ products, categories, zone, profile, defaultAddress
               boxShadow: '0 14px 30px -16px rgba(19,124,139,0.5)',
             }}
           >
-            <PhotoSlot label="Bannière héro — création du chef" src={hero.image_url} style={{ position: 'absolute', inset: 0 }} />
+            <PhotoSlot label="Bannière héro — création du chef" src={hero.image_url} style={{ position: 'absolute', inset: 0 }} sizes="100vw" priority />
             <div
               style={{
                 position: 'absolute',

@@ -217,7 +217,7 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
 
         {/* driver card */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 13, background: 'var(--soft)', borderRadius: 18, padding: 13, marginTop: 16 }}>
-          <PhotoSlot label={driver?.name ?? 'livreur'} src={driver?.avatar_url} style={{ width: 52, height: 52, borderRadius: 999 }} dim />
+          <PhotoSlot label={driver?.name ?? 'livreur'} src={driver?.avatar_url} style={{ width: 52, height: 52, borderRadius: 999 }} sizes="52px" dim />
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
               {driver?.name ?? "Recherche d'un livreur…"}

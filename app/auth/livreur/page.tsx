@@ -10,6 +10,7 @@ import { Btn } from '@/components/ui/Btn';
 import { Icon } from '@/components/ui/Icon';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { loginToEmail } from '@/lib/driver-credentials';
+import Image from 'next/image';
 
 const fieldWrap: React.CSSProperties = {
   display: 'flex',
@@ -83,10 +84,12 @@ export default function DriverAuthPage() {
     >
       {/* Brand + role header */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src="/brand/logo-ondark.png"
           alt="La Villa — Maison de Qualité, depuis 2007"
+          width={220}
+          height={111}
+          priority
           style={{ width: 220, height: 'auto', display: 'block' }}
         />
         <div
