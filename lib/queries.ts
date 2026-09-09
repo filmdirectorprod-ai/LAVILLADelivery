@@ -10,8 +10,8 @@ import { buildReviewRows, type ReviewRow } from '@/lib/admin-reviews';
 import { buildIncidentRows, type IncidentRow } from '@/lib/admin-incidents';
 import { buildShiftWeek, mondayOf, isoDate, type ShiftWeek } from '@/lib/admin-planning';
 import { buildSupportThreads, type SupportThread, type RawSupportDriver } from '@/lib/admin-support';
-import type { StatOrder, StatItem } from '@/lib/admin-stats';
-import { buildCustomerRows, type CrmOrder, type CrmProfile, type CustomerRow } from '@/lib/admin-crm';
+import { rangeWindow, toSnapshot, DEFAULT_RANGE, type StatsSnapshot } from '@/lib/admin-stats';
+import type { CustomerRow } from '@/lib/admin-crm';
 import type { LoyaltyMember } from '@/lib/admin-loyalty';
 import { loadKitchenBoard } from '@/lib/kitchen-data';
 import type { KitchenBoard } from '@/lib/kitchen';
@@ -613,58 +613,47 @@ export async function getKitchenBoard(): Promise<KitchenBoard> {
 }
 
 export interface AdminStatsData {
-  orders: StatOrder[];
-  items: StatItem[];
+  snapshot: StatsSnapshot;
   branches: Branch[];
 }
 
 /**
- * Last-90-days orders + their items + branches for the Statistiques screen. RLS
- * scopes the orders to the caller's branch (super-admin sees all), so the figures
- * are automatically per-agency for a branch gérant. The client filters by the
- * chosen date range and aggregates via lib/admin-stats.
+ * The Statistiques report for the default range, aggregated in Postgres
+ * (admin_stats_snapshot, 0051) rather than by shipping 90 days of orders and
+ * their items to the browser. The RPC applies the same staff/agency scoping RLS
+ * does, so a branch gérant gets their own figures.
  */
 export async function getAdminStatsData(): Promise<AdminStatsData> {
   const supabase = await createServerSupabase();
-  const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: orders } = await supabase
-    .from('orders')
-    .select('id, status, total_dh, placed_at, branch_id')
-    .gte('placed_at', since)
-    .order('placed_at', { ascending: false });
-  const ids = (orders ?? []).map((o) => (o as { id: string }).id);
-  const [itemsRes, branchesRes] = await Promise.all([
-    ids.length
-      ? supabase.from('order_items').select('order_id, name_snapshot, qty, price_snapshot').in('order_id', ids)
-      : Promise.resolve({ data: [] as StatItem[] }),
-    supabase.from('branches').select('*').order('slug'),
+  const { from, to, prevFrom } = rangeWindow(DEFAULT_RANGE);
+  const [snapshotRes, branchesRes] = await Promise.all([
+    supabase.rpc('admin_stats_snapshot', { p_from: from, p_to: to, p_prev_from: prevFrom }),
+    supabase.from('branches').select('id, name, slug').order('slug'),
   ]);
   return {
-    orders: (orders ?? []) as StatOrder[],
-    items: (itemsRes.data ?? []) as StatItem[],
+    snapshot: toSnapshot(snapshotRes.data),
     branches: (branchesRes.data ?? []) as Branch[],
   };
 }
 
 export interface AdminCrmData {
   rows: CustomerRow[];
-  orders: CrmOrder[];
 }
 
 /**
- * Customer directory: one row per customer who has ordered (RLS-scoped orders, so a
- * branch gérant only sees their agency's customers), enriched with profile + a note.
- * Also returns the raw orders so the screen can show a customer's history.
+ * Customer directory: one row per customer who has ordered, aggregated in
+ * Postgres (admin_customer_rows, 0051). It used to fetch every order and every
+ * profile and group them in JavaScript — unbounded, and silently truncated at
+ * PostgREST's 1000-row cap. The per-customer order history is loaded on demand
+ * by the screen (admin_customer_orders).
  */
 export async function getAdminCrmData(): Promise<AdminCrmData> {
   const supabase = await createServerSupabase();
-  const [ordersRes, profilesRes] = await Promise.all([
-    supabase.from('orders').select('id, user_id, code, status, total_dh, placed_at').order('placed_at', { ascending: false }),
-    supabase.from('profiles').select('id, full_name, phone, loyalty_points, loyalty_tier, crm_note'),
-  ]);
-  const orders = (ordersRes.data ?? []) as CrmOrder[];
-  const profiles = (profilesRes.data ?? []) as CrmProfile[];
-  return { rows: buildCustomerRows(orders, profiles), orders };
+  const { data } = await supabase.rpc('admin_customer_rows', { p_limit: 500 });
+  const rows = (data ?? []) as (Omit<CustomerRow, 'lastOrder'> & { last_order: string | null })[];
+  return {
+    rows: rows.map(({ last_order, ...r }) => ({ ...r, lastOrder: last_order })) as CustomerRow[],
+  };
 }
 
 /** Loyalty members (one per profile) for the admin Fidélité overview. */

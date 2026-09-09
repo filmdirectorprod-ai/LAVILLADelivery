@@ -1,9 +1,11 @@
-// /admin/customers — Server Component. Customer directory (RLS-scoped to the
-// caller's agency via the orders read), rendered by the client CRM screen.
+// /admin/customers — Server Component. Customer directory, aggregated in
+// Postgres and scoped to the caller's agency (admin_customer_rows, 0051), then
+// rendered by the client CRM screen — which loads a customer's order history on
+// demand rather than receiving every order up front.
 import { getAdminCrmData } from '@/lib/queries';
 import { CrmScreen } from '@/components/admin/crm/CrmScreen';
 
 export default async function CustomersPage() {
-  const { rows, orders } = await getAdminCrmData();
-  return <CrmScreen rows={rows} orders={orders} />;
+  const { rows } = await getAdminCrmData();
+  return <CrmScreen rows={rows} />;
 }

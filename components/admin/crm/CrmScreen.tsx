@@ -1,8 +1,11 @@
 'use client';
 // Admin CRM: searchable customer list (spend / orders / loyalty / segment) with a
 // detail panel showing the customer's order history and an editable note
-// (admin_set_customer_note). Figures are RLS-scoped to the caller's agency.
-import { useMemo, useState } from 'react';
+// (admin_set_customer_note). The rows come aggregated from Postgres
+// (admin_customer_rows, 0051) and the history is fetched for the selected
+// customer only (admin_customer_orders) — the screen used to hold every order of
+// every customer in memory to render one panel.
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import { orderStatusLabel } from '@/lib/order-status';
@@ -16,18 +19,32 @@ function dateLabel(iso: string | null): string {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export function CrmScreen({ rows, orders }: { rows: CustomerRow[]; orders: CrmOrder[] }) {
+export function CrmScreen({ rows }: { rows: CustomerRow[] }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(rows[0]?.id ?? null);
   const [notes, setNotes] = useState<Record<string, string>>(() => Object.fromEntries(rows.map((r) => [r.id, r.note ?? ''])));
   const [savingNote, setSavingNote] = useState(false);
+  const [history, setHistory] = useState<CrmOrder[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const visible = useMemo(() => filterCustomers(rows, query), [rows, query]);
   const active = useMemo(() => rows.find((r) => r.id === selected) ?? null, [rows, selected]);
-  const history = useMemo(
-    () => (active ? orders.filter((o) => o.user_id === active.id) : []),
-    [orders, active],
-  );
+
+  // The selected customer's recent orders, on demand.
+  const loadHistory = useCallback(async (userId: string) => {
+    setLoadingHistory(true);
+    const { data } = await createClient().rpc('admin_customer_orders', { p_user: userId, p_limit: 25 });
+    setHistory((data ?? []) as CrmOrder[]);
+    setLoadingHistory(false);
+  }, []);
+
+  useEffect(() => {
+    if (!selected) {
+      setHistory([]);
+      return;
+    }
+    loadHistory(selected);
+  }, [selected, loadHistory]);
 
   async function saveNote() {
     if (!active) return;
@@ -133,9 +150,11 @@ export function CrmScreen({ rows, orders }: { rows: CustomerRow[]; orders: CrmOr
 
               {/* History */}
               <div style={{ marginTop: 20 }}>
-                <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, color: 'var(--ink)', marginBottom: 10 }}>Historique ({history.length})</div>
+                <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, color: 'var(--ink)', marginBottom: 10 }}>
+                  Historique {loadingHistory ? '…' : `(${history.length})`}
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {history.slice(0, 25).map((o) => (
+                  {history.map((o) => (
                     <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 10 }}>
                       <Icon name="receipt" size={15} color="var(--muted)" />
                       <span style={{ fontFamily: 'var(--ui-font)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{o.code}</span>

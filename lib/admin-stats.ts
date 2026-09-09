@@ -1,34 +1,49 @@
-// Pure, testable aggregation helpers for the admin Statistiques screen. They take
-// plain order/item rows (RLS already scopes them to the caller's branch) and a date
-// range, and return the figures the screen renders + a CSV export. No React, no I/O.
+// Shapes + pure helpers for the admin Statistiques screen.
+//
+// The aggregation itself now happens in Postgres (admin_stats_snapshot, 0051):
+// the screen used to download 90 days of orders plus every order_item and reduce
+// them on the device, which grew without bound and — past PostgREST's 1000-row
+// cap — silently reported wrong figures. What is left here is the range maths
+// and the CSV export: no React, no I/O.
 
-export interface StatOrder {
-  status: string;
-  total_dh: number;
-  placed_at: string;
-  branch_id?: string | null;
-  id?: string;
-}
-export interface StatItem {
-  order_id: string;
-  name_snapshot: string;
-  qty: number;
-  price_snapshot: number;
-}
+export type RangeKey = 'today' | '7d' | '30d' | '90d';
 
-/** A non-cancelled order counts towards sales. */
-function isSale(o: StatOrder): boolean {
-  return o.status !== 'cancelled';
-}
+export const RANGES: { key: RangeKey; label: string; days: number }[] = [
+  { key: 'today', label: "Aujourd'hui", days: 1 },
+  { key: '7d', label: '7 jours', days: 7 },
+  { key: '30d', label: '30 jours', days: 30 },
+  { key: '90d', label: '90 jours', days: 90 },
+];
 
-/** iso within [fromISO, toISO] (inclusive of from, exclusive of to). */
-export function inRange(iso: string, fromISO: string, toISO: string): boolean {
-  const t = Date.parse(iso);
-  return t >= Date.parse(fromISO) && t < Date.parse(toISO);
+/** The default range the screen opens on. */
+export const DEFAULT_RANGE: RangeKey = '30d';
+
+export function daysFor(range: RangeKey): number {
+  return RANGES.find((r) => r.key === range)?.days ?? 30;
 }
 
-export function filterOrders(orders: StatOrder[], fromISO: string, toISO: string): StatOrder[] {
-  return orders.filter((o) => inRange(o.placed_at, fromISO, toISO));
+export interface RangeWindow {
+  /** Start of the reported window (inclusive). */
+  from: string;
+  /** End of the reported window (exclusive). */
+  to: string;
+  /** Start of the preceding same-length window, for the trend arrow. */
+  prevFrom: string;
+}
+
+/**
+ * Bounds for a range key. 'today' starts at local midnight; the others span the
+ * last N days. `prevFrom` goes one further window back so a single query can
+ * return both the period and its predecessor.
+ */
+export function rangeWindow(range: RangeKey, now: Date = new Date()): RangeWindow {
+  const days = daysFor(range);
+  const to = new Date(now.getTime() + 1000);
+  const from = new Date(now);
+  if (days === 1) from.setHours(0, 0, 0, 0);
+  else from.setTime(now.getTime() - days * 24 * 60 * 60 * 1000);
+  const prevFrom = new Date(from.getTime() - days * 24 * 60 * 60 * 1000);
+  return { from: from.toISOString(), to: to.toISOString(), prevFrom: prevFrom.toISOString() };
 }
 
 export interface StatKpis {
@@ -38,54 +53,40 @@ export interface StatKpis {
   delivered: number;
 }
 
-export function summarize(orders: StatOrder[]): StatKpis {
-  const sales = orders.filter(isSale);
-  const revenue = Math.round(sales.reduce((s, o) => s + (o.total_dh ?? 0), 0));
-  const count = sales.length;
-  const delivered = orders.filter((o) => o.status === 'delivered').length;
-  return { revenue, orders: count, avgBasket: count ? Math.round(revenue / count) : 0, delivered };
+export interface StatsSnapshot {
+  kpis: StatKpis;
+  /** Revenue over the preceding window of the same length. */
+  prevRevenue: number;
+  series: { day: string; revenue: number }[];
+  top: { name: string; qty: number; revenue: number }[];
+  /** Keyed by branch id, or 'none' for orders with no agency. */
+  byBranch: Record<string, { revenue: number; orders: number }>;
 }
 
-/** YYYY-MM-DD revenue series, ascending by day, over the sale orders given. */
-export function revenueByDay(orders: StatOrder[]): { day: string; revenue: number }[] {
-  const map = new Map<string, number>();
-  for (const o of orders) {
-    if (!isSale(o)) continue;
-    const day = o.placed_at.slice(0, 10);
-    map.set(day, (map.get(day) ?? 0) + (o.total_dh ?? 0));
-  }
-  return Array.from(map.entries())
-    .map(([day, revenue]) => ({ day, revenue: Math.round(revenue) }))
-    .sort((a, b) => a.day.localeCompare(b.day));
+export const EMPTY_SNAPSHOT: StatsSnapshot = {
+  kpis: { revenue: 0, orders: 0, avgBasket: 0, delivered: 0 },
+  prevRevenue: 0,
+  series: [],
+  top: [],
+  byBranch: {},
+};
+
+/** Percentage change vs the previous window, or null when there is no baseline. */
+export function revenueDelta(snapshot: StatsSnapshot): number | null {
+  if (snapshot.prevRevenue <= 0) return null;
+  return Math.round(((snapshot.kpis.revenue - snapshot.prevRevenue) / snapshot.prevRevenue) * 100);
 }
 
-/** Best-selling products by revenue, from the order_items in scope. */
-export function topProducts(items: StatItem[], limit = 8): { name: string; qty: number; revenue: number }[] {
-  const map = new Map<string, { qty: number; revenue: number }>();
-  for (const it of items) {
-    const cur = map.get(it.name_snapshot) ?? { qty: 0, revenue: 0 };
-    cur.qty += it.qty;
-    cur.revenue += it.price_snapshot * it.qty;
-    map.set(it.name_snapshot, cur);
-  }
-  return Array.from(map.entries())
-    .map(([name, v]) => ({ name, qty: v.qty, revenue: Math.round(v.revenue) }))
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, limit);
-}
-
-/** Revenue + order count per branch id (sale orders only). */
-export function revenueByBranch(orders: StatOrder[]): Map<string, { revenue: number; orders: number }> {
-  const map = new Map<string, { revenue: number; orders: number }>();
-  for (const o of orders) {
-    if (!isSale(o)) continue;
-    const key = o.branch_id ?? 'none';
-    const cur = map.get(key) ?? { revenue: 0, orders: 0 };
-    cur.revenue += o.total_dh ?? 0;
-    cur.orders += 1;
-    map.set(key, { revenue: Math.round(cur.revenue), orders: cur.orders });
-  }
-  return map;
+/** Normalises the jsonb the RPC returns (missing keys ⇒ empty figures). */
+export function toSnapshot(raw: unknown): StatsSnapshot {
+  const r = (raw ?? {}) as Partial<StatsSnapshot>;
+  return {
+    kpis: { ...EMPTY_SNAPSHOT.kpis, ...(r.kpis ?? {}) },
+    prevRevenue: Number(r.prevRevenue ?? 0),
+    series: Array.isArray(r.series) ? r.series : [],
+    top: Array.isArray(r.top) ? r.top : [],
+    byBranch: (r.byBranch as StatsSnapshot['byBranch']) ?? {},
+  };
 }
 
 /** CSV of the daily revenue series (BOM-friendly: caller adds the BOM). */

@@ -1,6 +1,10 @@
-// Pure, testable CRM aggregation. Builds one row per customer who has ordered (in
-// the RLS-scoped order set), enriched with profile info, total spend, order count,
-// last-order date, loyalty, a segment and the saved note. No React, no I/O.
+// Shapes + pure helpers for the admin CRM screen.
+//
+// The per-customer aggregation now happens in Postgres (admin_customer_rows,
+// 0051); the screen used to download every order and every profile and group
+// them here, which grew without bound and silently truncated at PostgREST's
+// 1000-row cap. `segmentFor` is kept as the single readable statement of the
+// segment rule the SQL implements — keep the two in step.
 
 export interface CrmOrder {
   id: string;
@@ -10,15 +14,6 @@ export interface CrmOrder {
   total_dh: number;
   placed_at: string;
 }
-export interface CrmProfile {
-  id: string;
-  full_name: string | null;
-  phone: string | null;
-  loyalty_points: number | null;
-  loyalty_tier: string | null;
-  crm_note: string | null;
-}
-
 export type Segment = 'VIP' | 'Régulier' | 'Nouveau';
 
 export interface CustomerRow {
@@ -38,38 +33,6 @@ export function segmentFor(spend: number, orders: number): Segment {
   if (spend >= 1000 || orders >= 10) return 'VIP';
   if (orders >= 3) return 'Régulier';
   return 'Nouveau';
-}
-
-const isSale = (o: CrmOrder): boolean => o.status !== 'cancelled';
-
-export function buildCustomerRows(orders: CrmOrder[], profiles: CrmProfile[]): CustomerRow[] {
-  const byUser = new Map<string, { orders: number; spend: number; last: string | null }>();
-  for (const o of orders) {
-    if (!isSale(o)) continue;
-    const cur = byUser.get(o.user_id) ?? { orders: 0, spend: 0, last: null };
-    cur.orders += 1;
-    cur.spend += o.total_dh ?? 0;
-    if (!cur.last || o.placed_at > cur.last) cur.last = o.placed_at;
-    byUser.set(o.user_id, cur);
-  }
-  const profById = new Map(profiles.map((p) => [p.id, p]));
-  const rows: CustomerRow[] = [];
-  byUser.forEach((agg, userId) => {
-    const p = profById.get(userId);
-    rows.push({
-      id: userId,
-      name: p?.full_name?.trim() || 'Client',
-      phone: p?.phone ?? null,
-      orders: agg.orders,
-      spend: Math.round(agg.spend),
-      lastOrder: agg.last,
-      points: p?.loyalty_points ?? 0,
-      tier: p?.loyalty_tier ?? null,
-      segment: segmentFor(agg.spend, agg.orders),
-      note: p?.crm_note ?? null,
-    });
-  });
-  return rows.sort((a, b) => b.spend - a.spend);
 }
 
 /** Case-insensitive filter on name or phone. */

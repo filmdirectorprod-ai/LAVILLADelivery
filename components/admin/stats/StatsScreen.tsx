@@ -1,32 +1,19 @@
 'use client';
-// Admin Statistiques: a date-range report over the last 90 days of orders. KPIs,
-// daily revenue bars, top products, per-agency split, and CSV export. All figures
-// come from the pure lib/admin-stats helpers; the rows are already RLS-scoped.
+// Admin Statistiques: a date-range report. The figures are aggregated in
+// Postgres (admin_stats_snapshot, 0051) and arrive ready to render — the screen
+// used to download 90 days of orders plus every order_item and reduce them here,
+// which grew without bound and, past PostgREST's 1000-row cap, silently showed
+// wrong totals. Changing the range refetches; the RPC also returns the previous
+// window's revenue for the trend arrow.
 import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import {
-  filterOrders, summarize, revenueByDay, topProducts, revenueByBranch, statsToCsv,
-  type StatOrder, type StatItem,
+  RANGES, DEFAULT_RANGE, rangeWindow, revenueDelta as deltaFor, toSnapshot, statsToCsv,
+  type RangeKey, type StatsSnapshot,
 } from '@/lib/admin-stats';
 import type { Branch } from '@/lib/types';
 import { useRealtime } from '@/lib/use-realtime';
-
-type RangeKey = 'today' | '7d' | '30d' | '90d';
-const RANGES: { key: RangeKey; label: string; days: number }[] = [
-  { key: 'today', label: "Aujourd'hui", days: 1 },
-  { key: '7d', label: '7 jours', days: 7 },
-  { key: '30d', label: '30 jours', days: 30 },
-  { key: '90d', label: '90 jours', days: 90 },
-];
-
-function rangeBounds(days: number): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date();
-  if (days === 1) from.setHours(0, 0, 0, 0);
-  else from.setTime(to.getTime() - days * 24 * 60 * 60 * 1000);
-  return { from: from.toISOString(), to: new Date(to.getTime() + 1000).toISOString() };
-}
 
 function Kpi({ label, value, accent, delta }: { label: string; value: string; accent?: boolean; delta?: number | null }) {
   return (
@@ -44,54 +31,44 @@ function Kpi({ label, value, accent, delta }: { label: string; value: string; ac
   );
 }
 
-export function StatsScreen({ orders: initialOrders, items: initialItems, branches }: { orders: StatOrder[]; items: StatItem[]; branches: Branch[] }) {
-  const [range, setRange] = useState<RangeKey>('30d');
-  const [orders, setOrders] = useState<StatOrder[]>(initialOrders);
-  const [items, setItems] = useState<StatItem[]>(initialItems);
+export function StatsScreen({ snapshot: initial, branches }: { snapshot: StatsSnapshot; branches: Branch[] }) {
+  const [range, setRange] = useState<RangeKey>(DEFAULT_RANGE);
+  const [snapshot, setSnapshot] = useState<StatsSnapshot>(initial);
+  const [loading, setLoading] = useState(false);
   const branchName = useMemo(() => new Map(branches.map((b) => [b.id, b.name.replace(/ —.*$/, '')])), [branches]);
 
-  // Live: re-pull the 90-day window whenever an order changes (RLS-scoped).
-  const refetch = useCallback(async () => {
-    const supabase = createClient();
-    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: ords } = await supabase
-      .from('orders')
-      .select('id, status, total_dh, placed_at, branch_id')
-      .gte('placed_at', since)
-      .order('placed_at', { ascending: false });
-    const ids = (ords ?? []).map((o) => (o as { id: string }).id);
-    const { data: its } = ids.length
-      ? await supabase.from('order_items').select('order_id, name_snapshot, qty, price_snapshot').in('order_id', ids)
-      : { data: [] as StatItem[] };
-    setOrders((ords ?? []) as StatOrder[]);
-    setItems((its ?? []) as StatItem[]);
+  const load = useCallback(async (key: RangeKey) => {
+    const { from, to, prevFrom } = rangeWindow(key);
+    setLoading(true);
+    const { data } = await createClient().rpc('admin_stats_snapshot', {
+      p_from: from,
+      p_to: to,
+      p_prev_from: prevFrom,
+    });
+    setSnapshot(toSnapshot(data));
+    setLoading(false);
   }, []);
 
-  // Stats are a 90-day aggregate: a 2 s debounce is plenty, and it stops a busy
-  // dinner service from re-running the whole aggregation on every order event.
+  const pick = useCallback(
+    (key: RangeKey) => {
+      setRange(key);
+      load(key);
+    },
+    [load],
+  );
+
+  // Live: re-run the aggregate when an order changes. A 2 s debounce keeps a busy
+  // dinner service to one aggregation, not one per order event.
+  const refetch = useCallback(() => load(range), [load, range]);
   useRealtime('admin-stats', [{ table: 'orders' }], refetch, { debounceMs: 2000 });
 
-  const { from, to } = useMemo(() => rangeBounds(RANGES.find((r) => r.key === range)!.days), [range]);
-  const scoped = useMemo(() => filterOrders(orders, from, to), [orders, from, to]);
-  const scopedIds = useMemo(() => new Set(scoped.map((o) => o.id)), [scoped]);
-  const scopedItems = useMemo(() => items.filter((it) => scopedIds.has(it.order_id)), [items, scopedIds]);
-
-  const kpis = useMemo(() => summarize(scoped), [scoped]);
-  // Same-length window immediately before, for the revenue trend.
-  const prevRevenue = useMemo(() => {
-    const days = RANGES.find((r) => r.key === range)!.days;
-    const prevFrom = new Date(Date.parse(from) - days * 24 * 60 * 60 * 1000).toISOString();
-    return summarize(filterOrders(orders, prevFrom, from)).revenue;
-  }, [orders, from, range]);
-  const revenueDelta = prevRevenue > 0 ? Math.round(((kpis.revenue - prevRevenue) / prevRevenue) * 100) : null;
-  const series = useMemo(() => revenueByDay(scoped), [scoped]);
-  const top = useMemo(() => topProducts(scopedItems), [scopedItems]);
-  const byBranch = useMemo(() => revenueByBranch(scoped), [scoped]);
+  const { kpis, series, top, byBranch } = snapshot;
+  const revenueDelta = deltaFor(snapshot);
   const maxDay = Math.max(1, ...series.map((s) => s.revenue));
 
   function exportCsv() {
     const csv = statsToCsv(series);
-    const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `stats-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -104,13 +81,15 @@ export function StatsScreen({ orders: initialOrders, items: initialItems, branch
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--ink)', margin: 0 }}>Statistiques</h1>
-          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>Chiffres de vente sur la période choisie.</p>
+          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>
+            Chiffres de vente sur la période choisie.{loading ? ' Mise à jour…' : ''}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {RANGES.map((r) => {
             const on = range === r.key;
             return (
-              <button key={r.key} onClick={() => setRange(r.key)} style={{ border: `1px solid ${on ? 'var(--brand)' : 'var(--line)'}`, borderRadius: 999, padding: '7px 14px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, background: on ? 'rgba(19,124,139,0.08)' : '#fff', color: on ? 'var(--brand)' : 'var(--muted)' }}>
+              <button key={r.key} onClick={() => pick(r.key)} style={{ border: `1px solid ${on ? 'var(--brand)' : 'var(--line)'}`, borderRadius: 999, padding: '7px 14px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, background: on ? 'rgba(19,124,139,0.08)' : '#fff', color: on ? 'var(--brand)' : 'var(--muted)' }}>
                 {r.label}
               </button>
             );
@@ -172,7 +151,7 @@ export function StatsScreen({ orders: initialOrders, items: initialItems, branch
             <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 14 }}>Par agence</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {branches.map((b) => {
-                const v = byBranch.get(b.id) ?? { revenue: 0, orders: 0 };
+                const v = byBranch[b.id] ?? { revenue: 0, orders: 0 };
                 return (
                   <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{ flex: 1, fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--ink)' }}>{branchName.get(b.id)}</span>
