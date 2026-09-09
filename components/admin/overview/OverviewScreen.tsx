@@ -20,9 +20,15 @@ import type { Order } from '@/lib/types';
 import { KpiCard } from './KpiCard';
 import { HourlyChart } from './HourlyChart';
 import { InProgressTable, type InProgressRow } from './InProgressTable';
-import { LiveDriverMap } from './LiveDriverMap';
+
 import { BranchesInfo } from '@/components/ui/BranchesInfo';
 import { useRealtime } from '@/lib/use-realtime';
+import dynamic from 'next/dynamic';
+
+// Loaded on demand — the admin overview renders long before the map matters.
+const LiveDriverMap = dynamic(() => import('./LiveDriverMap').then((m) => m.LiveDriverMap), {
+  ssr: false,
+});
 
 export function OverviewScreen({
   initial,

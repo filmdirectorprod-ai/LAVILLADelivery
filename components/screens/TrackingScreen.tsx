@@ -16,7 +16,14 @@ import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import { Badge } from '@/components/ui/Badge';
-import { GoogleDeliveryMap } from '@/components/ui/GoogleDeliveryMap';
+import dynamic from 'next/dynamic';
+
+// Loaded on demand: the Maps SDK should not sit in the bundle of every screen
+// that merely imports this one. ssr:false — it needs window.
+const GoogleDeliveryMap = dynamic(
+  () => import('@/components/ui/GoogleDeliveryMap').then((m) => m.GoogleDeliveryMap),
+  { ssr: false },
+);
 
 // Real map renders only when a browser Maps key is configured; otherwise the
 // built-in SVG map is used (graceful fallback, no key required).
