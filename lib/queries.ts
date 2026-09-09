@@ -44,22 +44,25 @@ export async function getCategories(): Promise<Category[]> {
 
 export async function getProducts(branchId?: string | null): Promise<Product[]> {
   const supabase = await createServerSupabase();
+  // Per-branch stock (0035) comes back in the SAME round trip as the catalogue:
+  // the embedded product_branch rows are filtered to the serving agency (a left
+  // join, so products with no override still come through), and their in_stock
+  // overrides the global flag for the "Rupture" badge.
+  if (!branchId) {
+    const { data } = await supabase.from('products').select('*').eq('active', true).order('created_at');
+    return (data ?? []) as Product[];
+  }
   const { data } = await supabase
     .from('products')
-    .select('*')
+    .select('*, product_branch(in_stock)')
     .eq('active', true)
+    .eq('product_branch.branch_id', branchId)
     .order('created_at');
-  const products = (data ?? []) as Product[];
-  // Per-branch stock (0035): override the global in_stock with the viewer's branch
-  // availability, so the catalogue's "Rupture" badge reflects the serving agency.
-  if (!branchId) return products;
-  const { data: overrides } = await supabase
-    .from('product_branch')
-    .select('product_id, in_stock')
-    .eq('branch_id', branchId);
-  if (!overrides || overrides.length === 0) return products;
-  const map = new Map(overrides.map((o) => [(o as { product_id: string }).product_id, (o as { in_stock: boolean }).in_stock]));
-  return products.map((p) => (map.has(p.id) ? { ...p, in_stock: map.get(p.id)! } : p));
+  return (data ?? []).map((row) => {
+    const { product_branch, ...product } = row as Product & { product_branch: { in_stock: boolean }[] | null };
+    const override = Array.isArray(product_branch) ? product_branch[0] : product_branch;
+    return (override ? { ...product, in_stock: override.in_stock } : product) as Product;
+  });
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
@@ -316,13 +319,30 @@ export async function getMyLoyaltyLedger(): Promise<LoyaltyLedgerEntry[]> {
   return data ?? [];
 }
 
-export async function getMyNotifications(): Promise<Notification[]> {
+export async function getMyNotifications(limit = 200): Promise<Notification[]> {
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from('notifications')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(limit);
   return data ?? [];
+}
+
+/**
+ * Kinds of the current user's UNREAD notifications — all the home header needs
+ * for its badge. It used to download the full notification history (every
+ * column, no limit) on every home render just to count them.
+ */
+export async function getMyUnreadNotificationKinds(limit = 100): Promise<string[]> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from('notifications')
+    .select('kind')
+    .eq('read', false)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  return (data ?? []).map((n) => (n as { kind: string }).kind);
 }
 
 export interface AdminOverviewData {
