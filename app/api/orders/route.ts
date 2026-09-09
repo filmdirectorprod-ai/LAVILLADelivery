@@ -4,6 +4,7 @@
 // product prices). The client total is never trusted.
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { customerMessage } from '@/lib/order-error-messages';
 
 interface OrderItemInput {
   product_id: string;
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: customerMessage(error.message) }, { status: 400 });
   }
 
   return NextResponse.json({ order_id: data as string }, { status: 201 });
