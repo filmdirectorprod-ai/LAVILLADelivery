@@ -16,6 +16,7 @@ import { ProductCard } from './ProductCard';
 import { ProductForm, type ProductDraft } from './ProductForm';
 import { ProductEditModal } from './ProductEditModal';
 import { useRealtime } from '@/lib/use-realtime';
+import { revalidateCatalogue } from '@/lib/revalidate-catalogue';
 
 export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
   const [products, setProducts] = useState<Product[]>(initial.products);
@@ -50,6 +51,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
         p_in_stock: patch.in_stock ?? product.in_stock,
       });
       setBusy(false);
+      revalidateCatalogue();
       refetch();
     },
     [refetch],
@@ -63,7 +65,10 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
       const { error } = await supabase.rpc('admin_delete_product', { p_product: p.id });
       setBusy(false);
       if (error) window.alert('Suppression échouée : ' + error.message);
-      else refetch();
+      else {
+        revalidateCatalogue();
+        refetch();
+      }
     },
     [refetch],
   );
@@ -96,6 +101,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
       }
       setBusy(false);
       setShowForm(false);
+      revalidateCatalogue();
       refetch();
     },
     [refetch],
@@ -172,6 +178,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
           onClose={() => setEditing(null)}
           onDone={() => {
             setEditing(null);
+            revalidateCatalogue();
             refetch();
           }}
         />

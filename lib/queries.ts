@@ -2,6 +2,7 @@
 // (RLS-enforced) client; catalog tables are public-read, personal tables are
 // owner-scoped by policy. Import only from Server Components / Route Handlers.
 import { createServerSupabase } from '@/lib/supabase/server';
+import { getCachedCategories, getCachedProducts, getCachedZones } from '@/lib/catalogue';
 import { startOfTodayISO } from '@/lib/admin-overview';
 import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import { buildAdminOrderRows, type AdminOrderRow } from '@/lib/admin-orders';
@@ -36,33 +37,15 @@ import type {
   Branch,
 } from '@/lib/types';
 
+// The three public-read catalogue tables are served from the shared server cache
+// (lib/catalogue.ts) — same rows for every visitor, invalidated by the admin
+// screens through /api/revalidate.
 export async function getCategories(): Promise<Category[]> {
-  const supabase = await createServerSupabase();
-  const { data } = await supabase.from('categories').select('*').order('sort');
-  return data ?? [];
+  return getCachedCategories();
 }
 
 export async function getProducts(branchId?: string | null): Promise<Product[]> {
-  const supabase = await createServerSupabase();
-  // Per-branch stock (0035) comes back in the SAME round trip as the catalogue:
-  // the embedded product_branch rows are filtered to the serving agency (a left
-  // join, so products with no override still come through), and their in_stock
-  // overrides the global flag for the "Rupture" badge.
-  if (!branchId) {
-    const { data } = await supabase.from('products').select('*').eq('active', true).order('created_at');
-    return (data ?? []) as Product[];
-  }
-  const { data } = await supabase
-    .from('products')
-    .select('*, product_branch(in_stock)')
-    .eq('active', true)
-    .eq('product_branch.branch_id', branchId)
-    .order('created_at');
-  return (data ?? []).map((row) => {
-    const { product_branch, ...product } = row as Product & { product_branch: { in_stock: boolean }[] | null };
-    const override = Array.isArray(product_branch) ? product_branch[0] : product_branch;
-    return (override ? { ...product, in_stock: override.in_stock } : product) as Product;
-  });
+  return getCachedProducts(branchId ?? null);
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
@@ -72,9 +55,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 }
 
 export async function getZones(): Promise<Zone[]> {
-  const supabase = await createServerSupabase();
-  const { data } = await supabase.from('delivery_zones').select('*').order('fee_dh');
-  return data ?? [];
+  return getCachedZones();
 }
 
 export async function getRewards(): Promise<Reward[]> {

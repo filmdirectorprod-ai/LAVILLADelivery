@@ -13,6 +13,7 @@ import type { AdminZonesData } from '@/lib/queries';
 import type { Zone } from '@/lib/types';
 import { ZoneEditor } from './ZoneEditor';
 import { useRealtime } from '@/lib/use-realtime';
+import { revalidateCatalogue } from '@/lib/revalidate-catalogue';
 
 type EditState = { mode: 'new' } | { mode: 'edit'; zone: Zone } | null;
 
@@ -42,6 +43,7 @@ export function ZonesScreen({ initial }: { initial: AdminZonesData }) {
       });
       setBusy(false);
       setEdit(null);
+      revalidateCatalogue();
       refetch();
     },
     [refetch],
@@ -53,6 +55,7 @@ export function ZonesScreen({ initial }: { initial: AdminZonesData }) {
       const supabase = createClient();
       await supabase.rpc('admin_delete_zone', { p_id: zone.id });
       setBusy(false);
+      revalidateCatalogue();
       refetch();
     },
     [refetch],

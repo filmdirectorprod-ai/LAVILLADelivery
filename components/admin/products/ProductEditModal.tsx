@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/ui/Icon';
 import { useBranches } from '@/lib/use-branches';
 import type { Category, Product, Universe } from '@/lib/types';
+import { revalidateCatalogue } from '@/lib/revalidate-catalogue';
 
 const field: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 14, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--ink)', width: '100%', background: '#fff' };
 const label: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', fontWeight: 600 };
@@ -46,6 +47,7 @@ export function ProductEditModal({ product, categories, onClose, onDone }: { pro
   async function toggleBranchStock(branchId: string, next: boolean) {
     setBranchStock((p) => ({ ...p, [branchId]: next }));
     await createClient().rpc('admin_set_product_branch_stock', { p_product: product.id, p_branch: branchId, p_in_stock: next });
+    revalidateCatalogue(); // the "Rupture" badge is served from the cached catalogue
   }
 
   const cats = useMemo(() => categories.filter((c) => c.universe === universe || c.universe === 'all'), [categories, universe]);
