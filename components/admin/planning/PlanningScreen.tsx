@@ -89,7 +89,7 @@ export function PlanningScreen({ initial }: { initial: AdminPlanningData }) {
     <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--a-text)', margin: 0 }}>Planning</h1>
+          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 34, letterSpacing: '-0.02em', color: 'var(--a-text)', margin: 0 }}>Planning</h1>
           <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--a-muted)', marginTop: 6 }}>Semaine du {weekLabel}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

@@ -44,7 +44,7 @@ export function LoyaltyAdminScreen({ members: initial }: { members: LoyaltyMembe
   return (
     <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 1000 }}>
       <div>
-        <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--a-text)', margin: 0 }}>Fidélité</h1>
+        <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 34, letterSpacing: '-0.02em', color: 'var(--a-text)', margin: 0 }}>Fidélité</h1>
         <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--a-muted)', marginTop: 6 }}>Programme de points & paliers · ajustements manuels.</p>
       </div>
 

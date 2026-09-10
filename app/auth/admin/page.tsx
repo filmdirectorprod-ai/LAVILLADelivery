@@ -19,10 +19,11 @@ const field: React.CSSProperties = {
   background: 'transparent',
   padding: '6px 0',
 };
+// Champ iOS : rectangle arrondi teinté, sans liseré. Teinte = #137C8B à 8 %.
 const fieldBox: React.CSSProperties = {
-  borderLeft: '3px solid var(--a-accent)',
-  background: 'var(--soft)',
-  padding: '10px 16px',
+  background: 'rgba(19, 124, 139, 0.08)',
+  borderRadius: 12,
+  padding: '10px 14px',
   marginTop: 10,
 };
 const fieldLabel: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--muted)' };
@@ -79,7 +80,7 @@ export default function AdminAuthPage() {
         <div style={{ width: '100%', maxWidth: 420, background: 'var(--a-card)', borderRadius: 'var(--a-r-card)', padding: '30px 28px' }}>
           <Image src="/brand/logo-client.png" alt="La Villa" width={180} height={91} priority style={{ width: 160, height: 'auto', display: 'block', marginBottom: 22 }} />
 
-          <h1 className="font-display" style={{ fontSize: 40, fontWeight: 700, color: 'var(--a-on-white)', margin: '0 0 10px', lineHeight: 1.05 }}>
+          <h1 className="font-display" style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--a-on-white)', margin: '0 0 10px', lineHeight: 1.1 }}>
             Espace gérant
           </h1>
           <p style={{ fontFamily: 'var(--ui-font)', fontSize: 14.5, color: 'var(--muted)', margin: '0 0 26px', lineHeight: 1.5 }}>
@@ -109,7 +110,7 @@ export default function AdminAuthPage() {
           {info && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#2f9e6f', fontWeight: 600, marginTop: 16 }}>{info}</div>}
 
           <div style={{ marginTop: 22 }}>
-            <button onClick={submit} disabled={busy} style={{ width: '100%', border: 'none', borderRadius: 999, padding: '14px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, letterSpacing: 1, color: '#ffffff', background: 'var(--a-on-white)', opacity: busy ? 0.6 : 1 }}>
+            <button onClick={submit} disabled={busy} style={{ width: '100%', border: 'none', borderRadius: 12, padding: '14px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, letterSpacing: 1, color: '#ffffff', background: 'var(--a-on-white)', opacity: busy ? 0.6 : 1 }}>
               {busy ? '…' : 'CONNEXION'}
             </button>
           </div>

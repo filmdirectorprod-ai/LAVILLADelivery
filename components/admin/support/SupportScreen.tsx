@@ -153,7 +153,7 @@ export function SupportScreen({ initial }: { initial: AdminSupportData }) {
     <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 18, height: '100%', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <div>
-          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--a-text)', margin: 0 }}>Support livreurs</h1>
+          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 34, letterSpacing: '-0.02em', color: 'var(--a-text)', margin: 0 }}>Support livreurs</h1>
           <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--a-muted)', marginTop: 6 }}>
             {todayLabel()} · Fès
             {totalUnread > 0 ? ` · ${totalUnread} non lu${totalUnread > 1 ? 's' : ''}` : ''}

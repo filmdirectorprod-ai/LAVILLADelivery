@@ -145,6 +145,11 @@ body {
      --brand-d) : sur une pleine page, le #137C8B vibre et fatigue ; foncé, il
      laisse les cartes blanches porter le regard. Le turquoise clair reste la
      couleur des actions, sur ces cartes. */
+  /* Style iOS : la police système d'Apple (SF Pro sur Mac et iPhone, la police
+     système ailleurs) remplace Poppins et Playfair dans l'admin seulement. */
+  --ui-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
   --a-ground: #0f606b;
   --a-panel: rgba(255, 255, 255, 0.08);
   --a-panel-2: rgba(255, 255, 255, 0.14);
@@ -162,6 +167,42 @@ body {
   --a-r-pill: 999px;
   background: var(--a-ground);
   color: var(--a-text);
+}
+
+/* Barre de navigation iOS : verre dépoli. Elle est collante à l'intérieur du
+   défileur, pour que le contenu passe dessous et que le flou ait quelque chose
+   à flouter. Le teint est #0F606B à 72 % — la palette reste stricte. */
+.lv-ios-bar {
+  background: rgba(15, 96, 107, 0.72);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.22);
+}
+
+/* Contrôle segmenté iOS : un rail translucide, le segment actif en blanc avec
+   l'ombre douce d'iOS (une profondeur, pas une couleur). */
+.lv-ios-segmented {
+  padding: 2px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.lv-ios-segment {
+  padding: 6px 12px;
+  border-radius: 9px;
+  font-family: var(--ui-font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--a-muted);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.lv-ios-segment:hover {
+  color: var(--a-text);
+}
+.lv-ios-segment.is-active {
+  background: #ffffff;
+  color: var(--a-on-white);
+  font-weight: 600;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04);
 }
 
 .lv-frame:has(.lv-admin-root) {
