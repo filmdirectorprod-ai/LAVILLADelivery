@@ -72,7 +72,7 @@ export default function AdminAuthPage() {
   }
 
   return (
-    <div className="lv-admin-root" style={{ display: 'flex', minHeight: '100dvh', width: '100%', background: 'var(--a-ground)' }}>
+    <div className="lv-admin-root" style={{ display: 'flex', minHeight: '100dvh', width: '100%' }}>
       <style>{`@media (max-width: 860px){ .lv-admin-visual { display:none !important; } }`}</style>
 
       {/* Left — form */}

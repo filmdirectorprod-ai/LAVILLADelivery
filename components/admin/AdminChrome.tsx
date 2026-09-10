@@ -26,10 +26,10 @@ export function AdminChrome({ children, managerName, agencyLabel = 'Gérant' }: 
       {/* Un seul défileur : la barre est collante À L'INTÉRIEUR, pour que le
           contenu glisse dessous et que le verre dépoli ait quelque chose à
           flouter — c'est tout l'effet d'une barre de navigation iOS. */}
-      <main style={{ flex: 1, minWidth: 0, overflow: 'auto', background: 'var(--a-ground)' }}>
+      <main style={{ flex: 1, minWidth: 0, overflow: 'auto', background: 'transparent' }}>
         <header
           className="lv-ios-bar"
-          style={{ position: 'sticky', top: 0, zIndex: 40, display: 'flex', alignItems: 'center', gap: 16, padding: '10px 20px' }}
+          style={{ position: 'sticky', top: 0, zIndex: 40, display: 'flex', alignItems: 'center', gap: 18, padding: '14px 24px' }}
         >
           <Image
             src="/brand/logo-ondark.png"
@@ -68,7 +68,7 @@ export function AdminChrome({ children, managerName, agencyLabel = 'Gérant' }: 
             <NotificationBell />
             <div
               title={`${managerName} · ${agencyLabel}`}
-              style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--a-panel-2)', borderRadius: 'var(--a-r-pill)', padding: '5px 5px 5px 12px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--a-glass)', border: '1px solid var(--a-glass-line)', borderRadius: 'var(--a-r-pill)', padding: '5px 5px 5px 14px' }}
             >
               <div style={{ minWidth: 0, textAlign: 'right' }}>
                 <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--a-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>
