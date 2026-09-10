@@ -1,4 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+
+// Load .env.local the way Next does, so the flow specs can find the seeded test
+// account without those values being typed on a command line (where they would
+// land in shell history). Anything already set in the environment wins.
+try {
+  for (const line of readFileSync('.env.local', 'utf8').split('\n')) {
+    const m = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].trim();
+  }
+} catch {
+  /* no .env.local — CI supplies the variables directly */
+}
 
 // La Villa — end-to-end test config.
 //
