@@ -158,11 +158,27 @@ body {
   --a-muted: rgba(255, 255, 255, 0.68);
   --a-accent: #a89723;
   --a-accent-ink: #ffffff;
+  /* Inversion des jetons d'encre de la maison, dans l'admin seulement : les
+     écrans colorent leur texte, leurs bordures et leurs puits via --ink,
+     --muted, --line et --soft. Les redéfinir ici fait passer tout le contenu
+     des cartes noires en blanc sans réécrire les écrans un par un. */
+  --ink: #ffffff;
+  --muted: rgba(255, 255, 255, 0.66);
+  --line: rgba(255, 255, 255, 0.12);
+  --soft: rgba(255, 255, 255, 0.06);
+  /* Le turquoise foncé sert d'encre d'accent à 5 libellés ; sur carte noire il
+     tomberait à ~2:1. L'or de la palette y atteint ~7:1. */
+  --brand-d: #a89723;
+  /* Contrôles natifs (listes déroulantes, dates, cases) en thème sombre, pour
+     que les champs sans fond explicite ne restent pas blancs sous du texte
+     blanc. */
+  color-scheme: dark;
   --a-on-white: #137c8b;
-  /* Les cartes sont blanches à 90 % : le turquoise du sol transparaît juste
-     assez pour les rattacher à la page, sans coûter en lisibilité (le texte
-     conserve un contraste supérieur à 4,5:1 sur ce fond). */
-  --a-card: rgba(255, 255, 255, 0.86);
+  /* Cartes en noir à 70 % (panneaux sombres du modèle visionOS) : le
+     turquoise du sol transparaît à 30 %, assez pour que le flou du verre se
+     voie. Leur contenu passe en blanc par l'inversion des jetons d'encre
+     ci-dessous. */
+  --a-card: rgba(0, 0, 0, 0.70);
   /* Verre (style visionOS) : blanc à faible opacité + liseré lumineux. */
   --a-glass: rgba(255, 255, 255, 0.10);
   --a-glass-strong: rgba(255, 255, 255, 0.16);
@@ -240,5 +256,5 @@ body {
 .lv-admin-root [style*="--a-card"] {
   -webkit-backdrop-filter: saturate(160%) blur(22px);
   backdrop-filter: saturate(160%) blur(22px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 10px 34px -12px rgba(7, 40, 45, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 12px 36px -12px rgba(0, 0, 0, 0.55);
 }
