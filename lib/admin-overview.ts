@@ -131,3 +131,34 @@ export function driversToPositions(drivers: LocatedDriver[], now: Date = new Dat
   }
   return out;
 }
+
+export interface OverviewDetail {
+  /** Commandes livrées aujourd'hui. */
+  delivered: number;
+  /** Panier moyen des commandes non annulées, en DH (0 s'il n'y en a aucune). */
+  avgBasket: number;
+  /** Heure (0–23) qui a reçu le plus de commandes, ou null sur une journée vide. */
+  peakHour: number | null;
+  /** Nombre de commandes du jour par statut. */
+  statusCounts: Record<string, number>;
+}
+
+/** Chiffres de détail du grand panneau de la vue d'ensemble, dérivés des mêmes
+ *  lignes brutes que les indicateurs d'en-tête. `buckets` vient de
+ *  bucketOrdersByHour, pour que l'heure de pointe suive le fuseau de l'agence. */
+export function computeOverviewDetail(
+  orders: { status: string; total_dh: number }[],
+  buckets: number[],
+): OverviewDetail {
+  const statusCounts: Record<string, number> = {};
+  for (const o of orders) statusCounts[o.status] = (statusCounts[o.status] ?? 0) + 1;
+  const sales = orders.filter((o) => o.status !== 'cancelled');
+  const revenue = sales.reduce((sum, o) => sum + (o.total_dh ?? 0), 0);
+  const max = Math.max(0, ...buckets);
+  return {
+    delivered: statusCounts.delivered ?? 0,
+    avgBasket: sales.length ? revenue / sales.length : 0,
+    peakHour: max > 0 ? buckets.indexOf(max) : null,
+    statusCounts,
+  };
+}
