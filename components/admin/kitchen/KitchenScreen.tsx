@@ -60,8 +60,8 @@ export function KitchenScreen({ initial }: { initial: KitchenBoard }) {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--ink)', margin: 0 }}>Cuisine</h1>
-          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>{todayLabel()}</p>
+          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--a-text)', margin: 0 }}>Cuisine</h1>
+          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--a-muted)', marginTop: 6 }}>{todayLabel()}</p>
         </div>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--brand)', background: 'rgba(19,124,139,0.10)', padding: '7px 13px', borderRadius: 999 }}>
           <span style={{ width: 8, height: 8, borderRadius: 999, background: '#2f9e6f', display: 'inline-block' }} />

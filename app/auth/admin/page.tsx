@@ -71,13 +71,13 @@ export default function AdminAuthPage() {
   }
 
   return (
-    <div className="lv-admin-root" style={{ display: 'flex', minHeight: '100dvh', width: '100%', background: '#fff' }}>
+    <div className="lv-admin-root" style={{ display: 'flex', minHeight: '100dvh', width: '100%', background: 'var(--a-ground)' }}>
       <style>{`@media (max-width: 860px){ .lv-admin-visual { display:none !important; } }`}</style>
 
       {/* Left — form */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 28px' }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
-          <Image src="/brand/logo-client.png" alt="La Villa" width={180} height={91} priority style={{ width: 180, height: 'auto', display: 'block', marginBottom: 28 }} />
+        <div style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 'var(--a-r-card)', padding: '30px 28px' }}>
+          <Image src="/brand/logo-client.png" alt="La Villa" width={180} height={91} priority style={{ width: 160, height: 'auto', display: 'block', marginBottom: 22 }} />
 
           <h1 className="font-display" style={{ fontSize: 40, fontWeight: 700, color: 'var(--brand)', margin: '0 0 10px', lineHeight: 1.05 }}>
             Espace gérant

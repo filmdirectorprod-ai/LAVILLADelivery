@@ -128,11 +128,30 @@ body {
 /* Admin renders full-width, outside the centered phone frame. The marker class
    lives on AdminChrome's root; :has() lifts the .lv-frame constraints only when
    an admin page is mounted. */
+/* ── Administration — thème sombre ────────────────────────────────────────────
+   Même transposition que pour l'espace livreur : le turquoise de la maison
+   devient le sol, l'or l'accent. Les cartes des écrans restent blanches — sur ce
+   fond, le blanc devient l'accent le plus fort, et c'est lui qui porte les
+   données. Ces jetons ne s'appliquent QUE sous .lv-admin-root. */
+.lv-admin-root {
+  --a-ground: #071a1e;
+  --a-panel: #0e262c;
+  --a-panel-2: #143740;
+  --a-line: rgba(238, 244, 244, 0.10);
+  --a-text: #eef4f4;
+  --a-muted: #86a3a8;
+  --a-accent: #d8c33c;
+  --a-accent-ink: #071a1e;
+  --a-r-card: 20px;
+  background: var(--a-ground);
+  color: var(--a-text);
+}
+
 .lv-frame:has(.lv-admin-root) {
   max-width: none;
   height: 100dvh;
   margin: 0;
   border-radius: 0;
   box-shadow: none;
-  background: var(--soft);
+  background: #071a1e;
 }

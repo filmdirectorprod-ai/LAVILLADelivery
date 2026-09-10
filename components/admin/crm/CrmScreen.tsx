@@ -56,8 +56,8 @@ export function CrmScreen({ rows }: { rows: CustomerRow[] }) {
   return (
     <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 18, height: '100%', boxSizing: 'border-box' }}>
       <div>
-        <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--ink)', margin: 0 }}>Clients</h1>
-        <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>
+        <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--a-text)', margin: 0 }}>Clients</h1>
+        <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--a-muted)', marginTop: 6 }}>
           {rows.length} client{rows.length > 1 ? 's' : ''} · triés par total dépensé
         </p>
       </div>

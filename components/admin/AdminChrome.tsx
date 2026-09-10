@@ -1,7 +1,9 @@
 'use client';
-// Desktop admin shell: fixed left sidebar (brand-d) with the section nav and the
-// manager identity, plus a scrollable content area. Marker class .lv-admin-root
-// tells globals.css to drop the phone-frame sizing.
+// Desktop admin shell: fixed left sidebar with the section nav and the manager
+// identity, plus a scrollable content area on a dark ground. The screens' own
+// white cards then read as the lit surfaces, the way a control room does — the
+// data is what glows. Marker class .lv-admin-root drops the phone-frame sizing
+// and carries the dark tokens (see globals.css).
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -25,7 +27,8 @@ export function AdminChrome({ children, managerName, agencyLabel = 'Gérant' }: 
         style={{
           width: 260,
           flexShrink: 0,
-          background: 'var(--brand-d)',
+          background: 'var(--a-panel)',
+          borderRight: '1px solid var(--a-line)',
           display: 'flex',
           flexDirection: 'column',
           padding: '22px 14px',
@@ -43,7 +46,7 @@ export function AdminChrome({ children, managerName, agencyLabel = 'Gérant' }: 
               style={{ width: '100%', maxWidth: 190, height: 'auto', display: 'block' }}
             />
           </div>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11, letterSpacing: 1.5, color: 'var(--gold)', fontWeight: 600, marginTop: 10, textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11, letterSpacing: 1.5, color: 'var(--a-accent)', fontWeight: 600, marginTop: 10, textAlign: 'center' }}>
             ADMINISTRATION
           </div>
         </div>
@@ -59,45 +62,47 @@ export function AdminChrome({ children, managerName, agencyLabel = 'Gérant' }: 
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
-                  padding: '12px 12px',
-                  borderRadius: 12,
+                  padding: '12px 14px',
+                  // Pilule : la section active est la seule tache dorée de la
+                  // colonne, repérable sans lire.
+                  borderRadius: 999,
                   textDecoration: 'none',
                   fontFamily: 'var(--ui-font)',
                   fontSize: 14.5,
-                  fontWeight: 600,
-                  color: active ? 'var(--brand-d)' : 'rgba(255,255,255,0.85)',
-                  background: active ? '#fff' : 'transparent',
+                  fontWeight: active ? 700 : 500,
+                  color: active ? 'var(--a-accent-ink)' : 'var(--a-muted)',
+                  background: active ? 'var(--a-accent)' : 'transparent',
                 }}
               >
-                <Icon name={item.icon} size={19} color={active ? 'var(--brand)' : 'rgba(255,255,255,0.85)'} />
+                <Icon name={item.icon} size={19} color={active ? 'var(--a-accent-ink)' : 'var(--a-muted)'} />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 10px 0', borderTop: '1px solid rgba(255,255,255,0.12)', marginTop: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 999, background: 'rgba(255,255,255,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Icon name="user" size={18} color="#fff" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 10px 0', borderTop: '1px solid var(--a-line)', marginTop: 10 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 999, background: 'var(--a-panel-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name="user" size={18} color="var(--a-accent)" />
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: 'var(--a-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {managerName}
             </div>
-            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{agencyLabel}</div>
+            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--a-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{agencyLabel}</div>
           </div>
           <button
             onClick={signOut}
             title="Se déconnecter"
             aria-label="Se déconnecter"
-            style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.12)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 999, border: 'none', background: 'var(--a-panel-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            <Icon name="logout" size={17} color="rgba(255,255,255,0.85)" />
+            <Icon name="logout" size={17} color="var(--a-muted)" />
           </button>
         </div>
       </aside>
 
-      <main style={{ flex: 1, minWidth: 0, overflow: 'auto', background: 'var(--soft)' }}>
+      <main style={{ flex: 1, minWidth: 0, overflow: 'auto', background: 'var(--a-ground)' }}>
         <div
           style={{
             position: 'sticky',
@@ -108,9 +113,9 @@ export function AdminChrome({ children, managerName, agencyLabel = 'Gérant' }: 
             justifyContent: 'flex-end',
             gap: 12,
             padding: '12px 32px',
-            background: 'rgba(246,247,247,0.92)',
-            backdropFilter: 'blur(6px)',
-            borderBottom: '1px solid var(--line)',
+            background: 'rgba(7, 26, 30, 0.86)',
+            backdropFilter: 'blur(8px)',
+            borderBottom: '1px solid var(--a-line)',
           }}
         >
           <NotificationBell />
