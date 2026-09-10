@@ -173,11 +173,15 @@ body {
      Des halos des couleurs de la palette (turquoise, or à faible opacité) sur
      le turquoise foncé remplacent la photo floutée du modèle. Le fond reste
      immobile pendant que le contenu défile par-dessus. */
+  /* Plus foncé : #0F606B domine. Les halos ne sont plus que des reflets (juste
+     assez pour que le verre ait du relief à flouter), et un assombrissement
+     vers les bords descend sous #0F606B — du noir à faible opacité, une ombre,
+     pas une nouvelle couleur. */
   background:
-    radial-gradient(55% 45% at 12% 8%, rgba(19, 124, 139, 0.95), transparent 70%),
-    radial-gradient(40% 35% at 88% 14%, rgba(168, 151, 35, 0.32), transparent 70%),
-    radial-gradient(50% 50% at 72% 92%, rgba(19, 124, 139, 0.75), transparent 70%),
-    radial-gradient(35% 30% at 20% 85%, rgba(168, 151, 35, 0.18), transparent 70%),
+    radial-gradient(120% 95% at 50% 35%, transparent 45%, rgba(0, 0, 0, 0.42) 100%),
+    radial-gradient(50% 40% at 12% 8%, rgba(19, 124, 139, 0.38), transparent 70%),
+    radial-gradient(38% 32% at 88% 14%, rgba(168, 151, 35, 0.13), transparent 70%),
+    radial-gradient(45% 45% at 72% 92%, rgba(19, 124, 139, 0.26), transparent 70%),
     var(--a-ground);
   color: var(--a-text);
 }
@@ -186,7 +190,7 @@ body {
    défileur, pour que le contenu passe dessous et que le flou ait quelque chose
    à flouter. Le teint est #0F606B à 72 % — la palette reste stricte. */
 .lv-ios-bar {
-  background: rgba(15, 96, 107, 0.30);
+  background: rgba(15, 96, 107, 0.55);
   -webkit-backdrop-filter: saturate(170%) blur(30px);
   backdrop-filter: saturate(170%) blur(30px);
   border-bottom: 1px solid var(--a-glass-line);

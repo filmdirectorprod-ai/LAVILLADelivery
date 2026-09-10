@@ -120,7 +120,7 @@ export default function AdminAuthPage() {
       {/* Right — branded visual */}
       <div
         className="lv-admin-visual"
-        style={{ flex: 1, background: 'var(--a-panel)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18, padding: 40, position: 'relative', overflow: 'hidden' }}
+        style={{ flex: 1, background: 'transparent', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18, padding: 40, position: 'relative', overflow: 'hidden' }}
       >
         <Image src="/brand/logo-ondark.png" alt="La Villa" width={360} height={182} priority style={{ width: 'min(360px, 70%)', height: 'auto', display: 'block' }} />
         <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--a-muted)' }}>
