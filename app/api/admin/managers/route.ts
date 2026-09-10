@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { ok: true, identifiant: normalizeIdentifiant(body.identifiant), email },
+    { ok: true, user_id: userId, identifiant: normalizeIdentifiant(body.identifiant), email },
     { status: 201 },
   );
 }
@@ -121,6 +121,42 @@ export async function DELETE(request: NextRequest) {
   if (dErr) return NextResponse.json({ error: dErr.message }, { status: 400 });
   // Clean the profile in case it wasn't cascaded.
   await svc.from('profiles').delete().eq('id', body.user_id);
+
+  return NextResponse.json({ ok: true }, { status: 200 });
+}
+
+// PATCH /api/admin/managers — super-admin sets a new password for a branch gérant
+// (forgotten password). Same gate as DELETE; never touches a super-admin account.
+export async function PATCH(request: NextRequest) {
+  let body: { user_id?: string; password?: string };
+  try {
+    body = (await request.json()) as { user_id?: string; password?: string };
+  } catch {
+    return NextResponse.json({ error: 'Requête invalide' }, { status: 400 });
+  }
+  if (!body.user_id) return NextResponse.json({ error: 'Gérant manquant.' }, { status: 400 });
+  const pwErr = validateDriverPassword(body.password);
+  if (pwErr) return NextResponse.json({ error: pwErr }, { status: 400 });
+
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+  const { data: isStaff } = await supabase.rpc('lv_is_staff');
+  if (!isStaff) return NextResponse.json({ error: 'Accès réservé au staff.' }, { status: 403 });
+  const { data: callerBranch } = await supabase.rpc('lv_staff_branch');
+  if (callerBranch) return NextResponse.json({ error: 'Réservé au super-admin.' }, { status: 403 });
+
+  const svc = createServiceSupabase();
+  const { data: target } = await svc.from('profiles').select('is_staff, branch_id').eq('id', body.user_id).maybeSingle();
+  const t = target as { is_staff: boolean; branch_id: string | null } | null;
+  if (!t || !t.is_staff || !t.branch_id) {
+    return NextResponse.json({ error: 'Gérant introuvable.' }, { status: 404 });
+  }
+
+  const { error: uErr } = await svc.auth.admin.updateUserById(body.user_id, { password: body.password! });
+  if (uErr) return NextResponse.json({ error: uErr.message }, { status: 400 });
 
   return NextResponse.json({ ok: true }, { status: 200 });
 }

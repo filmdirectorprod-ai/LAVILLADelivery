@@ -246,6 +246,55 @@ try {
     ok('admin_stats_snapshot reports nothing to a non-staff caller');
   else bad(`LEAK: a customer read stats ${JSON.stringify(emptySnap.kpis)}`);
 
+
+  // ── 0053 : pages d'administration enrichies ──────────────────────────────
+  const snap53 = (await asUser(c, S, () => c.query(
+    `select admin_stats_snapshot(timestamptz '2026-06-01', timestamptz '2026-06-30', timestamptz '2026-05-01') as s`))).rows[0].s;
+  if (snap53.modes && snap53.modes.retrait && snap53.modes.retrait.orders === 2)
+    ok('admin_stats_snapshot splits sales by delivery mode (0053)');
+  else bad(`modes wrong: ${JSON.stringify(snap53.modes)}`);
+  if (snap53.cancelled && snap53.cancelled.total === 2 && snap53.cancelled.count === 0)
+    ok('admin_stats_snapshot counts cancellations against all orders of the window (0053)');
+  else bad(`cancelled wrong: ${JSON.stringify(snap53.cancelled)}`);
+  // Bob's two orders sit at 23:30 UTC on Thursday 11 June = 00:30 on Friday in Fès.
+  const friday0 = (snap53.heatmap || []).find((h) => h.dow === 5 && h.hour === 0);
+  if (friday0 && friday0.orders === 2) ok('admin_stats_snapshot buckets the heatmap in Fès time — Friday, 00h (0053)');
+  else bad(`heatmap wrong: ${JSON.stringify(snap53.heatmap)}`);
+  if (snap53.prevKpis && typeof snap53.prevKpis.orders === 'number' && Array.isArray(snap53.top))
+    ok('admin_stats_snapshot returns the previous-window KPIs (0053)');
+  else bad(`prevKpis wrong: ${JSON.stringify(snap53.prevKpis)}`);
+
+  const act = (await asUser(c, S, () => c.query('select * from admin_loyalty_activity(50)'))).rows;
+  if (act.length > 0 && act.every((r) => typeof r.name === 'string' && typeof r.delta_pts === 'number'))
+    ok(`admin_loyalty_activity returns the points ledger to staff (${act.length} rows)`);
+  else bad(`loyalty activity wrong: ${JSON.stringify(act.slice(0, 2))}`);
+  const actLeak = (await asUser(c, A, () => c.query('select * from admin_loyalty_activity(50)'))).rows;
+  if (actLeak.length === 0) ok('admin_loyalty_activity returns nothing to a non-staff caller');
+  else bad(`LEAK: a customer read ${actLeak.length} ledger rows of everyone`);
+
+  const flow = (await asUser(c, S, () => c.query('select * from admin_loyalty_flow(30)'))).rows;
+  if (flow.length === 30 && flow.some((d) => d.earned > 0))
+    ok('admin_loyalty_flow returns one row per day, with the points earned today');
+  else bad(`loyalty flow wrong: ${flow.length} rows, earned=${flow.map((d) => d.earned).join(',')}`);
+  const flowLeak = (await asUser(c, A, () => c.query('select * from admin_loyalty_flow(30)'))).rows;
+  if (flowLeak.length === 0) ok('admin_loyalty_flow returns nothing to a non-staff caller');
+  else bad(`LEAK: a customer read ${flowLeak.length} days of the loyalty flow`);
+
+  const reward = (await c.query(`insert into rewards (title, cost_pts) values ('Café offert', 100) returning id`)).rows[0];
+  await expectThrow('admin_set_reward_active rejects a non-staff caller',
+    () => asUser(c, A, () => c.query('select admin_set_reward_active($1, false)', [reward.id])), 'forbidden');
+  const branch = (await c.query('select id from branches limit 1')).rows[0];
+  if (branch) {
+    const G = (await c.query(`insert into auth.users (raw_user_meta_data) values ('{"full_name":"Gérant agence"}') returning id`)).rows[0].id;
+    await c.query('update profiles set is_staff = true, branch_id = $2 where id = $1', [G, branch.id]);
+    await expectThrow('admin_set_reward_active rejects a branch gérant — the catalogue is shared',
+      () => asUser(c, G, () => c.query('select admin_set_reward_active($1, false)', [reward.id])), 'forbidden branch');
+  } else bad('no branch seeded — cannot test the branch gérant restriction');
+  await asUser(c, S, () => c.query('select admin_set_reward_active($1, false)', [reward.id]));
+  const rewardActive = (await c.query('select active from rewards where id = $1', [reward.id])).rows[0].active;
+  if (rewardActive === false) ok('admin_set_reward_active lets the super-admin switch a reward off');
+  else bad(`reward still active after the super-admin switched it off`);
+
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
 } catch (e) {
   console.error('\nFATAL', e);

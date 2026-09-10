@@ -1,8 +1,10 @@
 // /admin/promotions — Server Component. Lists promo codes (RLS-scoped: a branch
-// gérant sees only their agency's, the super-admin sees all) + the branches for the
-// editor, then renders the client management screen.
+// gérant sees only their agency's, the super-admin sees all), the branches for
+// the editor, and the latest 500 redemptions with the order each one paid for —
+// enough for the headline figures and the recent-uses feed at La Villa's scale.
 import { createServerSupabase } from '@/lib/supabase/server';
 import { PromotionsScreen } from '@/components/admin/promotions/PromotionsScreen';
+import { REDEMPTIONS_SELECT, toRedemptions } from '@/lib/admin-promotions';
 import type { Branch, Promotion } from '@/lib/types';
 
 export default async function PromotionsPage() {
@@ -10,21 +12,14 @@ export default async function PromotionsPage() {
   const [{ data: promos }, { data: branches }, { data: reds }] = await Promise.all([
     supabase.from('promotions').select('*').order('created_at', { ascending: false }),
     supabase.from('branches').select('*').eq('is_active', true).order('slug'),
-    supabase.from('promo_redemptions').select('promotion_id'),
+    supabase.from('promo_redemptions').select(REDEMPTIONS_SELECT).order('created_at', { ascending: false }).limit(500),
   ]);
-
-  // Usage count per promo, for the "N utilisations" + auto status.
-  const uses: Record<string, number> = {};
-  for (const r of reds ?? []) {
-    const id = (r as { promotion_id: string }).promotion_id;
-    uses[id] = (uses[id] ?? 0) + 1;
-  }
 
   return (
     <PromotionsScreen
       initial={(promos ?? []) as Promotion[]}
       branches={(branches ?? []) as Branch[]}
-      uses={uses}
+      redemptions={toRedemptions(reds)}
     />
   );
 }
