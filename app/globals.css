@@ -140,8 +140,12 @@ body {
      L'or n'est jamais un fond porteur de texte : blanc sur #A89723 plafonne à
      2,6:1, sous le seuil de lisibilité. Il sert d'accent — point actif, liseré,
      chiffre clé — et la pilule de section active est blanche à texte turquoise
-     (4,6:1). */
-  --a-ground: #137c8b;
+     (4,6:1).
+     Le sol prend le turquoise FONCÉ de la maison (#0F606B, déjà présent sous
+     --brand-d) : sur une pleine page, le #137C8B vibre et fatigue ; foncé, il
+     laisse les cartes blanches porter le regard. Le turquoise clair reste la
+     couleur des actions, sur ces cartes. */
+  --a-ground: #0f606b;
   --a-panel: rgba(255, 255, 255, 0.08);
   --a-panel-2: rgba(255, 255, 255, 0.14);
   --a-line: rgba(255, 255, 255, 0.18);
@@ -162,5 +166,5 @@ body {
   margin: 0;
   border-radius: 0;
   box-shadow: none;
-  background: #137c8b;
+  background: #0f606b;
 }
