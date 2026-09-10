@@ -104,7 +104,7 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
             <button
               type="button"
               onClick={exportRoutes}
-              style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 16px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--ink)', background: '#fff' }}
+              style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 16px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--ink)', background: 'var(--a-card)' }}
             >
               Exporter tournées
             </button>
@@ -120,7 +120,7 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
       </div>
 
       {rows.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
           Aucun livreur enregistré.
         </div>
       ) : (

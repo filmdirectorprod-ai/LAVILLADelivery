@@ -112,11 +112,11 @@ export function PlanningScreen({ initial }: { initial: AdminPlanningData }) {
       )}
 
       {drivers.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
           Aucun livreur à planifier.
         </div>
       ) : (
-        <div style={{ overflowX: 'auto', background: '#fff', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}>
+        <div style={{ overflowX: 'auto', background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '160px repeat(7, minmax(120px, 1fr))', minWidth: 1000 }}>
             <div style={headerCell} />
             {week.days.map((d) => (
@@ -135,7 +135,7 @@ export function PlanningScreen({ initial }: { initial: AdminPlanningData }) {
 function PlanningRow({ row, busy, onDelete }: { row: ShiftRow; busy: boolean; onDelete: (id: string) => void }) {
   return (
     <>
-      <div style={{ ...bodyCell, fontWeight: 600, color: 'var(--ink)', position: 'sticky', left: 0, background: '#fff' }}>{row.driver.name}</div>
+      <div style={{ ...bodyCell, fontWeight: 600, color: 'var(--ink)', position: 'sticky', left: 0, background: 'var(--a-card)' }}>{row.driver.name}</div>
       {row.days.map((cell) => (
         <div key={cell.date} style={bodyCell}>
           {cell.shifts.map((s) => (
@@ -170,7 +170,7 @@ const navBtn: React.CSSProperties = {
   fontWeight: 600,
   fontSize: 13,
   color: 'var(--ink)',
-  background: '#fff',
+  background: 'var(--a-card)',
 };
 const headerCell: React.CSSProperties = {
   padding: '12px 14px',

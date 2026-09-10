@@ -15,7 +15,7 @@ export function KpiCard({ icon, label, value, sub, accent }: KpiCardProps) {
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--a-card)',
         border: '1px solid var(--line)',
         borderRadius: 18,
         padding: '18px 20px',

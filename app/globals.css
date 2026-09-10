@@ -154,6 +154,10 @@ body {
   --a-accent: #a89723;
   --a-accent-ink: #ffffff;
   --a-on-white: #137c8b;
+  /* Les cartes sont blanches à 90 % : le turquoise du sol transparaît juste
+     assez pour les rattacher à la page, sans coûter en lisibilité (le texte
+     conserve un contraste supérieur à 4,5:1 sur ce fond). */
+  --a-card: rgba(255, 255, 255, 0.90);
   --a-r-card: 20px;
   --a-r-pill: 999px;
   background: var(--a-ground);

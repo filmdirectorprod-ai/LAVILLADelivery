@@ -49,18 +49,18 @@ export function LoyaltyAdminScreen({ members: initial }: { members: LoyaltyMembe
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: '16px 18px', flex: 1, minWidth: 180 }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 16, padding: '16px 18px', flex: 1, minWidth: 180 }}>
           <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>Membres</div>
           <div style={{ fontFamily: 'var(--ui-font)', fontSize: 24, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>{o.totalMembers}</div>
         </div>
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: '16px 18px', flex: 1, minWidth: 180 }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 16, padding: '16px 18px', flex: 1, minWidth: 180 }}>
           <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>Points en circulation</div>
           <div style={{ fontFamily: 'var(--ui-font)', fontSize: 24, fontWeight: 700, color: 'var(--brand)', marginTop: 6 }}>{o.totalPoints.toLocaleString('fr-FR')}</div>
         </div>
       </div>
 
       {/* Tier distribution */}
-      <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
+      <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
           <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>Répartition par palier</div>
           <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)' }}>
@@ -81,7 +81,7 @@ export function LoyaltyAdminScreen({ members: initial }: { members: LoyaltyMembe
       </div>
 
       {/* Top members + adjust */}
-      <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
+      <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
         <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 14 }}>Top membres</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {o.top.map((mb, i) => (
@@ -91,7 +91,7 @@ export function LoyaltyAdminScreen({ members: initial }: { members: LoyaltyMembe
                 <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mb.name}</span>
                 <span style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, fontWeight: 700, color: TIER_COLOR[(LOYALTY_TIERS as readonly string[]).includes(mb.tier ?? '') ? (mb.tier as LoyaltyTier) : 'Gourmand'] }}>{mb.tier ?? 'Gourmand'}</span>
                 <span style={{ fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 700, color: 'var(--brand)', minWidth: 64, textAlign: 'right' }}>{mb.points} pts</span>
-                <button onClick={() => { setAdjusting(adjusting === mb.id ? null : mb.id); setDelta(''); setReason(''); }} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 11px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--brand)', background: '#fff' }}>
+                <button onClick={() => { setAdjusting(adjusting === mb.id ? null : mb.id); setDelta(''); setReason(''); }} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 11px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--brand)', background: 'var(--a-card)' }}>
                   Ajuster
                 </button>
               </div>

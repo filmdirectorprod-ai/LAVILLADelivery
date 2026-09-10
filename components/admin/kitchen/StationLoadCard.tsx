@@ -19,7 +19,7 @@ export function StationLoadCard({ load }: { load: StationLoad }) {
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--a-card)',
         border: '1px solid var(--line)',
         borderRadius: 18,
         boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)',

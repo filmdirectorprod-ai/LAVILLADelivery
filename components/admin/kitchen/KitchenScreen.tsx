@@ -128,7 +128,7 @@ function KitchenColumn({
         </span>
       </div>
       {tickets.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px dashed var(--line)', borderRadius: 14, padding: '26px 16px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>
+        <div style={{ background: 'var(--a-card)', border: '1px dashed var(--line)', borderRadius: 14, padding: '26px 16px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>
           Aucune commande.
         </div>
       ) : (

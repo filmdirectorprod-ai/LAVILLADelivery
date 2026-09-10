@@ -140,7 +140,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
       )}
 
       {groups.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
           Aucun produit au catalogue.
         </div>
       ) : (

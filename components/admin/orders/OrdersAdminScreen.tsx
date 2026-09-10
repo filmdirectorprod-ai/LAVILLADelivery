@@ -153,7 +153,7 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
           <button
             type="button"
             onClick={exportSales}
-            style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 16px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--ink)', background: '#fff' }}
+            style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 16px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--ink)', background: 'var(--a-card)' }}
           >
             Exporter ventes
           </button>
@@ -215,7 +215,7 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
         />
       </div>
 
-      <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)', overflowX: 'auto' }}>
+      <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)', overflowX: 'auto' }}>
         {visible.length === 0 ? (
           <div style={{ padding: '36px 22px', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', textAlign: 'center' }}>
             Aucune commande.
@@ -251,7 +251,7 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
                           value={r.tracking?.driver_id ?? ''}
                           disabled={busy}
                           onChange={(e) => e.target.value && onAssignDriver(r.order.id, e.target.value)}
-                          style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '7px 10px', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)', background: '#fff', maxWidth: 170 }}
+                          style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '7px 10px', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)', background: 'var(--a-card)', maxWidth: 170 }}
                         >
                           <option value="">Assigner…</option>
                           {drivers.map((d) => (
@@ -294,7 +294,7 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
                             disabled={busy}
                             onClick={() => onCancel(r.order.id)}
                             title="Annuler la commande"
-                            style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 10px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#a23', background: '#fff', opacity: busy ? 0.6 : 1 }}
+                            style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 10px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#a23', background: 'var(--a-card)', opacity: busy ? 0.6 : 1 }}
                           >
                             Annuler
                           </button>

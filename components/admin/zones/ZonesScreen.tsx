@@ -93,11 +93,11 @@ export function ZonesScreen({ initial }: { initial: AdminZonesData }) {
       )}
 
       {sorted.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
           Aucune zone de livraison.
         </div>
       ) : (
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
           {sorted.map((zone) => (
             <div
               key={zone.id}
@@ -111,7 +111,7 @@ export function ZonesScreen({ initial }: { initial: AdminZonesData }) {
                   type="button"
                   disabled={busy}
                   onClick={() => setEdit({ mode: 'edit', zone })}
-                  style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 12px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', background: '#fff' }}
+                  style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 12px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', background: 'var(--a-card)' }}
                 >
                   Modifier
                 </button>
@@ -119,7 +119,7 @@ export function ZonesScreen({ initial }: { initial: AdminZonesData }) {
                   type="button"
                   disabled={busy}
                   onClick={() => onDelete(zone)}
-                  style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 12px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#c0392b', background: '#fff' }}
+                  style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 12px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#c0392b', background: 'var(--a-card)' }}
                 >
                   Supprimer
                 </button>

@@ -81,7 +81,7 @@ export function ReviewsScreen({ initial }: { initial: AdminReviewsData }) {
 
       {/* Summary: big average + distribution bars */}
       {allReviews.length > 0 && (
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)', padding: '20px 24px', display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', gap: 28, alignItems: 'center' }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)', padding: '20px 24px', display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', gap: 28, alignItems: 'center' }}>
           <div style={{ textAlign: 'center', minWidth: 120 }}>
             <div style={{ fontFamily: 'var(--font-display, var(--ui-font))', fontWeight: 700, fontSize: 46, lineHeight: 1, color: 'var(--ink)' }}>{avg.toFixed(1)}</div>
             <div style={{ display: 'inline-flex', gap: 2, marginTop: 8 }} aria-label={`${avg.toFixed(1)} sur 5`}>
@@ -125,7 +125,7 @@ export function ReviewsScreen({ initial }: { initial: AdminReviewsData }) {
       )}
 
       {visible.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
           Aucun avis {rating !== null ? `à ${rating} étoile${rating > 1 ? 's' : ''}` : ''}.
         </div>
       ) : (

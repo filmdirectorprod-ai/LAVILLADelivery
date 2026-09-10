@@ -23,7 +23,7 @@ export interface DriverAccountModalProps {
 }
 
 const label: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)' };
-const wrap: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, border: '1.5px solid var(--line)', borderRadius: 12, padding: '11px 12px', marginTop: 6, background: '#fff' };
+const wrap: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, border: '1.5px solid var(--line)', borderRadius: 12, padding: '11px 12px', marginTop: 6, background: 'var(--a-card)' };
 const input: React.CSSProperties = { flex: 1, border: 'none', outline: 'none', fontFamily: 'var(--ui-font)', fontSize: 14.5, color: 'var(--ink)', background: 'transparent' };
 
 export function DriverAccountModal({ mode, driver, onClose, onDone }: DriverAccountModalProps) {
@@ -84,7 +84,7 @@ export function DriverAccountModal({ mode, driver, onClose, onDone }: DriverAcco
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: 'min(440px, 100%)', background: '#fff', borderRadius: 20, padding: 24, boxShadow: '0 30px 70px -30px rgba(0,0,0,0.6)', maxHeight: '90vh', overflow: 'auto' }}
+        style={{ width: 'min(440px, 100%)', background: 'var(--a-card)', borderRadius: 20, padding: 24, boxShadow: '0 30px 70px -30px rgba(0,0,0,0.6)', maxHeight: '90vh', overflow: 'auto' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: 'var(--ink)', margin: 0 }}>

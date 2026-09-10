@@ -17,7 +17,7 @@ import { useRealtime } from '@/lib/use-realtime';
 
 function Kpi({ label, value, accent, delta }: { label: string; value: string; accent?: boolean; delta?: number | null }) {
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: '16px 18px', flex: 1, minWidth: 150 }}>
+    <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 16, padding: '16px 18px', flex: 1, minWidth: 150 }}>
       <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
         <div style={{ fontFamily: 'var(--ui-font)', fontSize: 24, fontWeight: 700, color: accent ? 'var(--brand)' : 'var(--ink)' }}>{value}</div>
@@ -94,7 +94,7 @@ export function StatsScreen({ snapshot: initial, branches }: { snapshot: StatsSn
               </button>
             );
           })}
-          <button onClick={exportCsv} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', background: '#fff' }}>
+          <button onClick={exportCsv} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', background: 'var(--a-card)' }}>
             Exporter CSV
           </button>
         </div>
@@ -108,7 +108,7 @@ export function StatsScreen({ snapshot: initial, branches }: { snapshot: StatsSn
       </div>
 
       {/* Daily revenue bars */}
-      <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
+      <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
         <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 16 }}>Chiffre d&apos;affaires par jour</div>
         {series.length === 0 ? (
           <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>Aucune vente sur la période.</div>
@@ -127,7 +127,7 @@ export function StatsScreen({ snapshot: initial, branches }: { snapshot: StatsSn
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
         {/* Top products */}
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
           <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 14 }}>Top produits</div>
           {top.length === 0 ? (
             <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>—</div>
@@ -147,7 +147,7 @@ export function StatsScreen({ snapshot: initial, branches }: { snapshot: StatsSn
 
         {/* Per agency */}
         {branches.length > 1 && (
-          <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
+          <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
             <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 14 }}>Par agence</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {branches.map((b) => {

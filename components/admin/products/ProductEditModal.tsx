@@ -10,7 +10,7 @@ import { useBranches } from '@/lib/use-branches';
 import type { Category, Product, Universe } from '@/lib/types';
 import { revalidateCatalogue } from '@/lib/revalidate-catalogue';
 
-const field: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 14, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--ink)', width: '100%', background: '#fff' };
+const field: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 14, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--ink)', width: '100%', background: 'var(--a-card)' };
 const label: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', fontWeight: 600 };
 
 export function ProductEditModal({ product, categories, onClose, onDone }: { product: Product; categories: Category[]; onClose: () => void; onDone: () => void }) {
@@ -95,7 +95,7 @@ export function ProductEditModal({ product, categories, onClose, onDone }: { pro
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(8,28,31,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 100%)', maxHeight: '92vh', overflow: 'auto', background: '#fff', borderRadius: 20, padding: 24, boxShadow: '0 30px 70px -30px rgba(0,0,0,0.6)' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 100%)', maxHeight: '92vh', overflow: 'auto', background: 'var(--a-card)', borderRadius: 20, padding: 24, boxShadow: '0 30px 70px -30px rgba(0,0,0,0.6)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: 'var(--ink)', margin: 0 }}>Modifier le produit</h2>
           <button onClick={onClose} style={{ border: 'none', background: 'var(--soft)', borderRadius: 999, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -117,7 +117,7 @@ export function ProductEditModal({ product, categories, onClose, onDone }: { pro
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'center' }}>
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
-            <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ border: '1px solid var(--brand)', borderRadius: 9, padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--brand)', background: '#fff' }}>
+            <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ border: '1px solid var(--brand)', borderRadius: 9, padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--brand)', background: 'var(--a-card)' }}>
               {uploading ? 'Envoi…' : imageUrl ? 'Changer la photo' : 'Ajouter une photo'}
             </button>
             {imageUrl && (
@@ -192,7 +192,7 @@ export function ProductEditModal({ product, categories, onClose, onDone }: { pro
         {error &&<div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 14 }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-          <button onClick={onClose} disabled={busy} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 10, padding: '12px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)', background: '#fff' }}>Annuler</button>
+          <button onClick={onClose} disabled={busy} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 10, padding: '12px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)', background: 'var(--a-card)' }}>Annuler</button>
           <button onClick={save} disabled={busy || uploading} style={{ flex: 1.4, border: 'none', borderRadius: 10, padding: '12px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, color: '#fff', background: 'var(--brand)', opacity: busy || uploading ? 0.6 : 1 }}>{busy ? '…' : 'Enregistrer'}</button>
         </div>
       </div>

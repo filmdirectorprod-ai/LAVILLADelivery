@@ -13,7 +13,7 @@ export function HourlyChart({ buckets }: HourlyChartProps) {
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--a-card)',
         border: '1px solid var(--line)',
         borderRadius: 18,
         padding: '20px 22px',

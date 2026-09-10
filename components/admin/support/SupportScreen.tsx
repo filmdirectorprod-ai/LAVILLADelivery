@@ -166,7 +166,7 @@ export function SupportScreen({ initial }: { initial: AdminSupportData }) {
       </div>
 
       {threads.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
           Aucun livreur.
         </div>
       ) : (
@@ -182,7 +182,7 @@ export function SupportScreen({ initial }: { initial: AdminSupportData }) {
                   onClick={() => openThread(t.driver.id)}
                   style={{
                     textAlign: 'left',
-                    background: '#fff',
+                    background: 'var(--a-card)',
                     border: `1.5px solid ${isActive ? 'var(--brand)' : 'var(--line)'}`,
                     borderRadius: 16,
                     padding: '12px 14px',
@@ -211,7 +211,7 @@ export function SupportScreen({ initial }: { initial: AdminSupportData }) {
           </div>
 
           {/* Conversation */}
-          <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             {active === null ? (
               <div style={{ margin: 'auto', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>Sélectionnez une conversation.</div>
             ) : (

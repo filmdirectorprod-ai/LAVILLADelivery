@@ -9,7 +9,7 @@ import type { Branch } from '@/lib/types';
 
 type Manager = { id: string; full_name: string | null; branch_id: string | null };
 
-const field: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 14, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 10, color: 'var(--ink)', width: '100%', background: '#fff' };
+const field: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 14, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 10, color: 'var(--ink)', width: '100%', background: 'var(--a-card)' };
 const label: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', fontWeight: 600, marginBottom: 5, display: 'block' };
 
 export function ManagersScreen({ branches, managers: initial }: { branches: Branch[]; managers: Manager[] }) {
@@ -105,7 +105,7 @@ export function ManagersScreen({ branches, managers: initial }: { branches: Bran
       </div>
 
       {/* Creation form */}
-      <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
+      <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <div>
             <label style={label}>Identifiant</label>
@@ -122,7 +122,7 @@ export function ManagersScreen({ branches, managers: initial }: { branches: Bran
             <label style={label}>Mot de passe</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <input style={field} value={password} onChange={(e) => setPassword(e.target.value)} />
-              <button type="button" onClick={() => setPassword(generatePassword())} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '0 12px', cursor: 'pointer', background: '#fff', color: 'var(--brand)', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap' }}>
+              <button type="button" onClick={() => setPassword(generatePassword())} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '0 12px', cursor: 'pointer', background: 'var(--a-card)', color: 'var(--brand)', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap' }}>
                 Régénérer
               </button>
             </div>
@@ -152,7 +152,7 @@ export function ManagersScreen({ branches, managers: initial }: { branches: Bran
       </div>
 
       {/* Existing gérants */}
-      <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
+      <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: 22 }}>
         <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 12 }}>Gérants existants</div>
         {managers.length === 0 ? (
           <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>Aucun gérant d&apos;agence pour l&apos;instant.</div>
@@ -166,10 +166,10 @@ export function ManagersScreen({ branches, managers: initial }: { branches: Bran
                   </div>
                   <div style={{ flex: 1, minWidth: 0, fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.full_name || '—'}</div>
                   <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--brand)', fontWeight: 600 }}>{branchName.get(m.branch_id ?? '')?.replace(/ —.*$/, '') ?? '—'}</div>
-                  <button onClick={() => (editId === m.id ? setEditId(null) : startEdit(m))} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 11px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--brand)', background: '#fff' }}>
+                  <button onClick={() => (editId === m.id ? setEditId(null) : startEdit(m))} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 11px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--brand)', background: 'var(--a-card)' }}>
                     Modifier
                   </button>
-                  <button onClick={() => deleteManager(m)} disabled={rowBusy} aria-label="Supprimer" style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 9px', cursor: 'pointer', background: '#fff' }}>
+                  <button onClick={() => deleteManager(m)} disabled={rowBusy} aria-label="Supprimer" style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 9px', cursor: 'pointer', background: 'var(--a-card)' }}>
                     <Icon name="x" size={15} color="#C0392B" />
                   </button>
                 </div>
@@ -182,7 +182,7 @@ export function ManagersScreen({ branches, managers: initial }: { branches: Bran
                     <button onClick={saveEdit} disabled={rowBusy} style={{ border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 13, color: '#fff', background: 'var(--brand)', opacity: rowBusy ? 0.6 : 1 }}>
                       {rowBusy ? '…' : 'Enregistrer'}
                     </button>
-                    <button onClick={() => setEditId(null)} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--ink)', background: '#fff' }}>
+                    <button onClick={() => setEditId(null)} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--ink)', background: 'var(--a-card)' }}>
                       Annuler
                     </button>
                   </div>

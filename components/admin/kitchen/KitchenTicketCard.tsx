@@ -34,7 +34,7 @@ export function KitchenTicketCard({ ticket, busy, action }: KitchenTicketCardPro
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--a-card)',
         border: late ? '1px solid rgba(210,75,75,0.45)' : '1px solid var(--line)',
         borderRadius: 16,
         boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)',

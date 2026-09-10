@@ -71,7 +71,7 @@ export function CrmScreen({ rows }: { rows: CustomerRow[] }) {
             placeholder="Rechercher un client (nom ou téléphone)…"
             style={{ border: '1px solid var(--line)', borderRadius: 12, padding: '10px 14px', fontFamily: 'var(--ui-font)', fontSize: 14 }}
           />
-          <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, overflow: 'auto', flex: 1, minHeight: 0 }}>
+          <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 16, overflow: 'auto', flex: 1, minHeight: 0 }}>
             {visible.length === 0 ? (
               <div style={{ padding: '32px 18px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>Aucun client.</div>
             ) : (
@@ -98,7 +98,7 @@ export function CrmScreen({ rows }: { rows: CustomerRow[] }) {
         </div>
 
         {/* Detail */}
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 22, overflow: 'auto', minHeight: 0 }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: 22, overflow: 'auto', minHeight: 0 }}>
           {!active ? (
             <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>Sélectionnez un client.</div>
           ) : (

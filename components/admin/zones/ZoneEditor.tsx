@@ -53,7 +53,7 @@ export function ZoneEditor({ zone, busy, onSave, onCancel }: ZoneEditorProps) {
   const validation = validateZoneDraft(draft);
 
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--brand)', borderRadius: 18, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ background: 'var(--a-card)', border: '1px solid var(--brand)', borderRadius: 18, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>
         {zone ? 'Modifier la zone' : 'Nouvelle zone'}
       </div>
@@ -102,7 +102,7 @@ export function ZoneEditor({ zone, busy, onSave, onCancel }: ZoneEditorProps) {
           type="button"
           disabled={busy}
           onClick={onCancel}
-          style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 18px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: 'var(--ink)', background: '#fff' }}
+          style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 18px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: 'var(--ink)', background: 'var(--a-card)' }}
         >
           Annuler
         </button>

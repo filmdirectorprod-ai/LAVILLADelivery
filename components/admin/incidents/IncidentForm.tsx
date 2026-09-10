@@ -30,7 +30,7 @@ const field: React.CSSProperties = {
   borderRadius: 8,
   color: 'var(--ink)',
   width: '100%',
-  background: '#fff',
+  background: 'var(--a-card)',
 };
 const labelStyle: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', fontWeight: 600 };
 
@@ -45,7 +45,7 @@ export function IncidentForm({ drivers, orders, busy, onCreate, onCancel }: Inci
   const valid = title.trim() !== '';
 
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--brand)', borderRadius: 18, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ background: 'var(--a-card)', border: '1px solid var(--brand)', borderRadius: 18, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>Nouvel incident</div>
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 12 }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -116,7 +116,7 @@ export function IncidentForm({ drivers, orders, busy, onCreate, onCancel }: Inci
           type="button"
           disabled={busy}
           onClick={onCancel}
-          style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 18px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: 'var(--ink)', background: '#fff' }}
+          style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 18px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: 'var(--ink)', background: 'var(--a-card)' }}
         >
           Annuler
         </button>

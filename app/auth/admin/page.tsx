@@ -76,7 +76,7 @@ export default function AdminAuthPage() {
 
       {/* Left — form */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 28px' }}>
-        <div style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 'var(--a-r-card)', padding: '30px 28px' }}>
+        <div style={{ width: '100%', maxWidth: 420, background: 'var(--a-card)', borderRadius: 'var(--a-r-card)', padding: '30px 28px' }}>
           <Image src="/brand/logo-client.png" alt="La Villa" width={180} height={91} priority style={{ width: 160, height: 'auto', display: 'block', marginBottom: 22 }} />
 
           <h1 className="font-display" style={{ fontSize: 40, fontWeight: 700, color: 'var(--a-on-white)', margin: '0 0 10px', lineHeight: 1.05 }}>

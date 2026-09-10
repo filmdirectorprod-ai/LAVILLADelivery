@@ -9,7 +9,7 @@ import { Icon } from '@/components/ui/Icon';
 import type { Branch, Promotion } from '@/lib/types';
 import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
 
-const field: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 14, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 9, color: 'var(--ink)', width: '100%', background: '#fff' };
+const field: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 14, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 9, color: 'var(--ink)', width: '100%', background: 'var(--a-card)' };
 const label: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' };
 
 type Draft = {
@@ -146,7 +146,7 @@ export function PromotionsScreen({ initial, branches, uses: initialUses = {} }: 
       </div>
 
       {draft && (
-        <div style={{ background: '#fff', border: '1px solid var(--brand)', borderRadius: 18, padding: 22 }}>
+        <div style={{ background: 'var(--a-card)', border: '1px solid var(--brand)', borderRadius: 18, padding: 22 }}>
           <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 14 }}>
             {draft.id ? 'Modifier le code' : 'Nouveau code'}
           </div>
@@ -202,14 +202,14 @@ export function PromotionsScreen({ initial, branches, uses: initialUses = {} }: 
             <button onClick={save} disabled={busy} style={{ border: 'none', borderRadius: 10, padding: '11px 22px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, color: '#fff', background: 'var(--brand)', opacity: busy ? 0.6 : 1 }}>
               {busy ? '…' : 'Enregistrer'}
             </button>
-            <button onClick={() => { setDraft(null); setError(null); }} disabled={busy} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '11px 22px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)', background: '#fff' }}>
+            <button onClick={() => { setDraft(null); setError(null); }} disabled={busy} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '11px 22px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)', background: 'var(--a-card)' }}>
               Annuler
             </button>
           </div>
         </div>
       )}
 
-      <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden' }}>
         {promos.length === 0 ? (
           <div style={{ padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>Aucun code promo.</div>
         ) : (
@@ -235,13 +235,13 @@ export function PromotionsScreen({ initial, branches, uses: initialUses = {} }: 
                   </span>
                 );
               })()}
-              <button onClick={() => toggleActive(p)} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '7px 11px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', background: '#fff' }}>
+              <button onClick={() => toggleActive(p)} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '7px 11px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', background: 'var(--a-card)' }}>
                 {p.active ? 'Désactiver' : 'Activer'}
               </button>
-              <button onClick={() => setDraft(toDraft(p))} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '7px 11px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--brand)', background: '#fff' }}>
+              <button onClick={() => setDraft(toDraft(p))} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '7px 11px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--brand)', background: 'var(--a-card)' }}>
                 Modifier
               </button>
-              <button onClick={() => remove(p)} aria-label="Supprimer" style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '7px 9px', cursor: 'pointer', background: '#fff' }}>
+              <button onClick={() => remove(p)} aria-label="Supprimer" style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '7px 9px', cursor: 'pointer', background: 'var(--a-card)' }}>
                 <Icon name="x" size={15} color="#C0392B" />
               </button>
             </div>

@@ -101,7 +101,7 @@ export function IncidentsScreen({ initial }: { initial: AdminIncidentsData }) {
           À traiter · {open.length}
         </h2>
         {open.length === 0 ? (
-          <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: '32px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--muted)' }}>
+          <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: '32px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--muted)' }}>
             Aucun incident ouvert 🎉
           </div>
         ) : (

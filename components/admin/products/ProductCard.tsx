@@ -29,7 +29,7 @@ export function ProductCard({ product, busy, onToggleActive, onToggleSignature, 
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--a-card)',
         border: '1px solid var(--line)',
         borderRadius: 16,
         boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)',
@@ -131,7 +131,7 @@ export function ProductCard({ product, busy, onToggleActive, onToggleSignature, 
             type="button"
             disabled={busy}
             onClick={() => onEdit(product)}
-            style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '7px 10px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+            style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '7px 10px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', background: 'var(--a-card)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
           >
             <Icon name="edit" size={13} color="var(--ink)" /> Modifier
           </button>
@@ -139,7 +139,7 @@ export function ProductCard({ product, busy, onToggleActive, onToggleSignature, 
             type="button"
             disabled={busy}
             onClick={() => onDelete(product)}
-            style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '7px 10px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#C0392B', background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+            style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '7px 10px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#C0392B', background: 'var(--a-card)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
           >
             <Icon name="x" size={13} color="#C0392B" /> Supprimer
           </button>
