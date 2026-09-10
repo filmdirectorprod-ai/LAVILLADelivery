@@ -79,7 +79,7 @@ export default function AdminAuthPage() {
         <div style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 'var(--a-r-card)', padding: '30px 28px' }}>
           <Image src="/brand/logo-client.png" alt="La Villa" width={180} height={91} priority style={{ width: 160, height: 'auto', display: 'block', marginBottom: 22 }} />
 
-          <h1 className="font-display" style={{ fontSize: 40, fontWeight: 700, color: '#101215', margin: '0 0 10px', lineHeight: 1.05 }}>
+          <h1 className="font-display" style={{ fontSize: 40, fontWeight: 700, color: 'var(--a-on-white)', margin: '0 0 10px', lineHeight: 1.05 }}>
             Espace gérant
           </h1>
           <p style={{ fontFamily: 'var(--ui-font)', fontSize: 14.5, color: 'var(--muted)', margin: '0 0 26px', lineHeight: 1.5 }}>
@@ -109,7 +109,7 @@ export default function AdminAuthPage() {
           {info && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#2f9e6f', fontWeight: 600, marginTop: 16 }}>{info}</div>}
 
           <div style={{ marginTop: 22 }}>
-            <button onClick={submit} disabled={busy} style={{ width: '100%', border: 'none', borderRadius: 999, padding: '14px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, letterSpacing: 1, color: 'var(--a-accent-ink)', background: 'var(--a-accent)', opacity: busy ? 0.6 : 1 }}>
+            <button onClick={submit} disabled={busy} style={{ width: '100%', border: 'none', borderRadius: 999, padding: '14px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, letterSpacing: 1, color: '#ffffff', background: 'var(--a-on-white)', opacity: busy ? 0.6 : 1 }}>
               {busy ? '…' : 'CONNEXION'}
             </button>
           </div>
@@ -122,7 +122,7 @@ export default function AdminAuthPage() {
         style={{ flex: 1, background: 'var(--a-panel)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18, padding: 40, position: 'relative', overflow: 'hidden' }}
       >
         <Image src="/brand/logo-ondark.png" alt="La Villa" width={360} height={182} priority style={{ width: 'min(360px, 70%)', height: 'auto', display: 'block' }} />
-        <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--a-accent)' }}>
+        <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--a-muted)' }}>
           Administration
         </div>
         <p style={{ fontFamily: 'var(--ui-font)', fontSize: 14, color: 'rgba(255,255,255,0.8)', textAlign: 'center', maxWidth: 360, lineHeight: 1.6, marginTop: 8 }}>

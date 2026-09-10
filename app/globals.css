@@ -134,18 +134,22 @@ body {
    fond, le blanc devient l'accent le plus fort, et c'est lui qui porte les
    données. Ces jetons ne s'appliquent QUE sous .lv-admin-root. */
 .lv-admin-root {
-  /* Palette du modèle de référence : noir profond, vert lime, cartes blanches.
-     L'admin est un outil interne — il n'a pas à porter la vitrine turquoise et
-     or de la maison, que le client et le livreur continuent d'afficher. */
-  --a-ground: #101215;
-  --a-panel: #1a1d21;
-  --a-panel-2: #23272c;
-  --a-line: rgba(244, 246, 244, 0.09);
-  --a-text: #f4f6f4;
-  --a-muted: #9aa2a2;
-  --a-accent: #aef23c;
-  --a-accent-d: #98d92f;
-  --a-accent-ink: #101208;
+  /* Palette stricte : turquoise #137C8B, or #A89723, blanc #FFFFFF.
+     Les variations ne sont que des OPACITÉS de ces trois couleurs — aucune
+     teinte supplémentaire n'est introduite.
+     L'or n'est jamais un fond porteur de texte : blanc sur #A89723 plafonne à
+     2,6:1, sous le seuil de lisibilité. Il sert d'accent — point actif, liseré,
+     chiffre clé — et la pilule de section active est blanche à texte turquoise
+     (4,6:1). */
+  --a-ground: #137c8b;
+  --a-panel: rgba(255, 255, 255, 0.08);
+  --a-panel-2: rgba(255, 255, 255, 0.14);
+  --a-line: rgba(255, 255, 255, 0.18);
+  --a-text: #ffffff;
+  --a-muted: rgba(255, 255, 255, 0.68);
+  --a-accent: #a89723;
+  --a-accent-ink: #ffffff;
+  --a-on-white: #137c8b;
   --a-r-card: 20px;
   --a-r-pill: 999px;
   background: var(--a-ground);
@@ -158,5 +162,5 @@ body {
   margin: 0;
   border-radius: 0;
   box-shadow: none;
-  background: #101215;
+  background: #137c8b;
 }

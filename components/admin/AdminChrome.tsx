@@ -79,14 +79,14 @@ export function AdminChrome({ children, managerName, agencyLabel = 'Gérant' }: 
                   fontFamily: 'var(--ui-font)',
                   fontSize: 13.5,
                   fontWeight: active ? 700 : 500,
-                  // Une seule pilule verte : la section ouverte. Le reste
-                  // s'efface, comme dans le modèle.
-                  color: active ? 'var(--a-accent-ink)' : 'var(--a-muted)',
-                  background: active ? 'var(--a-accent)' : 'transparent',
+                  // Une seule pilule blanche : la section ouverte, son icône en
+                  // or. Le reste s'efface.
+                  color: active ? 'var(--a-on-white)' : 'var(--a-muted)',
+                  background: active ? '#ffffff' : 'transparent',
                   flexShrink: 0,
                 }}
               >
-                <Icon name={item.icon} size={17} color={active ? 'var(--a-accent-ink)' : 'var(--a-muted)'} />
+                <Icon name={item.icon} size={17} color={active ? 'var(--a-accent)' : 'var(--a-muted)'} />
                 {item.label}
               </Link>
             );
