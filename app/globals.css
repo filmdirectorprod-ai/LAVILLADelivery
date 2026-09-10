@@ -134,15 +134,20 @@ body {
    fond, le blanc devient l'accent le plus fort, et c'est lui qui porte les
    données. Ces jetons ne s'appliquent QUE sous .lv-admin-root. */
 .lv-admin-root {
-  --a-ground: #071a1e;
-  --a-panel: #0e262c;
-  --a-panel-2: #143740;
-  --a-line: rgba(238, 244, 244, 0.10);
-  --a-text: #eef4f4;
-  --a-muted: #86a3a8;
-  --a-accent: #d8c33c;
-  --a-accent-ink: #071a1e;
+  /* Palette du modèle de référence : noir profond, vert lime, cartes blanches.
+     L'admin est un outil interne — il n'a pas à porter la vitrine turquoise et
+     or de la maison, que le client et le livreur continuent d'afficher. */
+  --a-ground: #101215;
+  --a-panel: #1a1d21;
+  --a-panel-2: #23272c;
+  --a-line: rgba(244, 246, 244, 0.09);
+  --a-text: #f4f6f4;
+  --a-muted: #9aa2a2;
+  --a-accent: #aef23c;
+  --a-accent-d: #98d92f;
+  --a-accent-ink: #101208;
   --a-r-card: 20px;
+  --a-r-pill: 999px;
   background: var(--a-ground);
   color: var(--a-text);
 }
@@ -153,5 +158,5 @@ body {
   margin: 0;
   border-radius: 0;
   box-shadow: none;
-  background: #071a1e;
+  background: #101215;
 }
