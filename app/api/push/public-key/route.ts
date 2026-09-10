@@ -4,6 +4,10 @@
 import { NextResponse } from 'next/server';
 import { createServiceSupabase } from '@/lib/supabase/server';
 
+// Reads app_config at request time, so it must not be evaluated during the
+// build — without live Supabase credentials that fails the whole export.
+export const dynamic = 'force-dynamic';
+
 let cached: string | null = null;
 
 export async function GET() {

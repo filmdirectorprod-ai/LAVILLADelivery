@@ -102,7 +102,7 @@ export function SupportScreen({ initial }: { initial: AdminSupportData }) {
     [{ table: 'support_messages' }, { table: 'drivers' }],
     useCallback(
       (payload: RealtimeChangePayload) => {
-        if (payload.table === 'support_messages' && payload.eventType === 'INSERT' && (payload.new as SupportMessage)?.sender === 'driver') {
+        if (payload.table === 'support_messages' && payload.eventType === 'INSERT' && (payload.new as unknown as SupportMessage)?.sender === 'driver') {
           beep();
         }
         refetch();
