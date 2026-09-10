@@ -4,6 +4,7 @@
 // product prices). The client total is never trusted.
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { customerMessage } from '@/lib/order-error-messages';
 
 interface OrderItemInput {
   product_id: string;
@@ -16,8 +17,11 @@ interface PlaceOrderBody {
   items: OrderItemInput[];
   mode: 'livraison' | 'retrait';
   address?: string | null;
+  phone?: string | null;
+  branch_slug?: string | null;
   zone_id?: string | null;
   promo?: boolean;
+  promo_code?: string | null;
   redeem_pts?: number;
   redeem_dh?: number;
 }
@@ -54,10 +58,13 @@ export async function POST(request: NextRequest) {
     p_promo: body.promo ?? false,
     p_redeem_pts: body.redeem_pts ?? 0,
     p_redeem_dh: body.redeem_dh ?? 0,
+    p_phone: body.phone ?? null,
+    p_branch_slug: body.branch_slug ?? null,
+    p_promo_code: body.promo_code ?? null,
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: customerMessage(error.message) }, { status: 400 });
   }
 
   return NextResponse.json({ order_id: data as string }, { status: 201 });

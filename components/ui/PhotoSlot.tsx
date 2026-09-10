@@ -1,5 +1,13 @@
-// Brand-tinted labeled placeholder (photo-ready). Ported verbatim (ui.jsx).
+// Brand-tinted labeled placeholder (photo-ready).
+//
+// When a photo is present it renders through next/image: product shots come
+// from Supabase Storage at full upload size, and this used to paint them as a
+// CSS background — no resizing, no modern format, no lazy loading, the whole
+// original file on every card. `fill` + `sizes` lets Next serve a width that
+// matches the slot; `priority` opts the one above-the-fold image out of lazy
+// loading. The empty state is unchanged.
 import type { CSSProperties } from 'react';
+import Image from 'next/image';
 
 export interface PhotoSlotProps {
   label?: string;
@@ -7,6 +15,10 @@ export interface PhotoSlotProps {
   style?: CSSProperties;
   rounded?: number;
   dim?: boolean;
+  /** Rendered width hint for the srcset picker. Defaults to a full-width slot. */
+  sizes?: string;
+  /** Set on the hero / above-the-fold image only — it disables lazy loading. */
+  priority?: boolean;
 }
 
 export function PhotoSlot({
@@ -15,20 +27,28 @@ export function PhotoSlot({
   style = {},
   rounded = 0,
   dim = false,
+  sizes = '100vw',
+  priority = false,
 }: PhotoSlotProps) {
   const base: CSSProperties = {
     position: 'relative',
     overflow: 'hidden',
     borderRadius: rounded,
     background: src
-      ? `center/cover no-repeat url("${src}")`
+      ? undefined
       : 'repeating-linear-gradient(135deg, var(--soft) 0 14px, #eef1f1 14px 28px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     ...style,
   };
-  if (src) return <div style={base} />;
+  if (src) {
+    return (
+      <div style={base}>
+        <Image src={src} alt={label} fill sizes={sizes} priority={priority} style={{ objectFit: 'cover' }} />
+      </div>
+    );
+  }
   return (
     <div style={base}>
       <div

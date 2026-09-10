@@ -8,13 +8,16 @@
 // read (support_messages staff RLS, 0018), so the driver app sees replies in real
 // time and the unread badge clears.
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { buildSupportThreads, driverInitials, threadPreview, type SupportDriver } from '@/lib/admin-support';
 import type { AdminSupportData } from '@/lib/queries';
 import type { RawSupportDriver } from '@/lib/admin-support';
 import type { SupportMessage } from '@/lib/types';
+import { useBeep } from '@/lib/use-beep';
 import { Icon } from '@/components/ui/Icon';
+import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
+import Image from 'next/image';
 
 function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -35,6 +38,7 @@ function Avatar({ driver, size }: { driver: SupportDriver; size: number }) {
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       <div
         style={{
+          position: 'relative', // <Image fill> anchors to this box
           width: size,
           height: size,
           borderRadius: 999,
@@ -51,8 +55,7 @@ function Avatar({ driver, size }: { driver: SupportDriver; size: number }) {
         }}
       >
         {driver.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={driver.avatarUrl} alt={driver.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <Image src={driver.avatarUrl} alt={driver.name} fill sizes="44px" style={{ objectFit: 'cover' }} />
         ) : (
           driverInitials(driver.name)
         )}
@@ -79,28 +82,35 @@ export function SupportScreen({ initial }: { initial: AdminSupportData }) {
   const [selected, setSelected] = useState<string | null>(initial.threads[0]?.driver.id ?? null);
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
+  const { beep } = useBeep();
   const drivers = useRef<RawSupportDriver[]>(initial.threads.map((t) => ({ id: t.driver.id, name: t.driver.name })));
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
     const [messagesRes, driversRes] = await Promise.all([
-      supabase.from('support_messages').select('*').order('created_at'),
+      supabase.from('support_messages').select('*').order('created_at', { ascending: false }).limit(500),
       supabase.from('drivers').select('id, name, avatar_url, is_online').order('name'),
     ]);
     drivers.current = (driversRes.data ?? []) as RawSupportDriver[];
     setThreads(buildSupportThreads((messagesRes.data ?? []) as SupportMessage[], drivers.current));
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-support')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_messages' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  // Immediate (no debounce): the beep must fire on the message that triggered it.
+  // `drivers` keeps the online/offline dots live.
+  useRealtime(
+    'admin-support',
+    [{ table: 'support_messages' }, { table: 'drivers' }],
+    useCallback(
+      (payload: RealtimeChangePayload) => {
+        if (payload.table === 'support_messages' && payload.eventType === 'INSERT' && (payload.new as unknown as SupportMessage)?.sender === 'driver') {
+          beep();
+        }
+        refetch();
+      },
+      [beep, refetch],
+    ),
+    { debounceMs: 0 },
+  );
 
   const markRead = useCallback(async (driverId: string) => {
     const supabase = createClient();

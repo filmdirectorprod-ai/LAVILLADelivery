@@ -95,7 +95,7 @@ export function ReviewScreen({ order, items, products }: ReviewScreenProps) {
 
       <div style={{ flex: 1, overflow: 'auto', padding: '18px 18px 8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--soft)', borderRadius: 16, padding: 12 }}>
-          <PhotoSlot label={first?.name_snapshot ?? 'commande'} src={firstImg} style={{ width: 52, height: 52, borderRadius: 12, flexShrink: 0 }} />
+          <PhotoSlot label={first?.name_snapshot ?? 'commande'} src={firstImg} style={{ width: 52, height: 52, borderRadius: 12, flexShrink: 0 }} sizes="52px" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>{order.code}</div>
             <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{names}</div>

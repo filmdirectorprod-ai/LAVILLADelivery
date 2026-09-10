@@ -4,12 +4,13 @@
 // the driver sees only their own upcoming shifts (shifts_driver_read RLS),
 // grouped by day. Subscribes to Realtime on driver_shifts so a newly-assigned or
 // cancelled shift updates live. Pure grouping lives in lib/driver-planning.ts.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { groupShiftsByDay, shiftRange } from '@/lib/driver-planning';
+import { useRealtime } from '@/lib/use-realtime';
 import type { DriverShift } from '@/lib/types';
 
 function shiftHours(shift: DriverShift): number | null {
@@ -27,22 +28,15 @@ export function DriverPlanningScreen({ initialShifts }: { initialShifts: DriverS
     const supabase = createClient();
     const { data } = await supabase
       .from('driver_shifts')
-      .select('*')
+      .select('id, driver_id, starts_at, ends_at, note')
       .gte('ends_at', new Date().toISOString())
       .order('starts_at');
     setShifts((data ?? []) as DriverShift[]);
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('driver-shifts')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_shifts' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  // RLS already limits the stream to this driver's shifts; the debounce keeps a
+  // gérant saving several créneaux at once down to a single refetch.
+  useRealtime('driver-shifts', [{ table: 'driver_shifts' }], refetch);
 
   const days = groupShiftsByDay(shifts);
 

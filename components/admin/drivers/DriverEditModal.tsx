@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/ui/Icon';
+import { useBranches } from '@/lib/use-branches';
 import type { Driver } from '@/lib/types';
 
 const label: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)' };
@@ -14,8 +15,10 @@ export function DriverEditModal({ driver, onClose, onDone }: { driver: Driver; o
   const [name, setName] = useState(driver.name);
   const [phone, setPhone] = useState(driver.phone ?? '');
   const [vehicle, setVehicle] = useState(driver.vehicle ?? '');
+  const [branchId, setBranchId] = useState(driver.branch_id ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const branches = useBranches();
 
   async function save() {
     setError(null);
@@ -28,6 +31,9 @@ export function DriverEditModal({ driver, onClose, onDone }: { driver: Driver; o
       p_phone: phone,
       p_vehicle: vehicle,
     });
+    if (!e && branchId && branchId !== driver.branch_id) {
+      await supabase.rpc('admin_set_driver_branch', { p_driver: driver.id, p_branch: branchId });
+    }
     setBusy(false);
     if (e) return setError(e.message);
     onDone();
@@ -56,7 +62,20 @@ export function DriverEditModal({ driver, onClose, onDone }: { driver: Driver; o
           <div style={wrap}><input value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder="Scooter" style={input} /></div>
         </div>
 
-        {error && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 12 }}>{error}</div>}
+        <div style={{ marginTop: 12 }}>
+          <label style={label}>Agence</label>
+          <div style={wrap}>
+            <Icon name="store" size={16} color="var(--muted)" />
+            <select value={branchId} onChange={(e) => setBranchId(e.target.value)} style={{ ...input, cursor: 'pointer' }}>
+              {branches.length === 0 && <option value="">—</option>}
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {error &&<div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 12 }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
           <button onClick={onClose} disabled={busy} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 12, padding: '12px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)', background: '#fff' }}>Annuler</button>

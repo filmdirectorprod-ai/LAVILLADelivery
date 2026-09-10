@@ -4,6 +4,7 @@
 // (POST /api/orders). The bill shown here is a preview; the server recomputes.
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import type { Address, Product, Profile, Zone } from '@/lib/types';
 import { formatDH } from '@/lib/format';
 import { computeOrder, REDEEM_PALIERS } from '@/lib/pricing';
@@ -64,14 +65,21 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
   const items = useCart((s) => s.items);
   const clearCart = useCart((s) => s.clear);
   const mode = useOrderMode((s) => s.mode);
-  const promo = useOrderMode((s) => s.promo);
-  const setPromo = useOrderMode((s) => s.setPromo);
   const toast = useToast((s) => s.show);
 
   const [pay, setPay] = useState<Pay>('cmi');
   const [slot, setSlot] = useState('asap');
   const [redeem, setRedeem] = useState<number | null>(null); // palier pts
   const [busy, setBusy] = useState(false);
+  // Contact phone for this order — so the driver (and gérant) can call. Prefilled
+  // from the profile, else the default address.
+  const [phone, setPhone] = useState<string>(profile?.phone ?? addresses[0]?.phone ?? '');
+  // Promo code (0037): validated server-side via validate_promo for a live preview;
+  // place_order re-validates authoritatively.
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
+  const [promoMsg, setPromoMsg] = useState<string | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
 
   // Selected delivery address — defaults to the user's default (addresses are
   // already ordered default-first by the query), falling back to the first one.
@@ -99,11 +107,40 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
     items: items.map((it) => ({ price: it.opts.unit, qty: it.qty })),
     mode,
     zoneFee: zone?.fee_dh,
-    promo,
+    promo: false,
+    promoDiscount: appliedPromo?.discount,
     redeemPts: palier?.pts ?? 0,
     redeemDh: palier?.dh ?? 0,
     pointsBalance: points,
   });
+
+  async function applyPromo() {
+    const code = promoInput.trim();
+    if (!code || promoBusy) return;
+    setPromoBusy(true);
+    setPromoMsg(null);
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc('validate_promo', {
+      p_code: code,
+      p_subtotal: bill.subtotal,
+      p_branch: zone?.branch_id ?? null,
+    });
+    setPromoBusy(false);
+    const row = (Array.isArray(data) ? data[0] : data) as { valid: boolean; discount_dh: number; message: string } | null;
+    if (error || !row?.valid) {
+      setAppliedPromo(null);
+      setPromoMsg(row?.message ?? 'Code invalide.');
+      return;
+    }
+    setAppliedPromo({ code: code.toUpperCase(), discount: Number(row.discount_dh) });
+    setPromoMsg(null);
+  }
+
+  function clearPromo() {
+    setAppliedPromo(null);
+    setPromoInput('');
+    setPromoMsg(null);
+  }
 
   const byId = new Map(products.map((p) => [p.id, p]));
 
@@ -111,6 +148,10 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
     if (items.length === 0 || busy) return;
     if (mode === 'livraison' && !selectedAddress) {
       toast('Choisissez une adresse de livraison.');
+      return;
+    }
+    if (phone.replace(/[^0-9]/g, '').length < 9) {
+      toast('Entrez un numéro de téléphone pour la livraison.');
       return;
     }
     setBusy(true);
@@ -141,8 +182,11 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
               : selectedAddress
                 ? formatAddress(selectedAddress)
                 : '',
+          phone: phone.trim(),
+          branch_slug: mode === 'retrait' ? pickupBranchId : null,
           zone_id: mode === 'retrait' ? null : zone?.id ?? null,
-          promo,
+          promo: false,
+          promo_code: appliedPromo?.code ?? null,
           redeem_pts: palier?.pts ?? 0,
           redeem_dh: palier?.dh ?? 0,
         }),
@@ -157,7 +201,7 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
 
       const { order_id } = (await res.json()) as { order_id: string };
       clearCart();
-      setPromo(false);
+      clearPromo();
       setRedeem(null);
       router.replace(`/tracking/${order_id}`);
     } catch (e) {
@@ -423,6 +467,40 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
           )}
         </section>
 
+        {/* contact phone — so the driver and the gérant can reach the customer */}
+        <section>
+          <h3 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)', margin: '0 0 10px' }}>
+            Téléphone de contact
+          </h3>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <span style={{ position: 'absolute', left: 14, display: 'flex' }}>
+              <Icon name="phone" size={18} color="var(--muted)" />
+            </span>
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="06 12 34 56 78"
+              style={{
+                width: '100%',
+                padding: '13px 14px 13px 42px',
+                borderRadius: 14,
+                border: '1.5px solid var(--line)',
+                background: '#fff',
+                fontFamily: 'var(--ui-font)',
+                fontSize: 14.5,
+                color: 'var(--ink)',
+                outline: 'none',
+              }}
+            />
+          </div>
+          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', margin: '7px 2px 0' }}>
+            Le livreur pourra vous appeler à ce numéro.
+          </p>
+        </section>
+
         {/* time slot */}
         <section>
           <h3 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)', margin: '0 0 10px' }}>
@@ -585,6 +663,44 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
           )}
         </section>
 
+        {/* promo code */}
+        <section>
+          <h3 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)', margin: '0 0 8px' }}>
+            Code promo
+          </h3>
+          {appliedPromo ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(35,158,111,0.1)', border: '1px solid rgba(35,158,111,0.4)', borderRadius: 14, padding: '12px 14px' }}>
+              <Icon name="tag" size={18} color="#1f7a49" />
+              <div style={{ flex: 1, fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--ink)' }}>
+                <strong>{appliedPromo.code}</strong> appliqué · −{formatDH(appliedPromo.discount)}
+              </div>
+              <button onClick={clearPromo} style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#C0392B' }}>
+                Retirer
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={promoInput}
+                  onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && applyPromo()}
+                  placeholder="Entrez votre code"
+                  style={{ flex: 1, padding: '12px 14px', borderRadius: 12, border: '1.5px solid var(--line)', background: '#fff', fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--ink)', letterSpacing: 0.5, textTransform: 'uppercase', outline: 'none' }}
+                />
+                <button
+                  onClick={applyPromo}
+                  disabled={promoBusy || !promoInput.trim()}
+                  style={{ border: 'none', borderRadius: 12, padding: '0 18px', cursor: promoBusy || !promoInput.trim() ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: '#fff', background: 'var(--brand)', opacity: promoBusy || !promoInput.trim() ? 0.5 : 1 }}
+                >
+                  {promoBusy ? '…' : 'Appliquer'}
+                </button>
+              </div>
+              {promoMsg && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 7 }}>{promoMsg}</div>}
+            </>
+          )}
+        </section>
+
         {/* bill */}
         <section>
           <h3 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)', margin: '0 0 8px' }}>
@@ -597,7 +713,9 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
               value={bill.deliveryFee === 0 ? 'Offerte' : formatDH(bill.deliveryFee)}
               green={bill.deliveryFee === 0}
             />
-            {bill.discount > 0 && <Row label="Remise (-15 %)" value={`– ${formatDH(bill.discount)}`} gold />}
+            {bill.discount > 0 && (
+              <Row label={appliedPromo ? `Code ${appliedPromo.code}` : 'Remise (-15 %)'} value={`– ${formatDH(bill.discount)}`} gold />
+            )}
             {bill.pointsDiscount > 0 && palier && (
               <Row label={`Points fidélité (−${palier.pts} pts)`} value={`– ${formatDH(bill.pointsDiscount)}`} gold />
             )}

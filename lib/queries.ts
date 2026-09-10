@@ -2,6 +2,8 @@
 // (RLS-enforced) client; catalog tables are public-read, personal tables are
 // owner-scoped by policy. Import only from Server Components / Route Handlers.
 import { createServerSupabase } from '@/lib/supabase/server';
+import { fetchAllIn } from '@/lib/fetch-in-chunks';
+import { getCachedCategories, getCachedProducts, getCachedZones } from '@/lib/catalogue';
 import { startOfTodayISO } from '@/lib/admin-overview';
 import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import { buildAdminOrderRows, type AdminOrderRow } from '@/lib/admin-orders';
@@ -10,6 +12,9 @@ import { buildReviewRows, type ReviewRow } from '@/lib/admin-reviews';
 import { buildIncidentRows, type IncidentRow } from '@/lib/admin-incidents';
 import { buildShiftWeek, mondayOf, isoDate, type ShiftWeek } from '@/lib/admin-planning';
 import { buildSupportThreads, type SupportThread, type RawSupportDriver } from '@/lib/admin-support';
+import { rangeWindow, toSnapshot, DEFAULT_RANGE, type StatsSnapshot } from '@/lib/admin-stats';
+import type { CustomerRow } from '@/lib/admin-crm';
+import type { LoyaltyMember } from '@/lib/admin-loyalty';
 import { loadKitchenBoard } from '@/lib/kitchen-data';
 import type { KitchenBoard } from '@/lib/kitchen';
 import type {
@@ -30,22 +35,18 @@ import type {
   Reward,
   Notification,
   LoyaltyLedgerEntry,
+  Branch,
 } from '@/lib/types';
 
+// The three public-read catalogue tables are served from the shared server cache
+// (lib/catalogue.ts) — same rows for every visitor, invalidated by the admin
+// screens through /api/revalidate.
 export async function getCategories(): Promise<Category[]> {
-  const supabase = await createServerSupabase();
-  const { data } = await supabase.from('categories').select('*').order('sort');
-  return data ?? [];
+  return getCachedCategories();
 }
 
-export async function getProducts(): Promise<Product[]> {
-  const supabase = await createServerSupabase();
-  const { data } = await supabase
-    .from('products')
-    .select('*')
-    .eq('active', true)
-    .order('created_at');
-  return data ?? [];
+export async function getProducts(branchId?: string | null): Promise<Product[]> {
+  return getCachedProducts(branchId ?? null);
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
@@ -55,9 +56,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 }
 
 export async function getZones(): Promise<Zone[]> {
-  const supabase = await createServerSupabase();
-  const { data } = await supabase.from('delivery_zones').select('*').order('fee_dh');
-  return data ?? [];
+  return getCachedZones();
 }
 
 export async function getRewards(): Promise<Reward[]> {
@@ -92,9 +91,13 @@ export async function getMyAddresses(): Promise<Address[]> {
   return data ?? [];
 }
 
-export async function getMyOrders(): Promise<Order[]> {
+export async function getMyOrders(limit = 50): Promise<Order[]> {
   const supabase = await createServerSupabase();
-  const { data } = await supabase.from('orders').select('*').order('placed_at', { ascending: false });
+  const { data } = await supabase
+    .from('orders')
+    .select('*')
+    .order('placed_at', { ascending: false })
+    .limit(limit);
   return data ?? [];
 }
 
@@ -106,10 +109,13 @@ export interface OrderWithItems {
 /** Current user's orders, each with its line items (newest first). */
 export async function getMyOrdersWithItems(): Promise<OrderWithItems[]> {
   const supabase = await createServerSupabase();
+  // Bounded: a long-standing customer's full history would otherwise grow past
+  // Supabase's silent row cap, and the screen only ever shows recent orders.
   const { data } = await supabase
     .from('orders')
     .select('*, order_items(*)')
-    .order('placed_at', { ascending: false });
+    .order('placed_at', { ascending: false })
+    .limit(50);
   return (data ?? []).map((row) => {
     const { order_items, ...order } = row as Order & { order_items: OrderItem[] };
     return { order: order as Order, items: order_items ?? [] };
@@ -167,8 +173,15 @@ export async function getMyShifts(): Promise<DriverShift[]> {
  */
 export async function getMySupportMessages(): Promise<SupportMessage[]> {
   const supabase = await createServerSupabase();
-  const { data } = await supabase.from('support_messages').select('*').order('created_at');
-  return (data ?? []) as SupportMessage[];
+  // The tail of the thread is what the screen renders; older messages are of no
+  // use to it and would eventually hit the row cap. Fetched newest-first to get
+  // the LAST 200, then flipped back to the oldest-first order callers expect.
+  const { data } = await supabase
+    .from('support_messages')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  return ((data ?? []) as SupportMessage[]).reverse();
 }
 
 /** The current user's profile IFF they are staff (gérant), else null. Gate for
@@ -198,13 +211,17 @@ export interface DriverOrder {
  * visibility via orders_driver_read). The caller splits the two by
  * tracking.driver_id / tracking.manual.
  */
-export async function getDriverBoard(): Promise<DriverOrder[]> {
+export async function getDriverBoard(branchId?: string | null): Promise<DriverOrder[]> {
   const supabase = await createServerSupabase();
-  const { data } = await supabase
+  let q = supabase
     .from('orders')
     .select('*, order_tracking(*)')
-    .in('status', DRIVER_POOL_STATUSES)
-    .order('placed_at', { ascending: false });
+    .in('status', DRIVER_POOL_STATUSES);
+  // Multi-agences (0033): a driver only sees their own branch's orders.
+  if (branchId) q = q.eq('branch_id', branchId);
+  // The pool is naturally small (active statuses only); the bound is a guard so
+  // a backlog can never truncate silently at the row cap.
+  const { data } = await q.order('placed_at', { ascending: false }).limit(100);
   return (data ?? []).map((row) => {
     const { order_tracking, ...order } = row as Order & {
       order_tracking: OrderTracking | OrderTracking[] | null;
@@ -283,12 +300,14 @@ export async function getDriverReviews(): Promise<DriverReview[]> {
 
 export async function getChatMessages(orderId: string): Promise<ChatMessage[]> {
   const supabase = await createServerSupabase();
+  // Last 200 messages of this order's thread, flipped back to oldest-first.
   const { data } = await supabase
     .from('chat_messages')
     .select('*')
     .eq('order_id', orderId)
-    .order('created_at');
-  return data ?? [];
+    .order('created_at', { ascending: false })
+    .limit(200);
+  return (data ?? []).reverse();
 }
 
 export async function getMyLoyaltyLedger(): Promise<LoyaltyLedgerEntry[]> {
@@ -296,17 +315,35 @@ export async function getMyLoyaltyLedger(): Promise<LoyaltyLedgerEntry[]> {
   const { data } = await supabase
     .from('loyalty_ledger')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(100);
   return data ?? [];
 }
 
-export async function getMyNotifications(): Promise<Notification[]> {
+export async function getMyNotifications(limit = 200): Promise<Notification[]> {
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from('notifications')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(limit);
   return data ?? [];
+}
+
+/**
+ * Kinds of the current user's UNREAD notifications — all the home header needs
+ * for its badge. It used to download the full notification history (every
+ * column, no limit) on every home render just to count them.
+ */
+export async function getMyUnreadNotificationKinds(limit = 100): Promise<string[]> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from('notifications')
+    .select('kind')
+    .eq('read', false)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  return (data ?? []).map((n) => (n as { kind: string }).kind);
 }
 
 export interface AdminOverviewData {
@@ -329,7 +366,7 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
   const supabase = await createServerSupabase();
   const since = startOfTodayISO();
   const [ordersRes, driversRes, reviewsRes, trackingRes] = await Promise.all([
-    supabase.from('orders').select('*').gte('placed_at', since).order('placed_at', { ascending: false }),
+    supabase.from('orders').select('*').gte('placed_at', since).order('placed_at', { ascending: false }).limit(500),
     supabase.from('drivers').select('*'),
     supabase.from('reviews').select('rating'),
     supabase
@@ -369,20 +406,18 @@ export async function getAdminOrdersData(): Promise<AdminOrdersData> {
   const ids = list.map((o) => o.id);
 
   const [itemsRes, trackingRes, driversRes, profilesRes] = await Promise.all([
-    ids.length
-      ? supabase.from('order_items').select('*').in('order_id', ids)
-      : Promise.resolve({ data: [] as OrderItem[] }),
-    ids.length
-      ? supabase.from('order_tracking').select('*').in('order_id', ids)
-      : Promise.resolve({ data: [] as OrderTracking[] }),
+    // Chunked: 200 orders' items cross Supabase's silent row cap as soon as they
+    // average five lines each (lib/fetch-in-chunks.ts).
+    fetchAllIn<OrderItem>(supabase, 'order_items', '*', 'order_id', ids),
+    fetchAllIn<OrderTracking>(supabase, 'order_tracking', '*', 'order_id', ids),
     supabase.from('drivers').select('*').order('name'),
     supabase.from('profiles').select('id, full_name'),
   ]);
 
   const rows = buildAdminOrderRows(
     list,
-    (itemsRes.data ?? []) as OrderItem[],
-    (trackingRes.data ?? []) as OrderTracking[],
+    itemsRes,
+    trackingRes,
     (driversRes.data ?? []) as Driver[],
     (profilesRes.data ?? []) as { id: string; full_name: string | null }[],
   );
@@ -437,7 +472,8 @@ export async function getAdminReviewsData(): Promise<AdminReviewsData> {
   const { data: reviews } = await supabase
     .from('reviews')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(200);
   const list = (reviews ?? []) as Review[];
 
   const [profilesRes, ordersRes, trackingRes, driversRes] = await Promise.all([
@@ -575,7 +611,9 @@ export interface AdminSupportData {
 export async function getAdminSupportData(): Promise<AdminSupportData> {
   const supabase = await createServerSupabase();
   const [messagesRes, driversRes] = await Promise.all([
-    supabase.from('support_messages').select('*').order('created_at'),
+    // Newest 500 across all threads (buildSupportThreads re-sorts per driver):
+    // the full history would eventually be truncated by the row cap instead.
+    supabase.from('support_messages').select('*').order('created_at', { ascending: false }).limit(500),
     supabase.from('drivers').select('id, name, avatar_url, is_online').order('name'),
   ]);
   const threads = buildSupportThreads(
@@ -594,4 +632,61 @@ export async function getAdminSupportData(): Promise<AdminSupportData> {
 export async function getKitchenBoard(): Promise<KitchenBoard> {
   const supabase = await createServerSupabase();
   return loadKitchenBoard(supabase);
+}
+
+export interface AdminStatsData {
+  snapshot: StatsSnapshot;
+  branches: Branch[];
+}
+
+/**
+ * The Statistiques report for the default range, aggregated in Postgres
+ * (admin_stats_snapshot, 0051) rather than by shipping 90 days of orders and
+ * their items to the browser. The RPC applies the same staff/agency scoping RLS
+ * does, so a branch gérant gets their own figures.
+ */
+export async function getAdminStatsData(): Promise<AdminStatsData> {
+  const supabase = await createServerSupabase();
+  const { from, to, prevFrom } = rangeWindow(DEFAULT_RANGE);
+  const [snapshotRes, branchesRes] = await Promise.all([
+    supabase.rpc('admin_stats_snapshot', { p_from: from, p_to: to, p_prev_from: prevFrom }),
+    supabase.from('branches').select('id, name, slug').order('slug'),
+  ]);
+  return {
+    snapshot: toSnapshot(snapshotRes.data),
+    branches: (branchesRes.data ?? []) as Branch[],
+  };
+}
+
+export interface AdminCrmData {
+  rows: CustomerRow[];
+}
+
+/**
+ * Customer directory: one row per customer who has ordered, aggregated in
+ * Postgres (admin_customer_rows, 0051). It used to fetch every order and every
+ * profile and group them in JavaScript — unbounded, and silently truncated at
+ * PostgREST's 1000-row cap. The per-customer order history is loaded on demand
+ * by the screen (admin_customer_orders).
+ */
+export async function getAdminCrmData(): Promise<AdminCrmData> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase.rpc('admin_customer_rows', { p_limit: 500 });
+  const rows = (data ?? []) as (Omit<CustomerRow, 'lastOrder'> & { last_order: string | null })[];
+  return {
+    rows: rows.map(({ last_order, ...r }) => ({ ...r, lastOrder: last_order })) as CustomerRow[],
+  };
+}
+
+/** Loyalty members (one per profile) for the admin Fidélité overview. */
+export async function getAdminLoyaltyMembers(): Promise<LoyaltyMember[]> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, full_name, loyalty_points, loyalty_tier')
+    .order('loyalty_points', { ascending: false });
+  return (data ?? []).map((p) => {
+    const r = p as { id: string; full_name: string | null; loyalty_points: number | null; loyalty_tier: string | null };
+    return { id: r.id, name: r.full_name?.trim() || 'Client', points: r.loyalty_points ?? 0, tier: r.loyalty_tier };
+  });
 }

@@ -7,9 +7,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 import type { DriverPosition } from '@/lib/admin-overview';
+import { LA_VILLA_BRANCHES, DEFAULT_BRANCH } from '@/lib/branches';
 
-// La Villa — 117 Av. Mohammed Bahnini, Ville Nouvelle, Fès (delivery origin).
-const ORIGIN = { lat: 34.0261, lng: -5.014 };
+// Map centre = the main shop; BOTH agencies are plotted as gold markers below.
+const CENTER = { lat: DEFAULT_BRANCH.lat, lng: DEFAULT_BRANCH.lng };
 
 export interface LiveDriverMapProps {
   apiKey: string | undefined;
@@ -34,25 +35,28 @@ export function LiveDriverMap({ apiKey, positions }: LiveDriverMapProps) {
       .then(() => {
         if (cancelled || !divRef.current) return;
         const mapInstance = new google.maps.Map(divRef.current, {
-          center: ORIGIN,
-          zoom: 13,
+          center: CENTER,
+          zoom: 12,
           disableDefaultUI: true,
           clickableIcons: false,
           styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }],
         });
-        new google.maps.Marker({
-          position: ORIGIN,
-          map: mapInstance,
-          title: 'La Villa',
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 7,
-            fillColor: '#A89723',
-            fillOpacity: 1,
-            strokeColor: '#fff',
-            strokeWeight: 3,
-          },
-        });
+        // One gold marker per La Villa agency (Riad + Badie).
+        for (const b of LA_VILLA_BRANCHES) {
+          new google.maps.Marker({
+            position: { lat: b.lat, lng: b.lng },
+            map: mapInstance,
+            title: b.name,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 7,
+              fillColor: '#A89723',
+              fillOpacity: 1,
+              strokeColor: '#fff',
+              strokeWeight: 3,
+            },
+          });
+        }
         setMap(mapInstance);
       })
       .catch(() => {
@@ -100,11 +104,11 @@ export function LiveDriverMap({ apiKey, positions }: LiveDriverMapProps) {
         live.delete(id);
       }
     }
-    // Frame origin + all drivers.
+    // Frame both agencies + all drivers (so both shops always show).
     const bounds = new google.maps.LatLngBounds();
-    bounds.extend(ORIGIN);
+    for (const b of LA_VILLA_BRANCHES) bounds.extend({ lat: b.lat, lng: b.lng });
     for (const p of positions) bounds.extend({ lat: p.lat, lng: p.lng });
-    if (positions.length > 0) map.fitBounds(bounds, 60);
+    map.fitBounds(bounds, 60);
   }, [map, positions]);
 
   const shellStyle: React.CSSProperties = {

@@ -3,16 +3,19 @@
 // the client HomeScreen. The header reflects the real avatar and the default
 // delivery address (its zone drives the ETA/fee badge), staying in sync with
 // the profile + addresses pages.
-import { getProducts, getCategories, getZones, getMyNotifications, getMyProfile, getMyAddresses } from '@/lib/queries';
+//
+// Two waves, not three: everything that does not depend on the serving agency
+// goes out at once, then the catalogue — which needs the zone's branch_id — is
+// a single query (its per-branch stock now rides along as an embed).
+import { getProducts, getCategories, getZones, getMyUnreadNotificationKinds, getMyProfile, getMyAddresses } from '@/lib/queries';
 import { isNotificationEnabled } from '@/lib/notifications';
 import { HomeScreen } from '@/components/screens/HomeScreen';
 
 export default async function HomePage() {
-  const [products, categories, zones, notifications, profile, addresses] = await Promise.all([
-    getProducts(),
+  const [categories, zones, unreadKinds, profile, addresses] = await Promise.all([
     getCategories(),
     getZones(),
-    getMyNotifications(),
+    getMyUnreadNotificationKinds(),
     getMyProfile(),
     getMyAddresses(),
   ]);
@@ -20,10 +23,10 @@ export default async function HomePage() {
   // Default delivery address (query returns default-first) drives the header.
   const defaultAddress = addresses[0] ?? null;
   const zone = zones.find((z) => z.id === defaultAddress?.zone_id) ?? zones[0] ?? null;
+  // Catalogue availability reflects the agency that serves the customer's zone.
+  const products = await getProducts(zone?.branch_id);
   // Unread badge counts only kinds the user opted into (in sync with Paramètres).
-  const unread = notifications.filter(
-    (n) => !n.read && isNotificationEnabled(n.kind, profile?.settings),
-  ).length;
+  const unread = unreadKinds.filter((kind) => isNotificationEnabled(kind, profile?.settings)).length;
 
   return (
     <HomeScreen

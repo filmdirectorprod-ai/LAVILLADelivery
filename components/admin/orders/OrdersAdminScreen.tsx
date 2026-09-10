@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import { orderStatusLabel, orderStatusPill } from '@/lib/order-status';
+import { useBranches } from '@/lib/use-branches';
 import {
   buildAdminOrderRows,
   filterAdminOrdersByTab,
@@ -25,6 +26,8 @@ import {
 import type { AdminOrdersData } from '@/lib/queries';
 import type { Driver, Order, OrderItem, OrderTracking } from '@/lib/types';
 import { OrderConfirmPanel } from './OrderConfirmPanel';
+import { useRealtime } from '@/lib/use-realtime';
+import { fetchAllIn } from '@/lib/fetch-in-chunks';
 
 const TABS: { value: OrderTab; label: string }[] = [
   { value: 'toconfirm', label: 'À confirmer' },
@@ -43,6 +46,8 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
   const [drivers, setDrivers] = useState<Driver[]>(initial.drivers);
   const [tab, setTab] = useState<OrderTab>('toconfirm');
   const [query, setQuery] = useState('');
+  const [branchFilter, setBranchFilter] = useState<string>(''); // '' = all agencies
+  const branches = useBranches();
   const [busy, setBusy] = useState(false);
   const [autoAssign, setAutoAssign] = useState(false);
   const [confirmRow, setConfirmRow] = useState<AdminOrderRow | null>(null);
@@ -57,8 +62,9 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
     const list = (orders ?? []) as Order[];
     const ids = list.map((o) => o.id);
     const [itemsRes, trackingRes, driversRes, profilesRes] = await Promise.all([
-      ids.length ? supabase.from('order_items').select('*').in('order_id', ids) : Promise.resolve({ data: [] as OrderItem[] }),
-      ids.length ? supabase.from('order_tracking').select('*').in('order_id', ids) : Promise.resolve({ data: [] as OrderTracking[] }),
+      // Chunked: 200 orders' line items otherwise cross Supabase's silent row cap.
+      fetchAllIn<OrderItem>(supabase, 'order_items', '*', 'order_id', ids),
+      fetchAllIn<OrderTracking>(supabase, 'order_tracking', '*', 'order_id', ids),
       supabase.from('drivers').select('*').order('name'),
       supabase.from('profiles').select('id, full_name'),
     ]);
@@ -66,29 +72,21 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
     setRows(
       buildAdminOrderRows(
         list,
-        (itemsRes.data ?? []) as OrderItem[],
-        (trackingRes.data ?? []) as OrderTracking[],
+        itemsRes,
+        trackingRes,
         (driversRes.data ?? []) as Driver[],
         (profilesRes.data ?? []) as { id: string; full_name: string | null }[],
       ),
     );
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_tracking' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  useRealtime('admin-orders', [{ table: 'orders' }, { table: 'order_items' }, { table: 'order_tracking' }], refetch);
 
   const counts = useMemo(() => countOrdersByTab(rows), [rows]);
-  const visible = useMemo(() => filterAdminOrdersByTab(rows, tab, query), [rows, tab, query]);
+  const visible = useMemo(() => {
+    const byTab = filterAdminOrdersByTab(rows, tab, query);
+    return branchFilter ? byTab.filter((r) => r.order.branch_id === branchFilter) : byTab;
+  }, [rows, tab, query, branchFilter]);
 
   const runRpc = useCallback(
     async (fn: string, params: Record<string, unknown>) => {
@@ -193,11 +191,27 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
             );
           })}
         </div>
+        {branches.length > 1 && (
+          <div style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
+            {[{ id: '', name: 'Toutes les agences' }, ...branches].map((b) => {
+              const active = branchFilter === b.id;
+              return (
+                <button
+                  key={b.id || 'all'}
+                  onClick={() => setBranchFilter(b.id)}
+                  style={{ border: `1px solid ${active ? 'var(--brand)' : 'var(--line)'}`, borderRadius: 999, padding: '7px 13px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, background: active ? 'rgba(19,124,139,0.08)' : '#fff', color: active ? 'var(--brand)' : 'var(--muted)' }}
+                >
+                  {b.name.replace(/ —.*$/, '')}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Rechercher un code…"
-          style={{ marginLeft: 'auto', border: '1px solid var(--line)', borderRadius: 12, padding: '9px 14px', fontFamily: 'var(--ui-font)', fontSize: 14, minWidth: 220 }}
+          style={{ marginLeft: branches.length > 1 ? 0 : 'auto', border: '1px solid var(--line)', borderRadius: 12, padding: '9px 14px', fontFamily: 'var(--ui-font)', fontSize: 14, minWidth: 220 }}
         />
       </div>
 

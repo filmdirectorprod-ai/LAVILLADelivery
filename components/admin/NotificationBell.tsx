@@ -7,7 +7,6 @@
 // notification and a short beep. All formatting is in lib/admin-notifications.ts.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/ui/Icon';
 import {
   orderNotification,
@@ -17,6 +16,7 @@ import {
   relativeTime,
   type AdminNotification,
 } from '@/lib/admin-notifications';
+import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
 
 export function NotificationBell() {
   const [items, setItems] = useState<AdminNotification[]>([]);
@@ -69,23 +69,26 @@ export function NotificationBell() {
     [beep],
   );
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-notify')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-        const row = payload.new as { id: string; code: string | null; placed_at: string | null };
-        notify(orderNotification(row));
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'incidents' }, (payload) => {
-        const row = payload.new as { id: string; title: string | null; created_at: string | null };
-        notify(incidentNotification(row));
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [notify]);
+  // Immediate (no debounce): each INSERT is its own notification, so no payload
+  // may be dropped. RLS scopes a gérant to their own agency's rows.
+  useRealtime(
+    'admin-notify',
+    [
+      { table: 'orders', event: 'INSERT' },
+      { table: 'incidents', event: 'INSERT' },
+    ],
+    useCallback(
+      (payload: RealtimeChangePayload) => {
+        if (payload.table === 'orders') {
+          notify(orderNotification(payload.new as { id: string; code: string | null; placed_at: string | null }));
+        } else {
+          notify(incidentNotification(payload.new as { id: string; title: string | null; created_at: string | null }));
+        }
+      },
+      [notify],
+    ),
+    { debounceMs: 0 },
+  );
 
   const enablePush = useCallback(async () => {
     // Runs inside a click → allowed to create/resume the AudioContext and prompt.

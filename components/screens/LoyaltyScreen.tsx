@@ -2,7 +2,9 @@
 // PROGRAMME DE FIDÉLITÉ — paliers de statut + paliers de paiement + récompenses
 // + historique. Ported from the prototype (screens-account.jsx Loyalty), driven
 // by the real profile balance, the rewards catalog, and the loyalty ledger.
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import type { LoyaltyLedgerEntry, Profile, Reward } from '@/lib/types';
 import { LOYALTY_TIERS, LOYALTY_BENEFITS, REDEEM_OPTIONS, tierFor, nextTierFor } from '@/lib/constants';
 import { useToast } from '@/lib/toast-store';
@@ -33,12 +35,52 @@ function ledgerIcon(e: LoyaltyLedgerEntry): string {
 export function LoyaltyScreen({ profile, rewards, ledger, reviewOrderId }: LoyaltyScreenProps) {
   const router = useRouter();
   const toast = useToast((s) => s.show);
-  const pts = profile?.loyalty_points ?? 0;
+
+  // Live points + activity: profiles & loyalty_ledger are published to Realtime
+  // (0047), so a new order / admin adjustment / review bonus reflects instantly.
+  const [liveProfile, setLiveProfile] = useState<Profile | null>(profile);
+  const [liveLedger, setLiveLedger] = useState<LoyaltyLedgerEntry[]>(ledger);
+  useEffect(() => {
+    const uid = profile?.id;
+    if (!uid) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel('loyalty-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${uid}` }, (payload) => {
+        setLiveProfile((p) => ({ ...(p as Profile), ...(payload.new as Partial<Profile>) }));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'loyalty_ledger', filter: `user_id=eq.${uid}` }, (payload) => {
+        const e = payload.new as LoyaltyLedgerEntry;
+        setLiveLedger((l) => (l.some((x) => x.id === e.id) ? l : [e, ...l]));
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]);
+
+  const pts = liveProfile?.loyalty_points ?? 0;
   const tier = tierFor(pts);
   const next = nextTierFor(pts);
   const toNext = next ? next.min - pts : 0;
   const span = next ? next.min - tier.min : 1;
   const prog = next ? Math.min(1, (pts - tier.min) / span) : 1;
+
+  const referralCode = liveProfile?.referral_code ?? '';
+  async function shareReferral() {
+    if (!referralCode) return;
+    const link = `${window.location.origin}/parrain/${referralCode}`;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: 'La Villa', text: 'Rejoins La Villa avec mon lien et profite de La Villa !', url: link });
+      } else {
+        await navigator.clipboard.writeText(link);
+        toast('Lien de parrainage copié !');
+      }
+    } catch {
+      /* share cancelled */
+    }
+  }
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -115,6 +157,32 @@ export function LoyaltyScreen({ profile, rewards, ledger, reviewOrderId }: Loyal
           </div>
         </div>
 
+        {/* parrainage */}
+        {referralCode && (
+          <div style={{ padding: '24px 18px 0' }}>
+            <SectionHead title="Parrainez vos amis" />
+            <div style={{ marginTop: 12, background: 'linear-gradient(120deg, rgba(19,124,139,0.06), rgba(168,151,35,0.08))', border: '1px solid rgba(19,124,139,0.18)', borderRadius: 18, padding: '16px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 13, background: 'rgba(168,151,35,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon name="gift" size={22} color="var(--gold)" fill />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>Gagnez 5 points par filleul</div>
+                  <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', marginTop: 2, lineHeight: 1.45 }}>
+                    Partagez votre lien. Dès que votre filleul reçoit sa <b>première commande</b>, vous gagnez <b style={{ color: 'var(--gold)' }}>+5 pts</b>.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
+                <div style={{ flex: 1, fontFamily: 'ui-monospace, monospace', fontSize: 13, color: 'var(--ink)', background: '#fff', border: '1px solid var(--line)', borderRadius: 12, padding: '11px 13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  /parrain/{referralCode}
+                </div>
+                <Btn variant="gold" onClick={shareReferral}>Partager</Btn>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* récompenses */}
         {rewards.length > 0 && (
           <div style={{ padding: '24px 18px 0' }}>
@@ -188,12 +256,12 @@ export function LoyaltyScreen({ profile, rewards, ledger, reviewOrderId }: Loyal
         </div>
 
         {/* historique */}
-        {ledger.length > 0 && (
+        {liveLedger.length > 0 && (
           <div style={{ padding: '22px 18px 0' }}>
             <SectionHead title="Activité des points" />
             <div style={{ marginTop: 8 }}>
-              {ledger.map((h, i) => (
-                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 2px', borderBottom: i < ledger.length - 1 ? '1px solid var(--line)' : 'none' }}>
+              {liveLedger.map((h, i) => (
+                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 2px', borderBottom: i < liveLedger.length - 1 ? '1px solid var(--line)' : 'none' }}>
                   <div style={{ width: 34, height: 34, borderRadius: 999, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Icon name={ledgerIcon(h)} size={16} color={h.delta_pts < 0 ? 'var(--muted)' : 'var(--brand)'} />
                   </div>

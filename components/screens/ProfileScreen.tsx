@@ -44,7 +44,7 @@ export function ProfileScreen({ profile }: ProfileScreenProps) {
       <div style={{ padding: `${SAFE_TOP + 10}px 18px 22px`, background: 'linear-gradient(150deg, var(--brand), var(--brand-d))' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ width: 64, height: 64, borderRadius: 999, border: '2.5px solid var(--gold)', padding: 2, flexShrink: 0 }}>
-            <PhotoSlot label={profile?.full_name ?? 'avatar'} src={profile?.avatar_url} style={{ width: '100%', height: '100%', borderRadius: 999 }} dim />
+            <PhotoSlot label={profile?.full_name ?? 'avatar'} src={profile?.avatar_url} style={{ width: '100%', height: '100%', borderRadius: 999 }} sizes="96px" dim />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 19, color: '#fff' }}>

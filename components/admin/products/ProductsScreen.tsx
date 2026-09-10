@@ -7,7 +7,7 @@
 // lib/admin-products.ts so server and client agree. Real-time: a price/visibility
 // change or a new product here propagates to the customer app instantly.
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { buildProductGroups, catalogueStats } from '@/lib/admin-products';
 import type { AdminProductsData } from '@/lib/queries';
@@ -15,6 +15,8 @@ import type { Product, Category } from '@/lib/types';
 import { ProductCard } from './ProductCard';
 import { ProductForm, type ProductDraft } from './ProductForm';
 import { ProductEditModal } from './ProductEditModal';
+import { useRealtime } from '@/lib/use-realtime';
+import { revalidateCatalogue } from '@/lib/revalidate-catalogue';
 
 export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
   const [products, setProducts] = useState<Product[]>(initial.products);
@@ -33,17 +35,9 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
     setCategories((categoriesRes.data ?? []) as Category[]);
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-products')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  // Editing a product fires one event per changed row; debounced, the catalogue
+  // reloads once.
+  useRealtime('admin-products', [{ table: 'products' }, { table: 'categories' }], refetch);
 
   const update = useCallback(
     async (product: Product, patch: { active?: boolean; price_dh?: number; is_signature?: boolean; in_stock?: boolean }) => {
@@ -57,6 +51,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
         p_in_stock: patch.in_stock ?? product.in_stock,
       });
       setBusy(false);
+      revalidateCatalogue();
       refetch();
     },
     [refetch],
@@ -70,7 +65,10 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
       const { error } = await supabase.rpc('admin_delete_product', { p_product: p.id });
       setBusy(false);
       if (error) window.alert('Suppression échouée : ' + error.message);
-      else refetch();
+      else {
+        revalidateCatalogue();
+        refetch();
+      }
     },
     [refetch],
   );
@@ -103,6 +101,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
       }
       setBusy(false);
       setShowForm(false);
+      revalidateCatalogue();
       refetch();
     },
     [refetch],
@@ -179,6 +178,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
           onClose={() => setEditing(null)}
           onDone={() => {
             setEditing(null);
+            revalidateCatalogue();
             refetch();
           }}
         />

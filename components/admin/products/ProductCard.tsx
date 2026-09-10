@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import type { Product } from '@/lib/types';
+import Image from 'next/image';
 
 export interface ProductCardProps {
   product: Product;
@@ -41,8 +42,7 @@ export function ProductCard({ product, busy, onToggleActive, onToggleSignature, 
       {/* Photo or placeholder */}
       <div style={{ position: 'relative', height: 124, background: 'var(--soft)' }}>
         {product.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <Image src={product.image_url} alt={product.name} fill sizes="120px" style={{ objectFit: 'cover' }} />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'var(--muted)' }}>
             <Icon name="camera" size={26} color="var(--line)" />

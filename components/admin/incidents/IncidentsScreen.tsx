@@ -4,13 +4,14 @@
 // change, and writes through the staff RLS (0018): inserting a new incident and
 // flipping one to resolved. Ordering/joins come from lib/admin-incidents.ts.
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { buildIncidentRows, openIncidentCount, partitionIncidentRows } from '@/lib/admin-incidents';
 import type { AdminIncidentsData } from '@/lib/queries';
 import type { Incident } from '@/lib/types';
 import { IncidentCard } from './IncidentCard';
 import { IncidentForm, type IncidentDraft } from './IncidentForm';
+import { useRealtime } from '@/lib/use-realtime';
 
 export function IncidentsScreen({ initial }: { initial: AdminIncidentsData }) {
   const [rows, setRows] = useState<AdminIncidentsData['rows']>(initial.rows);
@@ -33,16 +34,7 @@ export function IncidentsScreen({ initial }: { initial: AdminIncidentsData }) {
     setRows(buildIncidentRows((incidentsRes.data ?? []) as Incident[], d, o));
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-incidents')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  useRealtime('admin-incidents', [{ table: 'incidents' }], refetch);
 
   const onCreate = useCallback(
     async (draft: IncidentDraft) => {

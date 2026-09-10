@@ -3,9 +3,9 @@
 //   • Livraison en cours — the order this driver has claimed (rich card)
 //   • Disponibles        — the unclaimed pool any driver can accept
 // Subscribes to Realtime on `orders` and `order_tracking` and re-pulls the
-// RLS-scoped board on any change. The online/offline switch is a device-local
-// preference (there's no is_online column yet): when offline we hide the
-// available pool so the driver stops seeing new requests.
+// RLS-scoped board on any change. The online/offline switch (useDriverOnline)
+// drives the driver's REAL presence (DriverPresence heartbeats it to the admin)
+// and also hides the available pool locally when offline.
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -16,6 +16,8 @@ import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import { UserNotificationBell } from '@/components/ui/UserNotificationBell';
 import { unreadFromStaff, SUPPORT_SEEN_KEY } from '@/lib/driver-support';
+import { useDriverOnline } from '@/lib/driver-online-store';
+import { useRealtime } from '@/lib/use-realtime';
 import type { Driver, Order, OrderTracking, SupportMessage } from '@/lib/types';
 import type { DriverOrder } from '@/lib/queries';
 
@@ -26,8 +28,6 @@ const STAGE_LABEL: Record<number, string> = {
   3: 'En route',
   4: 'Livrée',
 };
-
-const ONLINE_KEY = 'lv-driver-online';
 
 function mapBoard(rows: unknown[]): DriverOrder[] {
   return (rows ?? []).map((r) => {
@@ -60,56 +60,44 @@ export function DriverDashboard({
 }) {
   const router = useRouter();
   const [board, setBoard] = useState<DriverOrder[]>(initialBoard);
-  const [online, setOnline] = useState(true);
+  // Availability switch — shared with DriverPresence, which heartbeats real
+  // presence to the admin based on it (+ persisted to localStorage).
+  const online = useDriverOnline((s) => s.online);
+  const toggleOnline = useDriverOnline((s) => s.toggle);
   const [supportUnread, setSupportUnread] = useState(0);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(ONLINE_KEY);
-    if (stored !== null) setOnline(stored === '1');
-  }, []);
-
-  const toggleOnline = () => {
-    setOnline((v) => {
-      const next = !v;
-      try {
-        localStorage.setItem(ONLINE_KEY, next ? '1' : '0');
-      } catch {
-        /* storage unavailable */
-      }
-      return next;
-    });
-  };
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    const { data } = await supabase
+    let q = supabase
       .from('orders')
       .select('*, order_tracking(*)')
-      .in('status', DRIVER_POOL_STATUSES)
-      .order('placed_at', { ascending: false });
+      .in('status', DRIVER_POOL_STATUSES);
+    if (driver.branch_id) q = q.eq('branch_id', driver.branch_id); // only this driver's agency
+    const { data } = await q.order('placed_at', { ascending: false }).limit(100);
     setBoard(mapBoard(data ?? []));
-  }, []);
+  }, [driver.branch_id]);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('driver-board')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_tracking' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  // Scoped to this driver's agency: a change in another branch no longer wakes
+  // this device. order_tracking has no branch_id, so it stays broad — the
+  // debounce keeps a claim burst down to one refetch.
+  useRealtime(
+    'driver-board',
+    [
+      { table: 'orders', filter: driver.branch_id ? `branch_id=eq.${driver.branch_id}` : undefined },
+      { table: 'order_tracking' },
+    ],
+    refetch,
+  );
 
   // Support badge: count staff replies newer than this device's last visit.
   const refreshSupport = useCallback(async () => {
     const supabase = createClient();
     const { data } = await supabase
       .from('support_messages')
-      .select('*')
+      .select('id, driver_id, sender, created_at')
       .eq('driver_id', driver.id)
-      .order('created_at');
+      .order('created_at', { ascending: false })
+      .limit(200);
     let lastSeen: string | null = null;
     try {
       lastSeen = localStorage.getItem(SUPPORT_SEEN_KEY);
@@ -121,19 +109,13 @@ export function DriverDashboard({
 
   useEffect(() => {
     refreshSupport();
-    const supabase = createClient();
-    const channel = supabase
-      .channel('driver-support-badge')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `driver_id=eq.${driver.id}` },
-        refreshSupport,
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [driver.id, refreshSupport]);
+  }, [refreshSupport]);
+
+  useRealtime(
+    'driver-support-badge',
+    [{ table: 'support_messages', event: 'INSERT', filter: `driver_id=eq.${driver.id}` }],
+    refreshSupport,
+  );
 
   const mine = board.filter((b) => b.tracking?.driver_id === driver.id && b.tracking?.manual);
   const available = board.filter((b) => !b.tracking?.manual);
@@ -151,7 +133,7 @@ export function DriverDashboard({
       <div style={{ padding: `${SAFE_TOP + 6}px 16px 18px`, background: 'linear-gradient(150deg, var(--brand), var(--brand-d))' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 52, height: 52, borderRadius: 999, border: '2.5px solid var(--gold)', padding: 2, flexShrink: 0 }}>
-            <PhotoSlot label={driver.name} src={driver.avatar_url ?? undefined} style={{ width: '100%', height: '100%', borderRadius: 999 }} dim />
+            <PhotoSlot label={driver.name} src={driver.avatar_url ?? undefined} style={{ width: '100%', height: '100%', borderRadius: 999 }} sizes="48px" dim />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -161,7 +143,7 @@ export function DriverDashboard({
               Livreur · {driver.vehicle ?? 'Scooter'}
             </div>
           </div>
-          <UserNotificationBell color="#fff" />
+          <UserNotificationBell color="#fff" audience="driver" />
           <button
             onClick={logout}
             aria-label="Déconnexion"

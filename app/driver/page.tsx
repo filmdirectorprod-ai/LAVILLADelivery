@@ -6,13 +6,13 @@ import { getMyDriver, getDriverBoard, getDriverDeliveries } from '@/lib/queries'
 import { DriverDashboard } from '@/components/driver/DriverDashboard';
 
 export default async function DriverHomePage() {
-  const [driver, board, deliveries] = await Promise.all([
-    getMyDriver(),
-    getDriverBoard(),
-    getDriverDeliveries(),
-  ]);
+  const driver = await getMyDriver();
   // driver is non-null here (layout gate), but guard for type-safety.
   if (!driver) return null;
+  const [board, deliveries] = await Promise.all([
+    getDriverBoard(driver.branch_id),
+    getDriverDeliveries(),
+  ]);
 
   const totalEarnings = deliveries.reduce((sum, d) => sum + (d.delivery_fee_dh ?? 0), 0);
 

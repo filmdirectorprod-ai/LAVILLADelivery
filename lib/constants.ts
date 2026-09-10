@@ -66,6 +66,7 @@ export const LOYALTY_BENEFITS: { tier: LoyaltyTier; icon: string; label: string 
 
 /** Redemption paliers (points → direct discount) shown on loyalty + checkout. */
 export const REDEEM_OPTIONS: { pts: number; dh: number; label: string; best?: boolean; popular?: boolean }[] = [
+  { pts: 100, dh: 10, label: '-10 DH' },
   { pts: 250, dh: 25, label: '-25 DH' },
   { pts: 500, dh: 60, label: '-60 DH', popular: true },
   { pts: 1000, dh: 130, label: '-130 DH', best: true },

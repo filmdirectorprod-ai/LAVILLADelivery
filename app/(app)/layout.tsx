@@ -10,6 +10,7 @@ import { formatDH } from '@/lib/format';
 import { SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { TabBar, type TabId } from '@/components/TabBar';
+import { ReferralCapture } from '@/components/ReferralCapture';
 
 const TAB_ROUTES: Record<string, TabId> = {
   '/': 'home',
@@ -55,6 +56,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       >
         {children}
       </div>
+
+      <ReferralCapture />
 
       {showFloat && (
         <button

@@ -4,13 +4,21 @@
 // tells globals.css to drop the phone-frame sizing.
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { ADMIN_NAV, isActiveNav } from '@/lib/admin-nav';
+import { createClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/ui/Icon';
 import { NotificationBell } from '@/components/admin/NotificationBell';
+import Image from 'next/image';
 
-export function AdminChrome({ children, managerName }: { children: ReactNode; managerName: string }) {
+export function AdminChrome({ children, managerName, agencyLabel = 'Gérant' }: { children: ReactNode; managerName: string; agencyLabel?: string }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function signOut() {
+    await createClient().auth.signOut();
+    router.replace('/auth/admin');
+  }
   return (
     <div className="lv-admin-root" style={{ display: 'flex', height: '100dvh', width: '100%' }}>
       <aside
@@ -26,10 +34,12 @@ export function AdminChrome({ children, managerName }: { children: ReactNode; ma
       >
         <div style={{ padding: '0 10px 18px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 2px' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src="/brand/logo.png"
               alt="La Villa — Maison de Qualité, depuis 2007"
+              width={190}
+              height={96}
+              priority
               style={{ width: '100%', maxWidth: 190, height: 'auto', display: 'block' }}
             />
           </div>
@@ -67,15 +77,23 @@ export function AdminChrome({ children, managerName }: { children: ReactNode; ma
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 10px 0', borderTop: '1px solid rgba(255,255,255,0.12)', marginTop: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 999, background: 'rgba(255,255,255,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 999, background: 'rgba(255,255,255,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Icon name="user" size={18} color="#fff" />
           </div>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {managerName}
             </div>
-            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'rgba(255,255,255,0.6)' }}>Gérant</div>
+            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{agencyLabel}</div>
           </div>
+          <button
+            onClick={signOut}
+            title="Se déconnecter"
+            aria-label="Se déconnecter"
+            style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.12)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Icon name="logout" size={17} color="rgba(255,255,255,0.85)" />
+          </button>
         </div>
       </aside>
 

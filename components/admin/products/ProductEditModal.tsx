@@ -3,10 +3,12 @@
 // en-vente / stock) and upload its photo. Image goes to the product-images storage
 // bucket (staff-only write); the public URL is saved via admin_edit_product (0029).
 'use client';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/ui/Icon';
+import { useBranches } from '@/lib/use-branches';
 import type { Category, Product, Universe } from '@/lib/types';
+import { revalidateCatalogue } from '@/lib/revalidate-catalogue';
 
 const field: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 14, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--ink)', width: '100%', background: '#fff' };
 const label: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', fontWeight: 600 };
@@ -25,6 +27,28 @@ export function ProductEditModal({ product, categories, onClose, onDone }: { pro
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const branches = useBranches();
+  // Per-branch stock overrides (absent ⇒ falls back to the global flag).
+  const [branchStock, setBranchStock] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    createClient()
+      .from('product_branch')
+      .select('branch_id, in_stock')
+      .eq('product_id', product.id)
+      .then(({ data }) => {
+        const m: Record<string, boolean> = {};
+        (data ?? []).forEach((r) => {
+          m[(r as { branch_id: string }).branch_id] = (r as { in_stock: boolean }).in_stock;
+        });
+        setBranchStock(m);
+      });
+  }, [product.id]);
+
+  async function toggleBranchStock(branchId: string, next: boolean) {
+    setBranchStock((p) => ({ ...p, [branchId]: next }));
+    await createClient().rpc('admin_set_product_branch_stock', { p_product: product.id, p_branch: branchId, p_in_stock: next });
+    revalidateCatalogue(); // the "Rupture" badge is served from the cached catalogue
+  }
 
   const cats = useMemo(() => categories.filter((c) => c.universe === universe || c.universe === 'all'), [categories, universe]);
   const effCategory = cats.some((c) => c.key === category) ? category : cats[0]?.key ?? category;
@@ -83,6 +107,8 @@ export function ProductEditModal({ product, categories, onClose, onDone }: { pro
         <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
           <div style={{ width: 110, height: 110, borderRadius: 12, background: 'var(--soft)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {imageUrl ? (
+              // Upload preview: the src can be an object URL, which next/image
+              // cannot optimise — a plain <img> is the right tool here.
               // eslint-disable-next-line @next/next/no-img-element
               <img src={imageUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
@@ -136,11 +162,34 @@ export function ProductEditModal({ product, categories, onClose, onDone }: { pro
             <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> En vente
           </label>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)' }}>
-            <input type="checkbox" checked={inStock} onChange={(e) => setInStock(e.target.checked)} /> En stock
+            <input type="checkbox" checked={inStock} onChange={(e) => setInStock(e.target.checked)} /> En stock (toutes agences)
           </label>
         </div>
 
-        {error && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 14 }}>{error}</div>}
+        {branches.length > 1 && (
+          <div style={{ marginTop: 14, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+            <div style={label}>Stock par agence</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+              {branches.map((b) => {
+                const on = branchStock[b.id] ?? inStock;
+                return (
+                  <label key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)' }}>
+                    <span>{b.name.replace(/ —.*$/, '')}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, color: on ? '#2f9e6f' : '#d24b4b', fontWeight: 600 }}>
+                      {on ? 'En stock' : 'Rupture'}
+                      <input type="checkbox" checked={on} onChange={(e) => toggleBranchStock(b.id, e.target.checked)} />
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            <p style={{ fontFamily: 'var(--ui-font)', fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+              Remplace la disponibilité globale pour chaque agence.
+            </p>
+          </div>
+        )}
+
+        {error &&<div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 14 }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
           <button onClick={onClose} disabled={busy} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 10, padding: '12px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)', background: '#fff' }}>Annuler</button>

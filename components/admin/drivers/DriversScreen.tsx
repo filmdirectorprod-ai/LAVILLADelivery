@@ -15,6 +15,7 @@ import type { Driver } from '@/lib/types';
 import { DriverCard } from './DriverCard';
 import { DriverAccountModal } from './DriverAccountModal';
 import { DriverEditModal } from './DriverEditModal';
+import { useRealtime } from '@/lib/use-realtime';
 
 type RawOrder = { id: string; status: string; delivery_fee_dh: number };
 type AccountModal = { mode: 'new' } | { mode: 'link'; driver: { id: string; name: string } };
@@ -41,7 +42,7 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    const since = startOfTodayISO(); // shared UTC boundary — matches the server paint
+    const since = startOfTodayISO(); // agency-midnight boundary — matches the server paint
     const [driversRes, ordersRes, trackingRes, activeRes] = await Promise.all([
       supabase.from('drivers').select('*').order('name'),
       supabase
@@ -62,21 +63,15 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
     );
   }, []);
 
+  // One refetch per burst instead of three: a status change touches orders,
+  // order_tracking and drivers within milliseconds of each other.
+  useRealtime('admin-drivers', [{ table: 'drivers' }, { table: 'order_tracking' }, { table: 'orders' }], refetch);
+
+  // Periodic refetch so a driver whose heartbeat went stale flips to offline
+  // even without a new DB event (lib/admin-presence applies the freshness TTL).
   useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-drivers')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_tracking' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refetch)
-      .subscribe();
-    // Periodic refetch so a driver whose heartbeat went stale flips to offline
-    // even without a new DB event (lib/admin-presence applies the freshness TTL).
     const tick = setInterval(refetch, 60_000);
-    return () => {
-      clearInterval(tick);
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(tick);
   }, [refetch]);
 
   const onlineCount = useMemo(() => rows.filter((r) => isDriverOnline(r.driver)).length, [rows]);

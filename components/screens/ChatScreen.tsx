@@ -92,7 +92,7 @@ export function ChatScreen({ order, driver, initialMessages }: ChatScreenProps) 
         >
           <Icon name="left" size={20} color="var(--ink)" />
         </button>
-        <PhotoSlot label={driver?.name ?? 'livreur'} src={driver?.avatar_url} style={{ width: 42, height: 42, borderRadius: 999, flexShrink: 0 }} dim />
+        <PhotoSlot label={driver?.name ?? 'livreur'} src={driver?.avatar_url} style={{ width: 42, height: 42, borderRadius: 999, flexShrink: 0 }} sizes="42px" dim />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
             {driver?.name ?? 'Votre livreur'}

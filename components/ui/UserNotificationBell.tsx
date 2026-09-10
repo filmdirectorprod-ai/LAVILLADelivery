@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/ui/Icon';
+import { isKindVisibleTo, type NotifAudience } from '@/lib/notifications';
 import type { Notification } from '@/lib/types';
 
 function relative(iso: string): string {
@@ -19,7 +20,7 @@ function relative(iso: string): string {
   return `il y a ${Math.floor(h / 24)} j`;
 }
 
-export function UserNotificationBell({ color = 'var(--ink)' }: { color?: string }) {
+export function UserNotificationBell({ color = 'var(--ink)', audience = 'client' }: { color?: string; audience?: NotifAudience }) {
   const [items, setItems] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
@@ -62,10 +63,12 @@ export function UserNotificationBell({ color = 'var(--ink)' }: { color?: string 
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(20);
-    const list = (data ?? []) as Notification[];
+    // Hide kinds that don't belong on this surface (e.g. gérant↔livreur support
+    // threads must never appear in the customer app).
+    const list = (data ?? []).filter((n) => isKindVisibleTo((n as Notification).kind, audience)) as Notification[];
     setItems(list);
     setUnread(list.filter((n) => !n.read).length);
-  }, []);
+  }, [audience]);
 
   useEffect(() => {
     load();
@@ -83,6 +86,7 @@ export function UserNotificationBell({ color = 'var(--ink)' }: { color?: string 
           { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
           (payload) => {
             const n = payload.new as Notification;
+            if (!isKindVisibleTo(n.kind, audience)) return; // not for this surface
             setItems((prev) => [n, ...prev].slice(0, 20));
             if (!openRef.current) setUnread((u) => u + 1);
             beep();
@@ -93,7 +97,7 @@ export function UserNotificationBell({ color = 'var(--ink)' }: { color?: string 
     return () => {
       if (channel) supabase.removeChannel(channel);
     };
-  }, [load, beep]);
+  }, [load, beep, audience]);
 
   async function toggle() {
     if (!audioRef.current) {

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import { Btn } from '@/components/ui/Btn';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
+import Image from 'next/image';
 
 const SLIDES = [
   {
@@ -54,10 +55,12 @@ export default function OnboardingPage() {
           boxShadow: '0 8px 20px -12px rgba(0,0,0,0.5)',
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src="/brand/logo-client.png"
           alt="La Villa — Maison de Qualité, depuis 2007"
+          width={140}
+          height={71}
+          priority
           style={{ width: 140, height: 'auto', display: 'block' }}
         />
       </div>

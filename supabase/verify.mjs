@@ -1,7 +1,7 @@
 // La Villa — backend verification harness.
 //
 // Boots a real PostgreSQL in userspace (no Docker, no admin) via the
-// `embedded-postgres` package, applies the migrations, and asserts the
+// `embedded-postgres` package, applies EVERY migration, and asserts the
 // server-authoritative security + pricing behaviour that `tsc`/`next build`
 // cannot reach. Run it before provisioning a real Supabase project, or in CI,
 // to catch SQL/RLS/RPC regressions.
@@ -9,21 +9,31 @@
 // Usage (the binary is heavy + dev-only, so it is intentionally NOT a
 // package.json dependency — install it on demand):
 //
-//   npm i embedded-postgres --no-save && node supabase/verify.mjs
+//   npm i embedded-postgres --no-save && npm run verify
 //
 // Notes:
-//   • Skips 0005 (pg_cron + the supabase_realtime publication are Supabase-only).
-//   • Shims the auth schema/roles/auth.uid() that Supabase normally provides,
-//     so auth.uid() reads the request.jwt.claim.sub GUC we set per "user".
+//   • Applies all 52 migrations. It used to stop at 0006, which left ~90% of the
+//     schema untested — nothing of branches, promotions, loyalty or referrals.
+//   • Shims what Supabase provides and a bare Postgres does not: the auth schema
+//     and auth.uid(), the storage schema, the supabase_realtime publication, and
+//     cron.schedule / net.http_post. The two `create extension` lines for
+//     pg_cron and pg_net are commented out as the files are read — the shims
+//     above already stand in for what those extensions do here.
 import EmbeddedPostgres from 'embedded-postgres';
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 const HERE = import.meta.dirname;
 const DIR = join(HERE, '.verify-pgdata');
 rmSync(DIR, { recursive: true, force: true });
 
-const read = (f) => readFileSync(join(HERE, 'migrations', f), 'utf8');
+// pg_cron and pg_net do not exist here; the shim provides the two functions the
+// migrations actually call, so only the CREATE EXTENSION lines need removing.
+const SUPABASE_ONLY_EXTENSION = /^\s*create extension[^;]*\b(pg_cron|pg_net)\b[^;]*;/gim;
+const read = (f) =>
+  readFileSync(join(HERE, 'migrations', f), 'utf8').replace(SUPABASE_ONLY_EXTENSION, '-- (extension shimmed)');
+const migrations = () =>
+  readdirSync(join(HERE, 'migrations')).filter((f) => f.endsWith('.sql')).sort();
 const seed = readFileSync(join(HERE, 'seed.sql'), 'utf8');
 
 let pass = 0, fail = 0;
@@ -48,6 +58,41 @@ create or replace function auth.uid() returns uuid language sql stable as $$
 $$;
 grant usage on schema public to anon, authenticated, service_role;
 grant usage on schema auth to anon, authenticated, service_role;
+
+-- ── Stand-ins for the Supabase services a bare Postgres lacks ────────────────
+-- Storage : le schéma, les deux tables et le helper que les politiques utilisent.
+create schema if not exists storage;
+create table if not exists storage.buckets (
+  id text primary key, name text not null, public boolean not null default false
+);
+create table if not exists storage.objects (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text references storage.buckets(id),
+  name text not null,
+  owner uuid
+);
+alter table storage.objects enable row level security;
+create or replace function storage.foldername(name text) returns text[]
+  language sql immutable as $$ select string_to_array(name, '/') $$;
+grant usage on schema storage to anon, authenticated, service_role;
+
+-- Realtime : une vraie publication, pour qu'« alter publication … add table » passe.
+do $$ begin
+  if not exists (select from pg_publication where pubname = 'supabase_realtime') then
+    create publication supabase_realtime;
+  end if;
+end $$;
+
+-- pg_cron : seul cron.schedule() est appelé (migration 0005).
+create schema if not exists cron;
+create or replace function cron.schedule(job_name text, schedule text, command text)
+  returns bigint language sql as $$ select 1::bigint $$;
+
+-- pg_net : seul net.http_post() est appelé (migration 0030, notifications push).
+create schema if not exists net;
+create or replace function net.http_post(url text, body jsonb default '{}'::jsonb, params jsonb default '{}'::jsonb, headers jsonb default '{}'::jsonb, timeout_milliseconds int default 5000)
+  returns bigint language sql as $$ select 1::bigint $$;
+grant usage on schema cron, net to service_role;
 `;
 
 // Base table grants Supabase provides by default — but NOT a blanket update on
@@ -87,20 +132,24 @@ const c = pg.getPgClient();
 await c.connect();
 
 try {
-  console.log('\n[apply] shim + migrations 0001-0004, 0006 + seed');
+  const files = migrations();
+  console.log(`\n[apply] shim + ${files.length} migrations + seed`);
   await c.query(SHIM);
-  for (const f of ['0001_core_schema.sql', '0002_rls.sql', '0003_profile_trigger.sql', '0004_place_order.sql', '0006_submit_review.sql']) {
-    await c.query(read(f));
-    console.log(`  applied ${f}`);
+  for (const f of files) {
+    try { await c.query(read(f)); }
+    catch (e) { bad(`${f} failed to apply — ${(e.message || '').split('\n')[0]}`); throw e; }
   }
+  ok(`all ${files.length} migrations executed without error`);
   await c.query(seed);
   await c.query(GRANTS);
-  ok('all migrations + seed executed without error');
+  ok('seed executed without error');
 
   const A = (await c.query(`insert into auth.users (raw_user_meta_data) values ('{"full_name":"Alice"}') returning id`)).rows[0].id;
   const B = (await c.query(`insert into auth.users (raw_user_meta_data) values ('{"full_name":"Bob"}') returning id`)).rows[0].id;
   const pA = (await c.query('select full_name, loyalty_points, loyalty_tier from profiles where id=$1', [A])).rows[0];
-  if (pA && pA.full_name === 'Alice' && pA.loyalty_points === 0 && pA.loyalty_tier === 'Gourmand') ok('handle_new_user trigger provisioned profile from metadata');
+  // 0047 grants a 10-point welcome bonus on signup — this used to expect 0,
+  // because the harness stopped applying migrations at 0006.
+  if (pA && pA.full_name === 'Alice' && pA.loyalty_points === 10 && pA.loyalty_tier === 'Gourmand') ok('handle_new_user provisioned the profile + 10-pt welcome bonus (0047)');
   else bad(`profile provisioning wrong: ${JSON.stringify(pA)}`);
 
   const fraisier = (await c.query(`select id from products where slug='p-fraisier'`)).rows[0];
@@ -130,16 +179,72 @@ try {
   else bad(`pricing mismatch: ${JSON.stringify(o)}`);
 
   const bal = (await c.query('select loyalty_points from profiles where id=$1', [A])).rows[0].loyalty_points;
-  if (bal === 76) ok('loyalty balance credited via RPC (76)'); else bad(`balance wrong: ${bal}`);
+  if (bal === 86) ok('loyalty balance credited via RPC (10 welcome + 76 earned = 86)'); else bad(`balance wrong: ${bal}`);
 
   await c.query(`update orders set status='delivered' where id=$1`, [oid]);
   const newBal = (await asUser(c, A, () => c.query(`select submit_review($1,$2,5,'{Goût}','Top',null) as b`, [A, oid]))).rows[0].b;
-  if (newBal === 126) ok('submit_review awarded +50 (76 → 126)'); else bad(`review balance wrong: ${newBal}`);
+  if (newBal === 136) ok('submit_review awarded +50 (86 → 136)'); else bad(`review balance wrong: ${newBal}`);
 
   await expectThrow('submit_review rejects a forged p_user',
     () => asUser(c, A, () => c.query(`select submit_review($1,$2,5,'{}','x',null)`, [B, oid])), 'forbidden');
   await expectThrow('second review on the same order is rejected (unique order_id)',
     () => asUser(c, A, () => c.query(`select submit_review($1,$2,4,'{}','again',null)`, [A, oid])), 'duplicate key');
+
+  // ── Admin aggregates (0051) + the business-day boundary (0052) ─────────────
+  // None of this surface was covered while the harness stopped at 0006.
+  const S = (await c.query(`insert into auth.users (raw_user_meta_data) values ('{"full_name":"Gérante"}') returning id`)).rows[0].id;
+  await c.query(`update profiles set is_staff = true where id = $1`, [S]);
+
+  // A customer (Bob) with two delivered orders, so the CRM has something to group.
+  for (const qty of [1, 2]) {
+    const id = (await asUser(c, B, () => c.query(
+      `select place_order($1, $2::jsonb, 'retrait', null, null, false, 0, 0) as id`,
+      [B, JSON.stringify([{ product_id: tajine.id, qty }])]))).rows[0].id;
+    await c.query(`update orders set status='delivered' where id=$1`, [id]);
+  }
+
+  const crm = (await asUser(c, S, () => c.query('select * from admin_customer_rows(50)'))).rows;
+  const bobRow = crm.find((r) => r.id === B);
+  if (bobRow && bobRow.orders === 2 && Number(bobRow.spend) > 0) ok(`admin_customer_rows aggregates per customer (Bob: ${bobRow.orders} orders, ${bobRow.spend} DH)`);
+  else bad(`admin_customer_rows wrong: ${JSON.stringify(bobRow)}`);
+  if (crm.every((r) => ['VIP', 'Régulier', 'Nouveau'].includes(r.segment))) ok('admin_customer_rows segments every row');
+  else bad(`unexpected segment: ${JSON.stringify(crm.map((r) => r.segment))}`);
+
+  const hist = (await asUser(c, S, () => c.query('select * from admin_customer_orders($1, 10)', [B]))).rows;
+  if (hist.length === 2) ok('admin_customer_orders returns that customer’s history only');
+  else bad(`admin_customer_orders returned ${hist.length} rows, expected 2`);
+
+  // A non-staff caller must get nothing back — the RPCs are SECURITY DEFINER, so
+  // this is the only thing standing between a customer and the whole CRM.
+  const leak = (await asUser(c, A, () => c.query('select * from admin_customer_rows(50)'))).rows;
+  if (leak.length === 0) ok('admin_customer_rows returns nothing to a non-staff caller');
+  else bad(`LEAK: a customer read ${leak.length} CRM rows`);
+  const leak2 = (await asUser(c, A, () => c.query('select * from admin_customer_orders($1, 10)', [B]))).rows;
+  if (leak2.length === 0) ok('admin_customer_orders returns nothing to a non-staff caller');
+  else bad(`LEAK: a customer read ${leak2.length} orders of another customer`);
+
+  // The day boundary: 23:30 UTC is already 00:30 the NEXT day in Fès (UTC+1).
+  // Grouping in UTC — what 0051 did, mirroring the old client-side slicing —
+  // filed such an order under the previous day. 0052 groups in Africa/Casablanca.
+  await c.query(`update orders set placed_at = timestamptz '2026-06-11 23:30:00+00' where user_id = $1`, [B]);
+  const snap = (await asUser(c, S, () => c.query(
+    `select admin_stats_snapshot(timestamptz '2026-06-01', timestamptz '2026-06-30', timestamptz '2026-05-01') as s`))).rows[0].s;
+  const days = (snap.series ?? []).map((d) => d.day);
+  if (days.includes('2026-06-12') && !days.includes('2026-06-11'))
+    ok('admin_stats_snapshot cuts the day at midnight in Fès, not UTC (0052)');
+  else bad(`day bucketing wrong: ${JSON.stringify(days)}`);
+  if (snap.kpis && snap.kpis.orders === 2 && Number(snap.kpis.revenue) > 0)
+    ok(`admin_stats_snapshot KPIs (${snap.kpis.orders} orders, ${snap.kpis.revenue} DH, avg ${snap.kpis.avgBasket})`);
+  else bad(`KPIs wrong: ${JSON.stringify(snap.kpis)}`);
+  if (Array.isArray(snap.top) && snap.top.length > 0 && snap.top[0].name)
+    ok(`admin_stats_snapshot ranks top products (#1 ${snap.top[0].name} ×${snap.top[0].qty})`);
+  else bad(`top products wrong: ${JSON.stringify(snap.top)}`);
+
+  const emptySnap = (await asUser(c, A, () => c.query(
+    `select admin_stats_snapshot(timestamptz '2026-06-01', timestamptz '2026-06-30', timestamptz '2026-05-01') as s`))).rows[0].s;
+  if (emptySnap.kpis.orders === 0 && Number(emptySnap.kpis.revenue) === 0)
+    ok('admin_stats_snapshot reports nothing to a non-staff caller');
+  else bad(`LEAK: a customer read stats ${JSON.stringify(emptySnap.kpis)}`);
 
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
 } catch (e) {

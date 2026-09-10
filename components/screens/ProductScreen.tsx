@@ -61,7 +61,7 @@ export function ProductScreen({ product: p }: ProductScreenProps) {
       <div style={{ flex: 1, overflow: 'auto' }}>
         {/* Photo header */}
         <div style={{ position: 'relative' }}>
-          <PhotoSlot label={p.photo_label ?? p.name} src={p.image_url} style={{ height: 320 }} />
+          <PhotoSlot label={p.photo_label ?? p.name} src={p.image_url} style={{ height: 320 }} sizes="100vw" priority />
           <button
             onClick={() => router.back()}
             style={{

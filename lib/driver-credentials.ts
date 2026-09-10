@@ -7,6 +7,14 @@
 /** Technical email domain backing every driver identifiant. */
 export const LIVREUR_EMAIL_DOMAIN = 'livreur.lavilla.ma';
 
+/** Technical email domain backing every branch-manager (gérant) identifiant. */
+export const GERANT_EMAIL_DOMAIN = 'gerant.lavilla.ma';
+
+/** Build the technical auth email for an admin-chosen gérant identifiant. */
+export function gerantIdentifiantToEmail(raw: string | null | undefined): string {
+  return `${normalizeIdentifiant(raw)}@${GERANT_EMAIL_DOMAIN}`;
+}
+
 /** Lowercase + trim an identifiant to its canonical form. */
 export function normalizeIdentifiant(raw: string | null | undefined): string {
   return (raw ?? '').trim().toLowerCase();

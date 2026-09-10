@@ -5,14 +5,14 @@
 // pattern used by DriverRequestsScreen. All derived numbers come from
 // lib/admin-overview.ts so server and client agree.
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import { isInProgressOrderStatus } from '@/lib/order-status';
 import {
   bucketOrdersByHour,
   computeOverviewKpis,
-  latestDriverPositions,
+  driversToPositions,
   startOfTodayISO,
 } from '@/lib/admin-overview';
 import type { AdminOverviewData } from '@/lib/queries';
@@ -20,8 +20,15 @@ import type { Order } from '@/lib/types';
 import { KpiCard } from './KpiCard';
 import { HourlyChart } from './HourlyChart';
 import { InProgressTable, type InProgressRow } from './InProgressTable';
-import { LiveDriverMap } from './LiveDriverMap';
+
 import { BranchesInfo } from '@/components/ui/BranchesInfo';
+import { useRealtime } from '@/lib/use-realtime';
+import dynamic from 'next/dynamic';
+
+// Loaded on demand — the admin overview renders long before the map matters.
+const LiveDriverMap = dynamic(() => import('./LiveDriverMap').then((m) => m.LiveDriverMap), {
+  ssr: false,
+});
 
 export function OverviewScreen({
   initial,
@@ -34,9 +41,9 @@ export function OverviewScreen({
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    const since = startOfTodayISO(); // shared UTC boundary — matches the server paint
+    const since = startOfTodayISO(); // agency-midnight boundary — matches the server paint
     const [ordersRes, driversRes, reviewsRes, trackingRes] = await Promise.all([
-      supabase.from('orders').select('*').gte('placed_at', since).order('placed_at', { ascending: false }),
+      supabase.from('orders').select('*').gte('placed_at', since).order('placed_at', { ascending: false }).limit(500),
       supabase.from('drivers').select('*'),
       supabase.from('reviews').select('rating'),
       supabase
@@ -53,29 +60,18 @@ export function OverviewScreen({
     });
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-overview')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_tracking' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, refetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  // The overview aggregates four tables; without the debounce every driver GPS
+  // fix (one per 5 s per driver) re-pulled all four.
+  useRealtime('admin-overview', [{ table: 'orders' }, { table: 'order_tracking' }, { table: 'drivers' }, { table: 'reviews' }], refetch);
 
   const kpis = useMemo(
     () => computeOverviewKpis({ orders: data.orders, drivers: data.drivers, ratings: data.ratings }),
     [data],
   );
   const buckets = useMemo(() => bucketOrdersByHour(data.orders), [data.orders]);
-  const positions = useMemo(
-    () => latestDriverPositions(data.drivers, data.tracking),
-    [data.drivers, data.tracking],
-  );
+  // Every online driver with a fresh GPS fix (streamed while online, not only
+  // during a delivery). 0049.
+  const positions = useMemo(() => driversToPositions(data.drivers), [data.drivers]);
 
   const inProgressRows: InProgressRow[] = useMemo(() => {
     const driverNameById = (id: string | null) =>

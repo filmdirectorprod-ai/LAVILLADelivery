@@ -6,6 +6,7 @@
 // call this so first paint and realtime refetch produce identical shapes.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildKitchenBoard, type KitchenBoard } from '@/lib/kitchen';
+import { fetchAllIn } from '@/lib/fetch-in-chunks';
 import type { Order, OrderItem, Universe } from '@/lib/types';
 
 /** Statuses shown on the Cuisine board (confirmed work only). */
@@ -19,16 +20,16 @@ export async function loadKitchenBoard(
     .from('orders')
     .select('*')
     .in('status', KITCHEN_STATUSES as unknown as string[])
-    .order('placed_at', { ascending: true });
+    .order('placed_at', { ascending: true })
+    .limit(200);
   const orders = (ordersData ?? []) as Order[];
 
   const orderIds = orders.map((o) => o.id);
   const userIds = Array.from(new Set(orders.map((o) => o.user_id)));
 
   const [itemsRes, productsRes, profilesRes] = await Promise.all([
-    orderIds.length
-      ? supabase.from('order_items').select('*').in('order_id', orderIds)
-      : Promise.resolve({ data: [] as OrderItem[] }),
+    // Chunked so a busy service cannot silently lose line items to the row cap.
+    fetchAllIn<OrderItem>(supabase, 'order_items', '*', 'order_id', orderIds),
     supabase.from('products').select('id, universe'),
     userIds.length
       ? supabase.from('profiles').select('id, full_name').in('id', userIds)
@@ -36,7 +37,7 @@ export async function loadKitchenBoard(
   ]);
 
   const itemsByOrder = new Map<string, OrderItem[]>();
-  for (const it of (itemsRes.data ?? []) as OrderItem[]) {
+  for (const it of itemsRes) {
     const cur = itemsByOrder.get(it.order_id);
     if (cur) cur.push(it);
     else itemsByOrder.set(it.order_id, [it]);

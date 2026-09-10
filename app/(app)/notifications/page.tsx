@@ -6,5 +6,5 @@ import { NotificationsScreen } from '@/components/screens/NotificationsScreen';
 
 export default async function NotificationsPage() {
   const [notifications, profile] = await Promise.all([getMyNotifications(), getMyProfile()]);
-  return <NotificationsScreen notifications={notifications} settings={profile?.settings ?? null} />;
+  return <NotificationsScreen notifications={notifications} settings={profile?.settings ?? null} userId={profile?.id ?? null} />;
 }

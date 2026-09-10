@@ -4,6 +4,8 @@
 // enforces), and reports a validated draft + id (null = create) via onSave.
 'use client';
 import { useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { useBranches } from '@/lib/use-branches';
 import { validateZoneDraft, type ZoneDraft } from '@/lib/admin-zones';
 import type { Zone } from '@/lib/types';
 
@@ -31,6 +33,16 @@ export function ZoneEditor({ zone, busy, onSave, onCancel }: ZoneEditorProps) {
   const [fee, setFee] = useState(String(zone?.fee_dh ?? ''));
   const [etaMin, setEtaMin] = useState(String(zone?.eta_min ?? ''));
   const [etaMax, setEtaMax] = useState(String(zone?.eta_max ?? ''));
+  const [branchId, setBranchId] = useState(zone?.branch_id ?? '');
+  const branches = useBranches();
+
+  // Branch assignment is applied immediately (separate from the zone draft save).
+  async function changeBranch(next: string) {
+    setBranchId(next);
+    if (zone?.id && next) {
+      await createClient().rpc('admin_set_zone_branch', { p_zone: zone.id, p_branch: next });
+    }
+  }
 
   const draft: ZoneDraft = {
     name,
@@ -63,6 +75,17 @@ export function ZoneEditor({ zone, busy, onSave, onCancel }: ZoneEditorProps) {
           <input style={field} type="number" min={0} value={etaMax} disabled={busy} onChange={(e) => setEtaMax(e.target.value)} />
         </label>
       </div>
+      {zone && (
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 5, maxWidth: 260 }}>
+          <span style={labelStyle}>Agence qui livre cette zone</span>
+          <select style={{ ...field, cursor: 'pointer' }} value={branchId} disabled={busy} onChange={(e) => changeBranch(e.target.value)}>
+            {branches.length === 0 && <option value="">—</option>}
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </label>
+      )}
       {!validation.ok && (
         <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#c0392b' }}>{validation.error}</div>
       )}

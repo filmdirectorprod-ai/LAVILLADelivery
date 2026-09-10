@@ -5,7 +5,7 @@
 // the rating filter/distribution come from lib/admin-reviews.ts so server and
 // client agree.
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/ui/Icon';
 import {
@@ -17,6 +17,7 @@ import {
 import type { AdminReviewsData } from '@/lib/queries';
 import type { Review } from '@/lib/types';
 import { ReviewCard } from './ReviewCard';
+import { useRealtime } from '@/lib/use-realtime';
 
 export function ReviewsScreen({ initial }: { initial: AdminReviewsData }) {
   const [rows, setRows] = useState<AdminReviewsData['rows']>(initial.rows);
@@ -27,7 +28,8 @@ export function ReviewsScreen({ initial }: { initial: AdminReviewsData }) {
     const { data: reviews } = await supabase
       .from('reviews')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
     const list = (reviews ?? []) as Review[];
     const [profilesRes, ordersRes, trackingRes, driversRes] = await Promise.all([
       supabase.from('profiles').select('id, full_name'),
@@ -46,16 +48,7 @@ export function ReviewsScreen({ initial }: { initial: AdminReviewsData }) {
     );
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel('admin-reviews')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, refetch)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
+  useRealtime('admin-reviews', [{ table: 'reviews' }], refetch);
 
   const allReviews = useMemo(() => rows.map((r) => r.review), [rows]);
   const distribution = useMemo(() => ratingDistribution(allReviews), [allReviews]);

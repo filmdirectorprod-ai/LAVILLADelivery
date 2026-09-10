@@ -16,7 +16,14 @@ import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import { Badge } from '@/components/ui/Badge';
-import { GoogleDeliveryMap } from '@/components/ui/GoogleDeliveryMap';
+import dynamic from 'next/dynamic';
+
+// Loaded on demand: the Maps SDK should not sit in the bundle of every screen
+// that merely imports this one. ssr:false — it needs window.
+const GoogleDeliveryMap = dynamic(
+  () => import('@/components/ui/GoogleDeliveryMap').then((m) => m.GoogleDeliveryMap),
+  { ssr: false },
+);
 
 // Real map renders only when a browser Maps key is configured; otherwise the
 // built-in SVG map is used (graceful fallback, no key required).
@@ -217,7 +224,7 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
 
         {/* driver card */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 13, background: 'var(--soft)', borderRadius: 18, padding: 13, marginTop: 16 }}>
-          <PhotoSlot label={driver?.name ?? 'livreur'} src={driver?.avatar_url} style={{ width: 52, height: 52, borderRadius: 999 }} dim />
+          <PhotoSlot label={driver?.name ?? 'livreur'} src={driver?.avatar_url} style={{ width: 52, height: 52, borderRadius: 999 }} sizes="52px" dim />
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
               {driver?.name ?? "Recherche d'un livreur…"}
@@ -233,8 +240,9 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
               )}
             </div>
           </div>
-          <button
-            onClick={() => router.push(`/call/${order.id}`)}
+          <a
+            href={driver?.phone ? `tel:${driver.phone.replace(/[^0-9+]/g, '')}` : `/call/${order.id}`}
+            aria-label="Appeler le livreur"
             style={{
               width: 44,
               height: 44,
@@ -246,10 +254,11 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 6px 14px -6px var(--brand)',
+              textDecoration: 'none',
             }}
           >
             <Icon name="phone" size={20} color="#fff" fill />
-          </button>
+          </a>
           <button
             onClick={() => router.push(`/chat/${order.id}`)}
             style={{

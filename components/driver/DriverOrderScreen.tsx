@@ -13,9 +13,17 @@ import { formatDH } from '@/lib/format';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { Btn } from '@/components/ui/Btn';
-import { GoogleDeliveryMap } from '@/components/ui/GoogleDeliveryMap';
+
 import type { OrderDetail, DriverContact } from '@/lib/queries';
 import type { OrderTracking } from '@/lib/types';
+import dynamic from 'next/dynamic';
+
+// The Maps SDK (~200 kB) is only needed once a delivery is on screen — load it
+// on demand rather than in every driver bundle. ssr:false: it touches window.
+const GoogleDeliveryMap = dynamic(
+  () => import('@/components/ui/GoogleDeliveryMap').then((m) => m.GoogleDeliveryMap),
+  { ssr: false },
+);
 
 // Real Fès map renders when a browser Maps key is configured; otherwise a
 // neutral placeholder keeps the layout intact (no key required to build).
