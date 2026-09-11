@@ -1,12 +1,12 @@
 'use client';
-// Driver "Demandes" — the dedicated available-orders pool (mockup 4). Lists the
-// unclaimed orders any driver can take, with two sort modes (most recent / best
-// paid), an "Accepter" action (driver_accept_order RPC, 0008) and a local
-// "Refuser" that just hides the card for this session.
+// Demandes — le vivier des courses non prises, dans la langue de l'admin :
+// chiffres en tête, pastilles de tri, cartes de verre. « Accepter » passe par
+// driver_accept_order (0008) ; « Refuser » masque la carte pour cette session.
 //
-// The driver earns the delivery fee (delivery_fee_dh). There's no per-order
-// distance or duration in the schema, so — unlike the mockup — we don't fake
-// "3.2 km / ~28 min"; we surface the real money (gain + order total) instead.
+// Le livreur gagne les frais de livraison. Le schéma ne stocke ni distance ni
+// durée par course : on n'invente donc pas « 3,2 km / ~28 min », on montre
+// l'argent réel (gain + total) et, depuis 0054, le créneau demandé et ce qu'il
+// faudra encaisser.
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -14,11 +14,11 @@ import { useToast } from '@/lib/toast-store';
 import { formatDH } from '@/lib/format';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
-import { Btn } from '@/components/ui/Btn';
-import { Badge } from '@/components/ui/Badge';
+import { slotShortLabel } from '@/lib/checkout-slots';
 import { useRealtime } from '@/lib/use-realtime';
 import type { Order, OrderTracking } from '@/lib/types';
 import type { DriverOrder } from '@/lib/queries';
+import { EmptyLine, Figure, GhostAction, Panel, Pill, PrimaryAction, text } from '@/components/driver/ui/DriverUI';
 
 type SortMode = 'recent' | 'pay';
 
@@ -34,6 +34,7 @@ function mapBoard(rows: unknown[]): DriverOrder[] {
 
 function timeAgo(iso: string): string {
   const mins = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  if (Number.isNaN(mins)) return '';
   if (mins < 1) return 'À l’instant';
   if (mins < 60) return `Il y a ${mins} min`;
   const h = Math.floor(mins / 60);
@@ -50,17 +51,14 @@ export function DriverRequestsScreen({ initialBoard, branchId }: { initialBoard:
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    let q = supabase
-      .from('orders')
-      .select('*, order_tracking(*)')
-      .in('status', DRIVER_POOL_STATUSES);
-    if (branchId) q = q.eq('branch_id', branchId); // only this driver's agency
+    let q = supabase.from('orders').select('*, order_tracking(*)').in('status', DRIVER_POOL_STATUSES);
+    if (branchId) q = q.eq('branch_id', branchId); // seulement l'agence du livreur
     const { data } = await q.order('placed_at', { ascending: false }).limit(100);
     setBoard(mapBoard(data ?? []));
   }, [branchId]);
 
-  // Only this agency's orders reach this device; the debounce collapses the
-  // order+tracking burst a claim produces into one refetch.
+  // Seules les commandes de cette agence atteignent l'appareil ; l'anti-rebond
+  // ramène la rafale d'une prise de course à un seul rechargement.
   useRealtime(
     'driver-requests',
     [
@@ -79,10 +77,11 @@ export function DriverRequestsScreen({ initialBoard, branchId }: { initialBoard:
     );
   }, [board, dismissed, sort]);
 
+  const gainTotal = available.reduce((n, b) => n + (b.order.delivery_fee_dh ?? 0), 0);
+
   const accept = async (orderId: string) => {
     setBusy(orderId);
-    const supabase = createClient();
-    const { error } = await supabase.rpc('driver_accept_order', { p_order: orderId });
+    const { error } = await createClient().rpc('driver_accept_order', { p_order: orderId });
     setBusy(null);
     if (error) {
       toast('Course déjà prise par un autre livreur.');
@@ -95,25 +94,29 @@ export function DriverRequestsScreen({ initialBoard, branchId }: { initialBoard:
   const refuse = (orderId: string) => setDismissed((prev) => new Set(prev).add(orderId));
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: `${SAFE_TOP + 6}px 16px 14px`, background: 'linear-gradient(150deg, var(--brand), var(--brand-d))' }}>
-        <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 21, color: '#fff', margin: 0 }}>
-          Nouvelles commandes
-        </h1>
-        <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-          {available.length} course{available.length > 1 ? 's' : ''} disponible{available.length > 1 ? 's' : ''} près de vous
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <Chip active={sort === 'recent'} onClick={() => setSort('recent')}>Plus récentes</Chip>
-          <Chip active={sort === 'pay'} onClick={() => setSort('pay')}>Mieux payées</Chip>
-        </div>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+      <div style={{ padding: `${SAFE_TOP + 10}px 16px 0` }}>
+        <h1 style={{ ...text, margin: 0, fontWeight: 600, fontSize: 27, letterSpacing: '-0.02em', color: 'var(--a-text)' }}>Demandes</h1>
+        <p style={{ ...text, fontSize: 13, color: 'var(--a-muted)', margin: '4px 0 0' }}>Courses disponibles dans votre agence.</p>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: `16px 16px ${SAFE_BOTTOM + 16}px` }}>
+      <div style={{ display: 'flex', gap: 24, padding: '18px 16px 0', flexWrap: 'wrap' }}>
+        <Figure label="Courses à prendre" value={String(available.length)} />
+        <Figure label="Gain cumulé" value={formatDH(gainTotal).replace(' DH', '')} unit="DH" />
+      </div>
+
+      <div role="group" aria-label="Trier les courses" style={{ display: 'flex', gap: 8, padding: '18px 16px 0' }}>
+        <SortChip on={sort === 'recent'} onClick={() => setSort('recent')}>
+          Plus récentes
+        </SortChip>
+        <SortChip on={sort === 'pay'} onClick={() => setSort('pay')}>
+          Mieux payées
+        </SortChip>
+      </div>
+
+      <div style={{ padding: `16px 16px ${SAFE_BOTTOM + 16}px`, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {available.length === 0 ? (
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', background: '#fff', border: '1px dashed var(--line)', borderRadius: 18, padding: '26px 16px', textAlign: 'center' }}>
-            Aucune commande à récupérer pour l’instant.
-          </div>
+          <EmptyLine title="Aucune course à récupérer." hint="Les nouvelles commandes prêtes apparaissent ici, en direct." />
         ) : (
           available.map((b) => (
             <RequestCard
@@ -130,20 +133,23 @@ export function DriverRequestsScreen({ initialBoard, branchId }: { initialBoard:
   );
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function SortChip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-pressed={on}
       style={{
-        border: 'none',
+        ...text,
+        border: on ? '1px solid #ffffff' : '1px solid var(--a-glass-line)',
+        background: on ? '#ffffff' : 'transparent',
+        color: on ? 'var(--a-on-white)' : 'var(--ink)',
         borderRadius: 999,
         padding: '9px 16px',
-        cursor: 'pointer',
-        fontFamily: 'var(--ui-font)',
         fontSize: 13.5,
         fontWeight: 600,
-        background: active ? '#fff' : 'rgba(255,255,255,0.16)',
-        color: active ? 'var(--brand-d)' : '#fff',
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
       }}
     >
       {children}
@@ -164,55 +170,49 @@ function RequestCard({
 }) {
   const { order } = data;
   const isDelivery = order.mode === 'livraison';
+  const slot = slotShortLabel(order.slot_at);
+  const cash = (order.payment_method ?? 'cod') === 'cod' ? order.total_dh : 0;
+
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 16, marginBottom: 12, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-          <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>{order.code}</span>
-          <Badge gold>Nouveau</Badge>
+    <Panel>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <span style={{ ...text, fontWeight: 600, fontSize: 16, color: 'var(--ink)' }}>{order.code}</span>
+          <Pill tone="outline">{isDelivery ? 'Livraison' : 'Retrait'}</Pill>
+          {slot && <Pill tone="accent">{slot}</Pill>}
         </div>
-        <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)' }}>{timeAgo(order.placed_at)}</span>
+        <span style={{ ...text, fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{timeAgo(order.placed_at)}</span>
       </div>
 
-      {/* route */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 3 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 999, background: 'var(--brand)' }} />
+      {/* trajet */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4 }}>
+          <span style={{ width: 9, height: 9, borderRadius: 999, background: '#ffffff' }} />
           <span style={{ width: 2, flex: 1, background: 'var(--line)', margin: '3px 0' }} />
-          <span style={{ width: 10, height: 10, borderRadius: 999, background: 'var(--brand-d)' }} />
+          <span style={{ width: 9, height: 9, borderRadius: 999, background: 'var(--a-accent)' }} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>La Villa · boutique</div>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 14.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ ...text, fontSize: 12.5, color: 'var(--muted)', marginBottom: 10 }}>La Villa · boutique</div>
+          <div style={{ ...text, fontSize: 14.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {isDelivery ? order.address ?? 'Adresse de livraison' : 'Retrait en boutique'}
           </div>
         </div>
       </div>
 
-      {/* money */}
-      <div style={{ display: 'flex', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)', margin: '0 0 14px' }}>
-        <Metric label="Gain (livraison)" value={formatDH(order.delivery_fee_dh)} accent />
-        <Metric label="Total commande" value={formatDH(order.total_dh)} />
+      {/* argent */}
+      <div style={{ display: 'flex', gap: 22, borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)', padding: '12px 0', marginBottom: 14 }}>
+        <Figure label="Votre gain" value={formatDH(order.delivery_fee_dh).replace(' DH', '')} unit="DH" />
+        <Figure label={cash > 0 ? 'À encaisser' : 'Total commande'} value={formatDH(order.total_dh).replace(' DH', '')} unit="DH" />
       </div>
 
-      {/* actions */}
       <div style={{ display: 'flex', gap: 10 }}>
-        <Btn variant="ghost" onClick={onRefuse} disabled={busy} style={{ flex: 1 }}>
+        <GhostAction onClick={onRefuse} disabled={busy} style={{ flex: 1 }}>
           Refuser
-        </Btn>
-        <Btn onClick={onAccept} disabled={busy} style={{ flex: 2 }}>
-          {busy ? 'Acceptation…' : `Accepter · ${formatDH(order.total_dh)}`}
-        </Btn>
+        </GhostAction>
+        <PrimaryAction onClick={onAccept} disabled={busy} full={false} style={{ flex: 1.6 }}>
+          {busy ? 'Acceptation…' : 'Accepter'}
+        </PrimaryAction>
       </div>
-    </div>
-  );
-}
-
-function Metric({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div style={{ flex: 1, padding: '12px 0', textAlign: 'center', borderRight: accent ? '1px solid var(--line)' : 'none' }}>
-      <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 16, color: accent ? 'var(--brand)' : 'var(--ink)' }}>{value}</div>
-      <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{label}</div>
-    </div>
+    </Panel>
   );
 }

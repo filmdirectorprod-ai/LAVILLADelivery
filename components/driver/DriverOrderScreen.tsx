@@ -1,8 +1,9 @@
 'use client';
-// Driver order detail + workflow. Quatre responsabilités :
+// La course, dans la langue de l'admin : panneaux de verre sur le fond turquoise
+// foncé. Quatre responsabilités :
 //   1) Montrer la course (articles, adresse, contact client une fois prise).
 //   2) Piloter la livraison via les RPC 0008 :
-//        available → driver_accept_order → 2 (récupérée) → 3 (en route) → 4 (livrée)
+//        disponible → driver_accept_order → 2 (récupérée) → 3 (en route) → 4 (livrée)
 //   3) Diffuser la position réelle du téléphone dans order_tracking, pour la
 //      carte du client.
 //   4) 0054 : ouvrir l'itinéraire, clore la course avec le code du client (ou
@@ -18,21 +19,30 @@ import { directionsUrl } from '@/lib/eta';
 import { slotShortLabel } from '@/lib/checkout-slots';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
-import { Btn } from '@/components/ui/Btn';
-
 import type { OrderDetail, DriverContact } from '@/lib/queries';
 import type { OrderTracking } from '@/lib/types';
 import dynamic from 'next/dynamic';
+import {
+  EmptyLine,
+  FormError,
+  GhostAction,
+  Notice,
+  Panel,
+  Pill,
+  PrimaryAction,
+  SectionTitle,
+  Well,
+  fieldStyle,
+  text,
+} from '@/components/driver/ui/DriverUI';
 
-// The Maps SDK (~200 kB) is only needed once a delivery is on screen — load it
-// on demand rather than in every driver bundle. ssr:false: it touches window.
+// Le SDK Maps (~200 ko) n'est utile qu'une fois la course à l'écran — chargé à
+// la demande. ssr:false : il touche window.
 const GoogleDeliveryMap = dynamic(
   () => import('@/components/ui/GoogleDeliveryMap').then((m) => m.GoogleDeliveryMap),
   { ssr: false },
 );
 
-// Real Fès map renders when a browser Maps key is configured; otherwise a
-// neutral placeholder keeps the layout intact (no key required to build).
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 const STAGE_LABEL: Record<number, string> = {
@@ -43,8 +53,8 @@ const STAGE_LABEL: Record<number, string> = {
   4: 'Livrée',
 };
 
-// The driver-facing course is a 4-step journey. Stages 0/1 (order still being
-// prepared) both map to step 1 "en route vers le restaurant".
+// Côté livreur la course tient en 4 étapes. Les états 0/1 (commande encore en
+// préparation) mènent tous deux à l'étape 1 « en route vers le restaurant ».
 const STEP_PHRASE: Record<number, string> = {
   1: 'En route vers le restaurant',
   2: 'Commande récupérée',
@@ -100,26 +110,23 @@ export function DriverOrderScreen({
   const destination =
     order.dest_lat != null && order.dest_lng != null ? { lat: order.dest_lat, lng: order.dest_lng } : null;
 
-  // Map inputs: follow the driver's own streamed GPS when present, else animate
-  // along the route by progress. Only meaningful for delivery (livraison) orders.
   const prog = tracking?.progress ?? 0;
   const driverPos =
     tracking?.lat != null && tracking?.lng != null ? { lat: tracking.lat, lng: tracking.lng } : null;
   const showMap = isDelivery;
 
-  // Keep optimistic tracking in sync if the server props change (router.refresh).
+  // Garde la position optimiste en phase avec le serveur (router.refresh).
   useEffect(() => {
     setTracking(detail.tracking);
   }, [detail.tracking]);
 
-  // ── Live GPS streaming (only while this driver is actively delivering) ──────
+  // ── Diffusion GPS (seulement pendant une livraison active) ──────────────────
   const pushPosition = useCallback(
     async (lat: number, lng: number) => {
       const now = Date.now();
-      if (now - lastPushRef.current < 4000) return; // throttle to ~1 / 4s
+      if (now - lastPushRef.current < 4000) return; // ~1 envoi / 4 s
       lastPushRef.current = now;
-      const supabase = createClient();
-      await supabase.rpc('driver_update_position', {
+      await createClient().rpc('driver_update_position', {
         p_order: order.id,
         p_lat: lat,
         p_lng: lng,
@@ -130,12 +137,12 @@ export function DriverOrderScreen({
   );
 
   useEffect(() => {
-    const active = mine && !delivered && stage >= 2; // streaming once picked up
+    const active = mine && !delivered && stage >= 2; // diffusion dès la récupération
     if (!active || typeof navigator === 'undefined' || !navigator.geolocation) return;
     const id = navigator.geolocation.watchPosition(
       (pos) => pushPosition(pos.coords.latitude, pos.coords.longitude),
       () => {
-        /* permission denied / unavailable — silent, stage actions still work */
+        /* permission refusée / indisponible — les actions restent utilisables */
       },
       { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 },
     );
@@ -149,8 +156,7 @@ export function DriverOrderScreen({
   // ── Actions ─────────────────────────────────────────────────────────────────
   const accept = async () => {
     setBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase.rpc('driver_accept_order', { p_order: order.id });
+    const { error } = await createClient().rpc('driver_accept_order', { p_order: order.id });
     setBusy(false);
     if (error) {
       toast('Commande déjà prise');
@@ -164,8 +170,7 @@ export function DriverOrderScreen({
 
   const advance = async (next: 2 | 3 | 4, opts?: { code?: string; proof?: string }) => {
     setBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase.rpc('driver_update_status', {
+    const { error } = await createClient().rpc('driver_update_status', {
       p_order: order.id,
       p_stage: next,
       p_code: opts?.code ?? null,
@@ -206,8 +211,7 @@ export function DriverOrderScreen({
 
   const reportIncident = async () => {
     setIncidentBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase.rpc('driver_report_incident', {
+    const { error } = await createClient().rpc('driver_report_incident', {
       p_order: order.id,
       p_kind: incidentKind,
       p_severity: incidentKind === 'accident' ? 'haute' : 'moyenne',
@@ -223,7 +227,7 @@ export function DriverOrderScreen({
     toast('Incident transmis au gérant');
   };
 
-  // Which primary action to show, given the current stage.
+  // L'action principale dépend de l'étape.
   let primary: { label: string; run: () => void } | null = null;
   if (!mine) {
     primary = { label: 'Accepter la commande', run: accept };
@@ -251,28 +255,28 @@ export function DriverOrderScreen({
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <div style={{ padding: `${SAFE_TOP + 4}px 16px 14px`, background: 'linear-gradient(150deg, var(--brand), var(--brand-d))', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={() => router.push('/driver')} aria-label="Retour" style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.16)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon name="left" size={20} color="#fff" />
+      {/* En-tête */}
+      <div style={{ padding: `${SAFE_TOP + 10}px 16px 14px`, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button
+          onClick={() => router.push('/driver')}
+          aria-label="Retour"
+          style={{ width: 42, height: 42, borderRadius: 999, border: '1px solid var(--a-glass-line)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+        >
+          <Icon name="left" size={20} color="var(--a-text)" />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: '#fff', margin: 0 }}>{order.code}</h1>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'rgba(255,255,255,0.72)' }}>
+          <h1 style={{ ...text, margin: 0, fontWeight: 600, fontSize: 22, color: 'var(--a-text)' }}>{order.code}</h1>
+          <div style={{ ...text, fontSize: 12.5, color: 'var(--a-muted)' }}>
             {isDelivery ? 'Livraison' : 'Retrait'} · {STAGE_LABEL[stage] ?? '—'}
             {slot ? ` · ${slot}` : ''}
           </div>
         </div>
-        {mine && stage >= 2 && !delivered && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'var(--ui-font)', fontSize: 11, fontWeight: 600, color: '#fff', background: 'rgba(105,224,160,0.25)', borderRadius: 999, padding: '5px 10px' }}>
-            <span className="lv-livedot" style={{ width: 6, height: 6, borderRadius: 999, background: '#69e0a0' }} /> GPS
-          </span>
-        )}
+        {mine && stage >= 2 && !delivered && <Pill tone="solid">GPS actif</Pill>}
       </div>
 
-      {/* Live map (delivery orders) */}
+      {/* Carte en direct (livraisons) */}
       {showMap && (
-        <div style={{ position: 'relative', height: 230, flexShrink: 0, background: '#eaf0f0', overflow: 'hidden' }}>
+        <div style={{ position: 'relative', height: 210, flexShrink: 0, margin: '0 16px', borderRadius: 20, overflow: 'hidden', border: '1px solid var(--a-glass-line)' }}>
           {MAPS_KEY ? (
             <GoogleDeliveryMap
               apiKey={MAPS_KEY}
@@ -282,159 +286,158 @@ export function DriverOrderScreen({
               driverPos={driverPos}
             />
           ) : (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, color: 'var(--muted)' }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, background: 'var(--a-card)' }}>
               <Icon name="pin" size={26} color="var(--muted)" />
-              <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5 }}>Carte indisponible</span>
+              <span style={{ ...text, fontSize: 12.5, color: 'var(--muted)' }}>Carte indisponible</span>
             </div>
           )}
         </div>
       )}
 
-      {/* Body */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflow: 'auto',
-          padding: '16px',
-          ...(showMap
-            ? { marginTop: -18, borderTopLeftRadius: 20, borderTopRightRadius: 20, background: 'var(--bg, #f6f8f8)', position: 'relative', zIndex: 1, boxShadow: '0 -8px 22px -16px rgba(0,0,0,0.35)' }
-            : {}),
-        }}
-      >
-        {/* Step progress */}
+      {/* Corps */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <StepBar isDelivery={isDelivery} step={stepIndex(stage)} />
 
-        {/* Destination / mode + itinéraire */}
-        <Card>
-          <Row icon={isDelivery ? 'pin' : 'store'} label={isDelivery ? 'Adresse de livraison' : 'Retrait en boutique'} value={isDelivery ? order.address ?? '—' : 'La Villa — Av. Hassan II'} />
+        {/* Destination + itinéraire */}
+        <Panel>
+          <Row icon={isDelivery ? 'pin' : 'store'} label={isDelivery ? 'Adresse de livraison' : 'Retrait en boutique'} value={isDelivery ? order.address ?? '—' : 'La Villa — boutique'} />
           {isDelivery && (
             <a
               href={directionsUrl(destination, order.address)}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', background: 'var(--brand)', borderRadius: 999, padding: '12px', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: '#fff' }}
+              style={{ ...text, marginTop: 14, minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', background: '#ffffff', borderRadius: 999, padding: '14px', fontWeight: 600, fontSize: 16, color: 'var(--a-on-white)' }}
             >
-              <Icon name="straight" size={18} color="#fff" /> Itinéraire
+              <Icon name="straight" size={18} color="var(--a-on-white)" /> Itinéraire
             </a>
           )}
-        </Card>
+        </Panel>
 
         {/* Encaissement */}
         {mine && !delivered && cashToCollect > 0 && (
-          <Card>
-            <Row icon="cash" label="À encaisser à la remise" value={`${formatDH(cashToCollect)} en espèces`} />
-          </Card>
+          <Notice icon="cash">{formatDH(cashToCollect)} à encaisser en espèces à la remise.</Notice>
         )}
 
-        {/* Customer contact (only once claimed) */}
+        {/* Contact client (une fois la course prise) */}
         {mine && initialContact && (
-          <Card>
+          <Panel>
             <Row icon="user" label="Client" value={initialContact.full_name || '—'} />
-            <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => router.push(`/driver/chat/${order.id}`)}
-                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: 'none', background: 'var(--soft)', borderRadius: 999, padding: '12px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--brand)' }}
-              >
-                <Icon name="message" size={18} color="var(--brand)" /> Message
-              </button>
+            <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
+              <GhostAction onClick={() => router.push(`/driver/chat/${order.id}`)} full>
+                <Icon name="message" size={18} color="var(--ink)" /> Message
+              </GhostAction>
               {initialContact.phone && (
-                <a href={`tel:${initialContact.phone}`} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', background: 'var(--soft)', borderRadius: 999, padding: '12px', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--brand)' }}>
-                  <Icon name="phone" size={18} color="var(--brand)" /> Appeler
+                <a
+                  href={`tel:${initialContact.phone}`}
+                  style={{ ...text, flex: 1, minHeight: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', border: '1px solid var(--a-glass-line)', borderRadius: 999, padding: '11px 18px', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)' }}
+                >
+                  <Icon name="phone" size={18} color="var(--ink)" /> Appeler
                 </a>
               )}
             </div>
-          </Card>
+          </Panel>
         )}
 
-        {/* Items */}
-        <Card>
-          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)', marginBottom: 10 }}>Articles</div>
+        {/* Articles */}
+        <Panel>
+          <SectionTitle aside={items.length ? `${items.length} ligne${items.length > 1 ? 's' : ''}` : undefined}>Articles</SectionTitle>
           {items.length === 0 ? (
-            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>
+            <div style={{ ...text, fontSize: 13, color: 'var(--muted)' }}>
               {mine ? 'Aucun article.' : 'Acceptez la commande pour voir le détail.'}
             </div>
           ) : (
             items.map((it) => (
-              <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '6px 0', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--ink)' }}>
+              <div key={it.id} style={{ ...text, display: 'flex', justifyContent: 'space-between', gap: 10, padding: '6px 0', fontSize: 14, color: 'var(--ink)' }}>
                 <span style={{ minWidth: 0 }}>
-                  <b style={{ color: 'var(--brand)' }}>{it.qty}×</b> {it.name_snapshot}
+                  <b style={{ fontWeight: 600 }}>{it.qty}×</b> {it.name_snapshot}
                 </span>
                 <span style={{ color: 'var(--muted)', flexShrink: 0 }}>{formatDH(it.price_snapshot * it.qty)}</span>
               </div>
             ))
           )}
-          <div style={{ borderTop: '1px solid var(--line)', marginTop: 10, paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
+          <div style={{ ...text, borderTop: '1px solid var(--line)', marginTop: 10, paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: 16, color: 'var(--ink)' }}>
             <span>Total</span>
             <span>{formatDH(order.total_dh)}</span>
           </div>
-        </Card>
+        </Panel>
 
         {/* Signaler un incident au gérant */}
         {mine && !delivered && (
-          <Card>
+          <Panel>
             {!incidentOpen ? (
-              <button
-                onClick={() => setIncidentOpen(true)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: '1.5px solid var(--gold)', background: '#fff', borderRadius: 999, padding: '12px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--gold)' }}
-              >
-                <Icon name="info" size={18} color="var(--gold)" /> Signaler un problème
-              </button>
+              <GhostAction onClick={() => setIncidentOpen(true)} full style={{ color: 'var(--a-accent)', borderColor: 'var(--a-accent)' }}>
+                <Icon name="info" size={18} color="var(--a-accent)" /> Signaler un problème
+              </GhostAction>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>Signaler un problème</div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {INCIDENT_KINDS.map((k) => (
-                    <button
-                      key={k.id}
-                      onClick={() => setIncidentKind(k.id)}
-                      style={{
-                        border: `1.5px solid ${incidentKind === k.id ? 'var(--brand)' : 'var(--line)'}`,
-                        background: incidentKind === k.id ? 'rgba(19,124,139,0.07)' : '#fff',
-                        color: incidentKind === k.id ? 'var(--brand)' : 'var(--ink)',
-                        borderRadius: 999,
-                        padding: '8px 14px',
-                        cursor: 'pointer',
-                        fontFamily: 'var(--ui-font)',
-                        fontWeight: 600,
-                        fontSize: 13,
-                      }}
-                    >
-                      {k.label}
-                    </button>
-                  ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <SectionTitle>Signaler un problème</SectionTitle>
+                <div role="group" aria-label="Type d’incident" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {INCIDENT_KINDS.map((k) => {
+                    const on = incidentKind === k.id;
+                    return (
+                      <button
+                        key={k.id}
+                        onClick={() => setIncidentKind(k.id)}
+                        aria-pressed={on}
+                        style={{
+                          ...text,
+                          border: on ? '1px solid #ffffff' : '1px solid var(--a-glass-line)',
+                          background: on ? '#ffffff' : 'transparent',
+                          color: on ? 'var(--a-on-white)' : 'var(--ink)',
+                          borderRadius: 999,
+                          padding: '9px 15px',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          fontSize: 13.5,
+                        }}
+                      >
+                        {k.label}
+                      </button>
+                    );
+                  })}
                 </div>
                 <textarea
                   value={incidentDetail}
                   onChange={(e) => setIncidentDetail(e.target.value)}
                   placeholder="Que s'est-il passé ?"
                   aria-label="Détail de l'incident"
-                  style={{ minHeight: 70, resize: 'vertical', border: '1.5px solid var(--line)', borderRadius: 14, padding: '11px 13px', fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--ink)', outline: 'none' }}
+                  style={{ ...fieldStyle, minHeight: 80, resize: 'vertical' }}
                 />
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <Btn variant="ghost" onClick={() => setIncidentOpen(false)} style={{ flex: 1 }}>
+                  <GhostAction onClick={() => setIncidentOpen(false)} style={{ flex: 1 }}>
                     Annuler
-                  </Btn>
-                  <Btn onClick={reportIncident} disabled={incidentBusy} style={{ flex: 1.4 }}>
+                  </GhostAction>
+                  <PrimaryAction onClick={reportIncident} disabled={incidentBusy} full={false} style={{ flex: 1.4 }}>
                     {incidentBusy ? 'Envoi…' : 'Envoyer au gérant'}
-                  </Btn>
+                  </PrimaryAction>
                 </div>
               </div>
             )}
-          </Card>
+          </Panel>
         )}
+
+        {delivered && <EmptyLine title="Course terminée." hint="Merci — elle est enregistrée dans votre historique." />}
       </div>
 
       {/* Remise : code client ou photo */}
       {closing && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(8,28,31,0.55)', display: 'flex', alignItems: 'flex-end' }} onClick={() => setClosing(false)}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end' }} onClick={() => setClosing(false)}>
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ width: '100%', background: '#fff', borderRadius: '22px 22px 0 0', padding: `20px 18px ${SAFE_BOTTOM + 18}px`, display: 'flex', flexDirection: 'column', gap: 12 }}
+            style={{
+              width: '100%',
+              background: 'linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)), var(--a-ground)',
+              borderRadius: '24px 24px 0 0',
+              border: '1px solid var(--a-glass-line)',
+              padding: `22px 18px ${SAFE_BOTTOM + 18}px`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
           >
-            <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: 'var(--ink)' }}>Code du client</div>
-            <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', margin: 0 }}>
-              Demandez au client les 4 chiffres affichés sur son suivi. S&apos;il est absent, prenez une photo du dépôt.
+            <h2 style={{ ...text, margin: 0, fontWeight: 600, fontSize: 19, color: 'var(--a-text)' }}>Code du client</h2>
+            <p style={{ ...text, fontSize: 13.5, color: 'var(--a-muted)', margin: 0, lineHeight: 1.45 }}>
+              Demandez les 4 chiffres affichés sur son suivi. S&apos;il est absent, prenez une photo du dépôt.
             </p>
             <input
               value={code}
@@ -443,16 +446,12 @@ export function DriverOrderScreen({
               autoFocus
               placeholder="0000"
               aria-label="Code de remise"
-              style={{ fontFamily: 'ui-monospace, monospace', fontSize: 26, letterSpacing: 10, textAlign: 'center', padding: '14px', borderRadius: 16, border: '1.5px solid var(--line)', outline: 'none', color: 'var(--ink)' }}
+              style={{ ...fieldStyle, fontFamily: 'ui-monospace, monospace', fontSize: 28, letterSpacing: 12, textAlign: 'center', padding: '16px' }}
             />
-            {closeError && (
-              <div role="alert" style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#C0392B' }}>
-                {closeError}
-              </div>
-            )}
-            <Btn full size="lg" onClick={() => advance(4, { code })} disabled={busy || code.length < 4}>
+            {closeError && <FormError>{closeError}</FormError>}
+            <PrimaryAction onClick={() => advance(4, { code })} disabled={busy || code.length < 4}>
               {busy ? '…' : 'Valider la remise'}
-            </Btn>
+            </PrimaryAction>
             <input
               ref={photoRef}
               type="file"
@@ -464,34 +463,33 @@ export function DriverOrderScreen({
                 if (f) uploadProof(f);
               }}
             />
-            <Btn variant="ghost" full onClick={() => photoRef.current?.click()} disabled={uploading}>
+            <GhostAction onClick={() => photoRef.current?.click()} disabled={uploading} full>
               {uploading ? 'Envoi de la photo…' : 'Client absent — photo du dépôt'}
-            </Btn>
+            </GhostAction>
           </div>
         </div>
       )}
 
-      {/* Sticky action bar */}
-      <div style={{ padding: `12px 16px ${SAFE_BOTTOM + 12}px`, background: '#fff', borderTop: '1px solid var(--line)' }}>
+      {/* Barre d'action */}
+      <div style={{ padding: `12px 16px ${SAFE_BOTTOM + 12}px`, flexShrink: 0, borderTop: '1px solid var(--a-glass-line)', background: 'rgba(0,0,0,0.35)' }}>
         {delivered ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--brand)' }}>
-            <Icon name="check" size={20} color="var(--brand)" /> Commande livrée
+          <div style={{ ...text, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontWeight: 600, fontSize: 15, color: 'var(--a-text)' }}>
+            <Icon name="check" size={20} color="var(--a-text)" /> Commande livrée
           </div>
         ) : primary ? (
-          <Btn full size="lg" onClick={primary.run} disabled={busy}>
+          <PrimaryAction onClick={primary.run} disabled={busy}>
             {primary.label}
-          </Btn>
+          </PrimaryAction>
         ) : null}
       </div>
     </div>
   );
 }
 
-// Four-segment progress + the current step's headline, mirroring the customer
-// tracking sheet. `step` is 1..4 (see stepIndex).
+// Progression en 4 segments + la phrase de l'étape, comme le suivi du client.
 function StepBar({ isDelivery, step }: { isDelivery: boolean; step: number }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         {[1, 2, 3, 4].map((s) => (
           <span
@@ -500,34 +498,15 @@ function StepBar({ isDelivery, step }: { isDelivery: boolean; step: number }) {
               flex: 1,
               height: 5,
               borderRadius: 999,
-              background: s <= step ? 'var(--brand)' : 'var(--line)',
+              background: s <= step ? '#ffffff' : 'rgba(255,255,255,0.16)',
             }}
           />
         ))}
       </div>
-      <div
-        style={{
-          fontFamily: 'var(--ui-font)',
-          fontSize: 11.5,
-          fontWeight: 700,
-          letterSpacing: 0.6,
-          textTransform: 'uppercase',
-          color: 'var(--muted)',
-        }}
-      >
+      <div style={{ ...text, fontSize: 11.5, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--a-muted)' }}>
         {isDelivery ? 'Livraison' : 'Retrait'} · Étape {step}/4
       </div>
-      <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 20, color: 'var(--ink)', margin: '4px 0 0' }}>
-        {STEP_PHRASE[step]}
-      </h2>
-    </div>
-  );
-}
-
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 14, marginBottom: 12, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}>
-      {children}
+      <h2 style={{ ...text, fontWeight: 600, fontSize: 21, color: 'var(--a-text)', margin: '4px 0 0' }}>{STEP_PHRASE[step]}</h2>
     </div>
   );
 }
@@ -535,13 +514,18 @@ function Card({ children }: { children: React.ReactNode }) {
 function Row({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <Icon name={icon} size={20} color="var(--brand)" />
+      <div style={{ width: 44, height: 44, borderRadius: 14, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon name={icon} size={20} color="var(--ink)" />
       </div>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)' }}>{label}</div>
-        <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)' }}>{value}</div>
+        <div style={{ ...text, fontSize: 12, color: 'var(--muted)' }}>{label}</div>
+        <div style={{ ...text, fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>{value}</div>
       </div>
     </div>
   );
+}
+
+/** Conservé pour la lisibilité des blocs d'information secondaires. */
+export function InfoWell({ children }: { children: React.ReactNode }) {
+  return <Well>{children}</Well>;
 }

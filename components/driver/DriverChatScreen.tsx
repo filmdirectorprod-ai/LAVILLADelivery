@@ -1,17 +1,22 @@
 'use client';
-// Driver-side order chat — the livreur's view of the customer conversation.
-// Mirror of the customer ChatScreen but from the driver: outgoing messages are
-// sender='driver' (RLS: chat_driver_insert, migration 0012) and render on the
-// right; the customer's messages render on the left. Realtime INSERT
-// subscription keeps both sides live.
+// Chat de course — la vue du livreur sur la conversation avec le client. Ses
+// messages partent en sender='driver' (RLS chat_driver_insert, 0012) et
+// s'affichent à droite ; ceux du client à gauche. Abonnement temps réel aux
+// INSERT pour que les deux côtés restent vivants.
+//
+// Style de l'admin : fond turquoise foncé, bulles blanches à texte turquoise
+// pour le livreur, bulles de verre pour le client. L'échec d'envoi est
+// désormais signalé au lieu de disparaître en silence.
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/lib/toast-store';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import type { ChatMessage, Order } from '@/lib/types';
 import type { DriverContact } from '@/lib/queries';
+import { Panel, fieldStyle, text } from '@/components/driver/ui/DriverUI';
 
 const QUICK = ["J'arrive dans 5 min 🛵", 'Je suis devant chez vous', "J'ai récupéré votre commande", 'Merci !'];
 
@@ -31,6 +36,7 @@ export function DriverChatScreen({
   initialMessages: ChatMessage[];
 }) {
   const router = useRouter();
+  const toast = useToast((s) => s.show);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState('');
   const scroller = useRef<HTMLDivElement>(null);
@@ -57,70 +63,62 @@ export function DriverChatScreen({
     if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
   }, [messages.length]);
 
-  const send = async (text: string) => {
-    const body = text.trim();
+  const send = async (textToSend: string) => {
+    const body = textToSend.trim();
     if (!body) return;
     setDraft('');
-    const supabase = createClient();
-    await supabase.from('chat_messages').insert({ order_id: order.id, sender: 'driver', body });
+    const { error } = await createClient().from('chat_messages').insert({ order_id: order.id, sender: 'driver', body });
+    if (error) {
+      setDraft(body); // on rend le texte au livreur plutôt que de le perdre
+      toast("Message non envoyé. Vérifiez votre connexion.");
+    }
   };
 
   const customerName = contact?.full_name || 'Client';
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--soft)' }}>
-      {/* header — light, mirrors the customer ChatScreen */}
-      <div
-        style={{
-          padding: `${SAFE_TOP + 4}px 14px 12px`,
-          background: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 11,
-          borderBottom: '1px solid var(--line)',
-        }}
-      >
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* en-tête */}
+      <div style={{ padding: `${SAFE_TOP + 10}px 16px 12px`, display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--a-glass-line)' }}>
         <button
           onClick={() => router.push(`/driver/order/${order.id}`)}
           aria-label="Retour"
-          style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'var(--soft)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+          style={{ width: 42, height: 42, borderRadius: 999, border: '1px solid var(--a-glass-line)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
         >
-          <Icon name="left" size={20} color="var(--ink)" />
+          <Icon name="left" size={20} color="var(--a-text)" />
         </button>
         <PhotoSlot label={customerName} style={{ width: 42, height: 42, borderRadius: 999, flexShrink: 0 }} dim />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ ...text, fontWeight: 600, fontSize: 16, color: 'var(--a-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {customerName}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--brand)' }}>
-            <span className="lv-livedot" style={{ width: 7, height: 7, borderRadius: 999, background: 'var(--brand)' }} /> Client · Commande {order.code}
-          </div>
+          <div style={{ ...text, fontSize: 12, color: 'var(--a-muted)' }}>Commande {order.code}</div>
         </div>
         {contact?.phone && (
           <a
             href={`tel:${contact.phone}`}
             aria-label="Appeler"
-            style={{ width: 42, height: 42, borderRadius: 999, background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, textDecoration: 'none' }}
+            style={{ width: 42, height: 42, borderRadius: 999, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, textDecoration: 'none' }}
           >
-            <Icon name="phone" size={19} color="#fff" fill />
+            <Icon name="phone" size={19} color="var(--a-on-white)" fill />
           </a>
         )}
       </div>
 
-      {/* course banner — light card linking back to the course */}
+      {/* rappel de la course */}
       <button
         onClick={() => router.push(`/driver/order/${order.id}`)}
-        style={{ display: 'flex', alignItems: 'center', gap: 11, margin: '10px 16px 0', background: '#fff', border: '1px solid var(--line)', borderRadius: 14, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '12px 16px 0', background: 'var(--a-card)', border: '1px solid var(--a-glass-line)', borderRadius: 16, padding: '12px 14px', cursor: 'pointer', textAlign: 'left' }}
       >
-        <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon name="scooter" size={18} color="var(--brand)" />
+        <div style={{ width: 36, height: 36, borderRadius: 12, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon name="scooter" size={18} color="var(--ink)" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: 'var(--ink)' }}>
-            Commande {order.code} · {order.mode === 'livraison' ? 'À livrer' : 'Retrait'}
+          <div style={{ ...text, fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>
+            {order.mode === 'livraison' ? 'À livrer' : 'Retrait'} · {order.code}
           </div>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {order.address ?? 'Voir la course'} — voir la course
+          <div style={{ ...text, fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {order.address ?? 'Voir la course'}
           </div>
         </div>
         <Icon name="right" size={18} color="var(--muted)" />
@@ -128,30 +126,33 @@ export function DriverChatScreen({
 
       {/* messages */}
       <div ref={scroller} style={{ flex: 1, overflow: 'auto', padding: '16px 16px 8px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', margin: '2px 0 6px' }}>
-          Aujourd&apos;hui · Commande {order.code}
-        </div>
+        {messages.length === 0 && (
+          <Panel style={{ textAlign: 'center', padding: '20px 16px' }}>
+            <span style={{ ...text, fontSize: 13.5, color: 'var(--muted)' }}>
+              Aucun message. Prévenez le client de votre arrivée.
+            </span>
+          </Panel>
+        )}
         {messages.map((m) => {
           const me = m.sender === 'driver';
           return (
             <div key={m.id} style={{ display: 'flex', justifyContent: me ? 'flex-end' : 'flex-start' }}>
-              <div style={{ maxWidth: '76%' }}>
+              <div style={{ maxWidth: '78%' }}>
                 <div
                   style={{
-                    padding: '10px 14px',
-                    borderRadius: me ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                    background: me ? 'var(--brand)' : '#fff',
-                    color: me ? '#fff' : 'var(--ink)',
-                    fontFamily: 'var(--ui-font)',
-                    fontSize: 14,
+                    ...text,
+                    padding: '11px 14px',
+                    borderRadius: me ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
+                    background: me ? '#ffffff' : 'var(--a-card)',
+                    color: me ? 'var(--a-on-white)' : 'var(--ink)',
+                    border: me ? 'none' : '1px solid var(--a-glass-line)',
+                    fontSize: 14.5,
                     lineHeight: 1.45,
-                    border: me ? 'none' : '1px solid var(--line)',
-                    boxShadow: '0 2px 8px -4px rgba(0,0,0,0.12)',
                   }}
                 >
                   {m.body}
                 </div>
-                <div style={{ fontFamily: 'var(--ui-font)', fontSize: 10.5, color: 'var(--muted)', marginTop: 3, textAlign: me ? 'right' : 'left' }}>
+                <div style={{ ...text, fontSize: 11, color: 'var(--a-muted)', marginTop: 3, textAlign: me ? 'right' : 'left' }}>
                   {timeLabel(m.created_at)}
                 </div>
               </div>
@@ -160,36 +161,36 @@ export function DriverChatScreen({
         })}
       </div>
 
-      {/* quick replies */}
+      {/* réponses rapides */}
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '4px 16px 10px', scrollbarWidth: 'none' }}>
         {QUICK.map((q) => (
           <button
             key={q}
             onClick={() => send(q)}
-            style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 999, border: '1.5px solid var(--brand)', background: '#fff', color: 'var(--brand)', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ ...text, flexShrink: 0, padding: '9px 15px', borderRadius: 999, border: '1px solid var(--a-glass-line)', background: 'transparent', color: 'var(--ink)', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             {q}
           </button>
         ))}
       </div>
 
-      {/* input bar */}
-      <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid var(--line)', padding: `10px 14px ${SAFE_BOTTOM + 10}px`, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'var(--soft)', borderRadius: 999, padding: '11px 16px' }}>
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && send(draft)}
-            placeholder="Votre message…"
-            style={{ flex: 1, border: 'none', background: 'none', outline: 'none', fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--ink)' }}
-          />
-        </div>
+      {/* saisie */}
+      <div style={{ flexShrink: 0, borderTop: '1px solid var(--a-glass-line)', background: 'rgba(0,0,0,0.35)', padding: `10px 16px ${SAFE_BOTTOM + 10}px`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && send(draft)}
+          placeholder="Votre message…"
+          aria-label={`Message à ${customerName}`}
+          style={{ ...fieldStyle, flex: 1, borderRadius: 999 }}
+        />
         <button
           onClick={() => send(draft)}
           aria-label="Envoyer"
-          style={{ width: 46, height: 46, borderRadius: 999, background: 'var(--brand)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 6px 14px -6px var(--brand)' }}
+          disabled={draft.trim() === ''}
+          style={{ width: 48, height: 48, borderRadius: 999, background: '#ffffff', border: 'none', cursor: draft.trim() ? 'pointer' : 'default', opacity: draft.trim() ? 1 : 0.45, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
         >
-          <Icon name="right" size={21} color="#fff" strokeWidth={2.4} />
+          <Icon name="right" size={21} color="var(--a-on-white)" strokeWidth={2.4} />
         </button>
       </div>
     </div>

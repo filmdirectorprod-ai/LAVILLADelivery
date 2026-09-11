@@ -1,20 +1,22 @@
 'use client';
-// Driver "Support" — the livreur's direct thread with the gérant. Mirror of the
-// order chat (DriverChatScreen) but against support_messages (0018): the driver's
-// own messages go in as sender='driver' (support_driver_insert RLS) and render on
-// the right; staff replies render on the left and arrive live via a Realtime
-// INSERT subscription. Opening the screen stamps SUPPORT_SEEN_KEY so the home
-// badge clears.
+// Support — le fil direct du livreur avec le gérant (support_messages, 0018).
+// Ses messages partent en sender='driver' et s'affichent à droite ; les
+// réponses du staff arrivent à gauche, en direct. Ouvrir l'écran marque le fil
+// comme lu (SUPPORT_SEEN_KEY), ce qui éteint la pastille de l'accueil.
+//
+// Style de l'admin ; l'échec d'envoi est signalé au lieu d'être silencieux.
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/lib/toast-store';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { useBeep } from '@/lib/use-beep';
 import { SUPPORT_SEEN_KEY } from '@/lib/driver-support';
 import type { Driver, SupportMessage } from '@/lib/types';
+import { Panel, fieldStyle, text } from '@/components/driver/ui/DriverUI';
 
-const QUICK = ['Bonjour 👋', 'Problème avec une course', "Je suis en retard", 'Merci !'];
+const QUICK = ['Bonjour 👋', 'Problème avec une course', 'Je suis en retard', 'Merci !'];
 
 function timeLabel(iso: string): string {
   const d = new Date(iso);
@@ -26,7 +28,7 @@ function markSeen() {
   try {
     localStorage.setItem(SUPPORT_SEEN_KEY, new Date().toISOString());
   } catch {
-    /* storage unavailable */
+    /* stockage indisponible */
   }
 }
 
@@ -38,13 +40,14 @@ export function DriverSupportScreen({
   initialMessages: SupportMessage[];
 }) {
   const router = useRouter();
+  const toast = useToast((s) => s.show);
   const [messages, setMessages] = useState<SupportMessage[]>(initialMessages);
   const [draft, setDraft] = useState('');
   const scroller = useRef<HTMLDivElement>(null);
   const { beep } = useBeep();
 
-  // Viewing the thread counts as reading it — stamp on open and whenever a new
-  // message lands while the screen is open.
+  // Voir le fil vaut l'avoir lu — on marque à l'ouverture et à chaque message
+  // reçu pendant que l'écran est ouvert.
   useEffect(() => {
     markSeen();
   }, [messages.length]);
@@ -58,7 +61,7 @@ export function DriverSupportScreen({
         { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `driver_id=eq.${driver.id}` },
         (payload) => {
           const msg = payload.new as SupportMessage;
-          if (msg.sender === 'staff') beep(); // the gérant just replied
+          if (msg.sender === 'staff') beep(); // le gérant vient de répondre
           setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
         },
       )
@@ -72,78 +75,66 @@ export function DriverSupportScreen({
     if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
   }, [messages.length]);
 
-  const send = async (text: string) => {
-    const body = text.trim();
+  const send = async (textToSend: string) => {
+    const body = textToSend.trim();
     if (!body) return;
     setDraft('');
-    const supabase = createClient();
-    await supabase.from('support_messages').insert({ driver_id: driver.id, sender: 'driver', body });
+    const { error } = await createClient().from('support_messages').insert({ driver_id: driver.id, sender: 'driver', body });
+    if (error) {
+      setDraft(body);
+      toast("Message non envoyé. Vérifiez votre connexion.");
+    }
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--soft)' }}>
-      {/* header */}
-      <div
-        style={{
-          padding: `${SAFE_TOP + 4}px 14px 12px`,
-          background: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 11,
-          borderBottom: '1px solid var(--line)',
-        }}
-      >
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* en-tête */}
+      <div style={{ padding: `${SAFE_TOP + 10}px 16px 12px`, display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--a-glass-line)' }}>
         <button
           onClick={() => router.push('/driver')}
           aria-label="Retour"
-          style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'var(--soft)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+          style={{ width: 42, height: 42, borderRadius: 999, border: '1px solid var(--a-glass-line)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
         >
-          <Icon name="left" size={20} color="var(--ink)" />
+          <Icon name="left" size={20} color="var(--a-text)" />
         </button>
-        <div style={{ width: 42, height: 42, borderRadius: 999, background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon name="message" size={20} color="#fff" />
+        <div style={{ width: 42, height: 42, borderRadius: 999, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon name="message" size={20} color="var(--a-text)" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
-            Support La Villa
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--brand)' }}>
-            <span className="lv-livedot" style={{ width: 7, height: 7, borderRadius: 999, background: 'var(--brand)' }} /> Le gérant vous répond ici
-          </div>
+          <div style={{ ...text, fontWeight: 600, fontSize: 16, color: 'var(--a-text)' }}>Support La Villa</div>
+          <div style={{ ...text, fontSize: 12, color: 'var(--a-muted)' }}>Le gérant vous répond ici</div>
         </div>
       </div>
 
       {/* messages */}
       <div ref={scroller} style={{ flex: 1, overflow: 'auto', padding: '16px 16px 8px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', margin: '2px 0 6px' }}>
-          Une question ? Écrivez au gérant.
-        </div>
         {messages.length === 0 ? (
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', background: '#fff', border: '1px dashed var(--line)', borderRadius: 16, padding: '18px 16px', textAlign: 'center', marginTop: 4 }}>
-            Aucun message pour l&apos;instant. Envoyez votre premier message ci-dessous.
-          </div>
+          <Panel style={{ textAlign: 'center', padding: '22px 16px' }}>
+            <span style={{ ...text, fontSize: 13.5, color: 'var(--muted)' }}>
+              Aucun message. Écrivez au gérant, il vous répond ici.
+            </span>
+          </Panel>
         ) : (
           messages.map((m) => {
             const me = m.sender === 'driver';
             return (
               <div key={m.id} style={{ display: 'flex', justifyContent: me ? 'flex-end' : 'flex-start' }}>
-                <div style={{ maxWidth: '76%' }}>
+                <div style={{ maxWidth: '78%' }}>
                   <div
                     style={{
-                      padding: '10px 14px',
-                      borderRadius: me ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                      background: me ? 'var(--brand)' : '#fff',
-                      color: me ? '#fff' : 'var(--ink)',
-                      fontFamily: 'var(--ui-font)',
-                      fontSize: 14,
+                      ...text,
+                      padding: '11px 14px',
+                      borderRadius: me ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
+                      background: me ? '#ffffff' : 'var(--a-card)',
+                      color: me ? 'var(--a-on-white)' : 'var(--ink)',
+                      border: me ? 'none' : '1px solid var(--a-glass-line)',
+                      fontSize: 14.5,
                       lineHeight: 1.45,
-                      border: me ? 'none' : '1px solid var(--line)',
-                      boxShadow: '0 2px 8px -4px rgba(0,0,0,0.12)',
                     }}
                   >
                     {m.body}
                   </div>
-                  <div style={{ fontFamily: 'var(--ui-font)', fontSize: 10.5, color: 'var(--muted)', marginTop: 3, textAlign: me ? 'right' : 'left' }}>
+                  <div style={{ ...text, fontSize: 11, color: 'var(--a-muted)', marginTop: 3, textAlign: me ? 'right' : 'left' }}>
                     {me ? 'Vous' : 'Gérant'} · {timeLabel(m.created_at)}
                   </div>
                 </div>
@@ -153,36 +144,36 @@ export function DriverSupportScreen({
         )}
       </div>
 
-      {/* quick replies */}
+      {/* réponses rapides */}
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '4px 16px 10px', scrollbarWidth: 'none' }}>
         {QUICK.map((q) => (
           <button
             key={q}
             onClick={() => send(q)}
-            style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 999, border: '1.5px solid var(--brand)', background: '#fff', color: 'var(--brand)', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ ...text, flexShrink: 0, padding: '9px 15px', borderRadius: 999, border: '1px solid var(--a-glass-line)', background: 'transparent', color: 'var(--ink)', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             {q}
           </button>
         ))}
       </div>
 
-      {/* input bar */}
-      <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid var(--line)', padding: `10px 14px ${SAFE_BOTTOM + 10}px`, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'var(--soft)', borderRadius: 999, padding: '11px 16px' }}>
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && send(draft)}
-            placeholder="Votre message au gérant…"
-            style={{ flex: 1, border: 'none', background: 'none', outline: 'none', fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--ink)' }}
-          />
-        </div>
+      {/* saisie */}
+      <div style={{ flexShrink: 0, borderTop: '1px solid var(--a-glass-line)', background: 'rgba(0,0,0,0.35)', padding: `10px 16px ${SAFE_BOTTOM + 10}px`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && send(draft)}
+          placeholder="Votre message au gérant…"
+          aria-label="Message au gérant"
+          style={{ ...fieldStyle, flex: 1, borderRadius: 999 }}
+        />
         <button
           onClick={() => send(draft)}
           aria-label="Envoyer"
-          style={{ width: 46, height: 46, borderRadius: 999, background: 'var(--brand)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 6px 14px -6px var(--brand)' }}
+          disabled={draft.trim() === ''}
+          style={{ width: 48, height: 48, borderRadius: 999, background: '#ffffff', border: 'none', cursor: draft.trim() ? 'pointer' : 'default', opacity: draft.trim() ? 1 : 0.45, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
         >
-          <Icon name="right" size={21} color="#fff" strokeWidth={2.4} />
+          <Icon name="right" size={21} color="var(--a-on-white)" strokeWidth={2.4} />
         </button>
       </div>
     </div>

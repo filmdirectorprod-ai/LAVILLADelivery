@@ -1,8 +1,8 @@
 'use client';
-// Bottom navigation for the driver app — mirrors the customer TabBar styling but
-// with the four livreur destinations. Shown only on the top-level driver screens
-// (see DriverChrome); hidden on order-detail and settings so those get the full
-// height for their own back-button headers.
+// Barre d'onglets du bas — verre dépoli sur le fond turquoise foncé, dans la
+// langue de l'admin. L'onglet actif est une pilule blanche à texte turquoise
+// (le contrôle segmenté iOS de l'admin), pas un simple texte coloré : sur fond
+// sombre, la couleur seule ne suffisait pas à marquer l'état.
 import { usePathname, useRouter } from 'next/navigation';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { SAFE_BOTTOM } from '@/lib/layout';
@@ -21,13 +21,12 @@ export function DriverTabBar() {
 
   return (
     <nav
+      className="lv-driver-tabbar"
       style={{
-        background: '#fff',
-        borderTop: '1px solid var(--line)',
-        padding: `8px 6px ${SAFE_BOTTOM}px`,
+        padding: `8px 8px ${SAFE_BOTTOM + 6}px`,
         display: 'flex',
         justifyContent: 'space-around',
-        boxShadow: '0 -6px 20px -14px rgba(0,0,0,0.25)',
+        gap: 4,
         flexShrink: 0,
       }}
     >
@@ -37,25 +36,30 @@ export function DriverTabBar() {
           <button
             key={tab.href}
             onClick={() => router.push(tab.href)}
+            aria-current={active ? 'page' : undefined}
             style={{
               flex: 1,
+              minHeight: 52,
               border: 'none',
-              background: 'none',
+              borderRadius: 16,
+              background: active ? '#ffffff' : 'transparent',
               cursor: 'pointer',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: 3,
-              padding: '2px 0',
+              padding: '6px 2px',
+              transition: 'background-color 0.2s ease',
             }}
           >
-            <Icon name={tab.icon} size={23} color={active ? 'var(--brand)' : 'var(--muted)'} />
+            <Icon name={tab.icon} size={21} color={active ? 'var(--a-on-white)' : 'var(--a-muted)'} />
             <span
               style={{
                 fontFamily: 'var(--ui-font)',
                 fontSize: 10.5,
-                fontWeight: active ? 700 : 500,
-                color: active ? 'var(--brand)' : 'var(--muted)',
+                fontWeight: 600,
+                color: active ? 'var(--a-on-white)' : 'var(--a-muted)',
               }}
             >
               {tab.label}

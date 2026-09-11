@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport: Viewport = { themeColor: '#1f7a49' };
+export const viewport: Viewport = { themeColor: '#0f606b' };
 
 export default function DriverAuthLayout({ children }: { children: ReactNode }) {
   return <>{children}</>;

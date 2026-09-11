@@ -1,17 +1,18 @@
 'use client';
-// Driver "Mon planning" — read-only weekly roster for the signed-in livreur.
-// The gérant sets shifts in the admin Planning screen (driver_shifts, 0018); here
-// the driver sees only their own upcoming shifts (shifts_driver_read RLS),
-// grouped by day. Subscribes to Realtime on driver_shifts so a newly-assigned or
-// cancelled shift updates live. Pure grouping lives in lib/driver-planning.ts.
+// Mon planning — les créneaux à venir du livreur connecté, en lecture seule.
+// Le gérant les pose dans l'admin (driver_shifts, 0018) ; la RLS ne laisse voir
+// que les siens. S'abonne au temps réel pour qu'un créneau ajouté ou annulé
+// apparaisse sans rechargement. Le regroupement par jour vit dans
+// lib/driver-planning.ts.
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
+import { SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { groupShiftsByDay, shiftRange } from '@/lib/driver-planning';
 import { useRealtime } from '@/lib/use-realtime';
 import type { DriverShift } from '@/lib/types';
+import { DriverHeader, EmptyLine, Figure, Panel, SectionTitle, text } from '@/components/driver/ui/DriverUI';
 
 function shiftHours(shift: DriverShift): number | null {
   const start = Date.parse(shift.starts_at);
@@ -25,8 +26,7 @@ export function DriverPlanningScreen({ initialShifts }: { initialShifts: DriverS
   const [shifts, setShifts] = useState<DriverShift[]>(initialShifts);
 
   const refetch = useCallback(async () => {
-    const supabase = createClient();
-    const { data } = await supabase
+    const { data } = await createClient()
       .from('driver_shifts')
       .select('id, driver_id, starts_at, ends_at, note')
       .gte('ends_at', new Date().toISOString())
@@ -34,77 +34,48 @@ export function DriverPlanningScreen({ initialShifts }: { initialShifts: DriverS
     setShifts((data ?? []) as DriverShift[]);
   }, []);
 
-  // RLS already limits the stream to this driver's shifts; the debounce keeps a
-  // gérant saving several créneaux at once down to a single refetch.
+  // La RLS limite déjà le flux aux créneaux de ce livreur ; l'anti-rebond ramène
+  // plusieurs créneaux enregistrés d'affilée à un seul rechargement.
   useRealtime('driver-shifts', [{ table: 'driver_shifts' }], refetch);
 
   const days = groupShiftsByDay(shifts);
+  const totalHours = shifts.reduce((n, s) => n + (shiftHours(s) ?? 0), 0);
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--soft)' }}>
-      {/* header */}
-      <div
-        style={{
-          padding: `${SAFE_TOP + 4}px 14px 14px`,
-          background: 'linear-gradient(150deg, var(--brand), var(--brand-d))',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 11,
-        }}
-      >
-        <button
-          onClick={() => router.push('/driver')}
-          aria-label="Retour"
-          style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.14)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-        >
-          <Icon name="left" size={20} color="#fff" />
-        </button>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: '#fff' }}>Mon planning</div>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'rgba(255,255,255,0.72)' }}>
-            Vos créneaux à venir
-          </div>
-        </div>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon name="calendar" size={20} color="#fff" />
-        </div>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+      <DriverHeader title="Mon planning" subtitle="Vos créneaux à venir" onBack={() => router.push('/driver')} />
+
+      <div style={{ display: 'flex', gap: 24, padding: '2px 16px 0', flexWrap: 'wrap' }}>
+        <Figure label="Créneaux" value={String(shifts.length)} />
+        <Figure label="Heures planifiées" value={String(Math.round(totalHours * 10) / 10).replace('.', ',')} unit="h" />
       </div>
 
-      {/* body */}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: `16px 16px ${SAFE_BOTTOM + 16}px` }}>
+      <div style={{ padding: `18px 16px ${SAFE_BOTTOM + 16}px` }}>
         {days.length === 0 ? (
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', background: '#fff', border: '1px dashed var(--line)', borderRadius: 18, padding: '22px 16px', textAlign: 'center' }}>
-            Aucun créneau planifié pour le moment.
-            <br />
-            Le gérant vous préviendra dès qu&apos;un créneau est ajouté.
-          </div>
+          <EmptyLine
+            title="Aucun créneau planifié."
+            hint="Le gérant vous préviendra dès qu’un créneau est ajouté."
+          />
         ) : (
           days.map((day) => (
-            <div key={day.dateIso} style={{ marginBottom: 18 }}>
-              <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, color: 'var(--brand)', margin: '0 2px 9px' }}>
-                {day.label}
-              </div>
+            <div key={day.dateIso} style={{ marginBottom: 20 }}>
+              <SectionTitle>{day.label}</SectionTitle>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {day.shifts.map((s) => {
                   const hours = shiftHours(s);
                   return (
-                    <div
-                      key={s.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: 14, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}
-                    >
-                      <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Icon name="clock" size={21} color="var(--brand)" />
+                    <Panel key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14 }}>
+                      <div style={{ width: 44, height: 44, borderRadius: 14, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Icon name="clock" size={20} color="var(--ink)" />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
-                          {shiftRange(s)}
-                        </div>
-                        <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>
-                          {hours !== null ? `${hours} h` : 'Créneau'}
+                        <div style={{ ...text, fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>{shiftRange(s)}</div>
+                        <div style={{ ...text, fontSize: 12.5, color: 'var(--muted)' }}>
+                          {hours !== null ? `${String(hours).replace('.', ',')} h` : 'Créneau'}
                           {s.note ? ` · ${s.note}` : ''}
                         </div>
                       </div>
-                    </div>
+                    </Panel>
                   );
                 })}
               </div>

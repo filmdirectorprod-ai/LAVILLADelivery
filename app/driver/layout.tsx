@@ -22,14 +22,14 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport: Viewport = { themeColor: '#1f7a49' };
+export const viewport: Viewport = { themeColor: '#0f606b' };
 
 export default async function DriverLayout({ children }: { children: ReactNode }) {
   const driver = await getMyDriver();
   if (!driver) return <DriverGate />;
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--soft)' }}>
+    <div className="lv-driver-root" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <DriverChrome>{children}</DriverChrome>
     </div>
   );

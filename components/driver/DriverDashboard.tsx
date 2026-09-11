@@ -1,17 +1,21 @@
 'use client';
-// Driver dashboard — the livreur home. Live board with two sections:
-//   • Livraison en cours — the order this driver has claimed (rich card)
-//   • Disponibles        — the unclaimed pool any driver can accept
-// Subscribes to Realtime on `orders` and `order_tracking` and re-pulls the
-// RLS-scoped board on any change. The online/offline switch (useDriverOnline)
-// drives the driver's REAL presence (DriverPresence heartbeats it to the admin)
-// and also hides the available pool locally when offline.
+// Accueil livreur — dans la langue de l'admin : fond turquoise foncé, panneaux
+// de verre, grands chiffres fins. Deux sections vivantes :
+//   • Livraison en cours — la course que ce livreur a prise
+//   • Disponibles        — le vivier de courses à accepter
+// S'abonne au temps réel sur `orders` et `order_tracking`. L'interrupteur
+// En ligne pilote la présence réelle (DriverPresence la transmet à l'admin).
+//
+// Corrections : la note ne plante plus quand elle est vide, le point vert est
+// devenu blanc (palette stricte), et la carte de course annonce le créneau
+// demandé et les espèces à encaisser (0054).
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
+import { slotShortLabel } from '@/lib/checkout-slots';
 import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import { UserNotificationBell } from '@/components/ui/UserNotificationBell';
@@ -20,6 +24,7 @@ import { useDriverOnline } from '@/lib/driver-online-store';
 import { useRealtime } from '@/lib/use-realtime';
 import type { Driver, Order, OrderTracking, SupportMessage } from '@/lib/types';
 import type { DriverOrder } from '@/lib/queries';
+import { EmptyLine, Figure, GhostAction, Panel, Pill, PrimaryAction, SectionTitle, Switch, Well, text } from '@/components/driver/ui/DriverUI';
 
 const STAGE_LABEL: Record<number, string> = {
   0: 'Confirmée',
@@ -34,9 +39,7 @@ function mapBoard(rows: unknown[]): DriverOrder[] {
     const { order_tracking, ...order } = r as Order & {
       order_tracking: OrderTracking | OrderTracking[] | null;
     };
-    const tracking = Array.isArray(order_tracking)
-      ? order_tracking[0] ?? null
-      : order_tracking ?? null;
+    const tracking = Array.isArray(order_tracking) ? order_tracking[0] ?? null : order_tracking ?? null;
     return { order: order as Order, tracking };
   });
 }
@@ -44,7 +47,7 @@ function mapBoard(rows: unknown[]): DriverOrder[] {
 function etaMinutes(eta: string | null): number | null {
   if (!eta) return null;
   const diff = Math.round((Date.parse(eta) - Date.now()) / 60000);
-  return Math.max(0, diff);
+  return Number.isNaN(diff) ? null : Math.max(0, diff);
 }
 
 export function DriverDashboard({
@@ -60,26 +63,23 @@ export function DriverDashboard({
 }) {
   const router = useRouter();
   const [board, setBoard] = useState<DriverOrder[]>(initialBoard);
-  // Availability switch — shared with DriverPresence, which heartbeats real
-  // presence to the admin based on it (+ persisted to localStorage).
+  // Disponibilité — partagée avec DriverPresence, qui transmet la présence réelle
+  // à l'admin (et la garde en mémoire locale).
   const online = useDriverOnline((s) => s.online);
   const toggleOnline = useDriverOnline((s) => s.toggle);
   const [supportUnread, setSupportUnread] = useState(0);
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    let q = supabase
-      .from('orders')
-      .select('*, order_tracking(*)')
-      .in('status', DRIVER_POOL_STATUSES);
-    if (driver.branch_id) q = q.eq('branch_id', driver.branch_id); // only this driver's agency
+    let q = supabase.from('orders').select('*, order_tracking(*)').in('status', DRIVER_POOL_STATUSES);
+    if (driver.branch_id) q = q.eq('branch_id', driver.branch_id); // seulement son agence
     const { data } = await q.order('placed_at', { ascending: false }).limit(100);
     setBoard(mapBoard(data ?? []));
   }, [driver.branch_id]);
 
-  // Scoped to this driver's agency: a change in another branch no longer wakes
-  // this device. order_tracking has no branch_id, so it stays broad — the
-  // debounce keeps a claim burst down to one refetch.
+  // Limité à l'agence de ce livreur : un changement dans une autre agence ne
+  // réveille plus l'appareil. order_tracking n'a pas de branch_id, donc il reste
+  // large — l'anti-rebond ramène une rafale de prises à un seul rechargement.
   useRealtime(
     'driver-board',
     [
@@ -89,7 +89,7 @@ export function DriverDashboard({
     refetch,
   );
 
-  // Support badge: count staff replies newer than this device's last visit.
+  // Pastille support : les réponses du gérant plus récentes que la dernière visite.
   const refreshSupport = useCallback(async () => {
     const supabase = createClient();
     const { data } = await supabase
@@ -102,7 +102,7 @@ export function DriverDashboard({
     try {
       lastSeen = localStorage.getItem(SUPPORT_SEEN_KEY);
     } catch {
-      /* storage unavailable */
+      /* stockage indisponible */
     }
     setSupportUnread(unreadFromStaff((data ?? []) as SupportMessage[], lastSeen));
   }, [driver.id]);
@@ -120,6 +120,7 @@ export function DriverDashboard({
   const mine = board.filter((b) => b.tracking?.driver_id === driver.id && b.tracking?.manual);
   const available = board.filter((b) => !b.tracking?.manual);
   const activeDelivery = mine[0] ?? null;
+  const note = Number(driver.rating ?? 0).toFixed(1);
 
   const logout = async () => {
     const supabase = createClient();
@@ -128,186 +129,168 @@ export function DriverDashboard({
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <div style={{ padding: `${SAFE_TOP + 6}px 16px 18px`, background: 'linear-gradient(150deg, var(--brand), var(--brand-d))' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 52, height: 52, borderRadius: 999, border: '2.5px solid var(--gold)', padding: 2, flexShrink: 0 }}>
-            <PhotoSlot label={driver.name} src={driver.avatar_url ?? undefined} style={{ width: '100%', height: '100%', borderRadius: 999 }} sizes="48px" dim />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {driver.name}
-            </div>
-            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'rgba(255,255,255,0.7)' }}>
-              Livreur · {driver.vehicle ?? 'Scooter'}
-            </div>
-          </div>
-          <UserNotificationBell color="#fff" audience="driver" />
-          <button
-            onClick={logout}
-            aria-label="Déconnexion"
-            style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.14)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-          >
-            <Icon name="logout" size={19} color="#fff" />
-          </button>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+      {/* En-tête : identité + accès rapides */}
+      <div style={{ padding: `${SAFE_TOP + 10}px 16px 0`, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 52, height: 52, borderRadius: 999, border: '2px solid var(--a-accent)', padding: 2, flexShrink: 0 }}>
+          <PhotoSlot label={driver.name} src={driver.avatar_url ?? undefined} style={{ width: '100%', height: '100%', borderRadius: 999 }} sizes="48px" dim />
         </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ ...text, fontWeight: 600, fontSize: 19, color: 'var(--a-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {driver.name}
+          </div>
+          <div style={{ ...text, fontSize: 12.5, color: 'var(--a-muted)' }}>Livreur · {driver.vehicle ?? 'Scooter'}</div>
+        </div>
+        <UserNotificationBell color="var(--a-text)" audience="driver" />
+        <button
+          onClick={logout}
+          aria-label="Déconnexion"
+          style={{ width: 42, height: 42, borderRadius: 999, border: '1px solid var(--a-glass-line)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+        >
+          <Icon name="logout" size={19} color="var(--a-text)" />
+        </button>
+      </div>
 
-        {/* Quick actions — planning + support */}
-        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-          <button
-            onClick={() => router.push('/driver/planning')}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 14, padding: '14px 14px', cursor: 'pointer' }}
-          >
-            <Icon name="calendar" size={20} color="#fff" />
-            <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: '#fff', whiteSpace: 'nowrap' }}>
-              Mon planning
-            </span>
-          </button>
-          <button
-            onClick={() => router.push('/driver/support')}
-            style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 14, padding: '14px 14px', cursor: 'pointer' }}
-          >
-            <Icon name="message" size={20} color="#fff" />
-            <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: '#fff', whiteSpace: 'nowrap' }}>
-              Support
-            </span>
+      {/* Chiffres du livreur */}
+      <div style={{ display: 'flex', gap: 22, padding: '20px 16px 0', flexWrap: 'wrap' }}>
+        <Figure label="Courses" value={String(deliveriesCount)} />
+        <Figure label="Gains cumulés" value={formatDH(totalEarnings).replace(' DH', '')} unit="DH" />
+        <Figure label="Note" value={note} unit="/ 5" />
+      </div>
+
+      <div style={{ padding: `18px 16px ${SAFE_BOTTOM + 16}px`, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Disponibilité */}
+        <Panel>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: 999,
+                flexShrink: 0,
+                background: online ? '#ffffff' : 'rgba(255,255,255,0.28)',
+                boxShadow: online ? '0 0 0 4px rgba(255,255,255,0.16)' : 'none',
+              }}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ ...text, fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>
+                {online ? 'En ligne' : 'Hors ligne'}
+              </div>
+              <div style={{ ...text, fontSize: 12.5, color: 'var(--muted)' }}>
+                {online ? 'Vous recevez les nouvelles courses' : 'Activez pour recevoir des courses'}
+              </div>
+            </div>
+            <Switch checked={online} onChange={toggleOnline} label="Être en ligne" />
+          </div>
+        </Panel>
+
+        {/* Accès rapides */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <GhostAction onClick={() => router.push('/driver/planning')} full>
+            <Icon name="calendar" size={18} color="var(--ink)" /> Planning
+          </GhostAction>
+          <GhostAction onClick={() => router.push('/driver/support')} full style={{ position: 'relative' }}>
+            <Icon name="message" size={18} color="var(--ink)" /> Support
             {supportUnread > 0 && (
               <span
                 aria-label={`${supportUnread} message${supportUnread > 1 ? 's' : ''} non lu${supportUnread > 1 ? 's' : ''}`}
-                style={{ position: 'absolute', top: -7, right: -7, minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, background: 'var(--gold)', color: 'var(--brand-d)', border: '2px solid var(--brand-d)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 800 }}
+                style={{ ...text, position: 'absolute', top: -6, right: -6, minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, background: '#ffffff', color: 'var(--a-on-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600 }}
               >
                 {supportUnread > 9 ? '9+' : supportUnread}
               </span>
             )}
-          </button>
+          </GhostAction>
         </div>
 
-        {/* Online toggle */}
-        <button
-          onClick={toggleOnline}
-          style={{ width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 14, padding: '12px 14px', cursor: 'pointer' }}
-        >
-          <span className={online ? 'lv-livedot' : undefined} style={{ width: 9, height: 9, borderRadius: 999, background: online ? '#69e0a0' : 'rgba(255,255,255,0.4)', flexShrink: 0 }} />
-          <span style={{ flex: 1, textAlign: 'left', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: '#fff' }}>
-            {online ? 'En ligne · vous recevez des courses' : 'Hors ligne'}
-          </span>
-          <span style={{ width: 46, height: 28, borderRadius: 999, background: online ? 'var(--brand)' : 'rgba(255,255,255,0.25)', position: 'relative', transition: 'background 0.15s', flexShrink: 0 }}>
-            <span style={{ position: 'absolute', top: 3, left: online ? 21 : 3, width: 22, height: 22, borderRadius: 999, background: '#fff', transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
-          </span>
-        </button>
-
-        {/* Stats */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <Stat label="Courses" value={deliveriesCount} />
-          <Stat label="Gains" value={formatDH(totalEarnings)} />
-          <Stat label="Note" value={driver.rating.toFixed(1)} />
+        {/* Livraison en cours */}
+        <div>
+          <SectionTitle aside={mine.length ? `${mine.length} en cours` : undefined}>Livraison en cours</SectionTitle>
+          {activeDelivery ? (
+            <ActiveCard data={activeDelivery} onOpen={() => router.push(`/driver/order/${activeDelivery.order.id}`)} />
+          ) : (
+            <EmptyLine title="Aucune livraison en cours." hint="Les courses acceptées apparaissent ici." />
+          )}
         </div>
-      </div>
 
-      {/* Body */}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: `16px 16px ${SAFE_BOTTOM + 16}px` }}>
-        <Section title="Livraison en cours" count={mine.length} />
-        {activeDelivery ? (
-          <ActiveCard data={activeDelivery} onOpen={() => router.push(`/driver/order/${activeDelivery.order.id}`)} />
-        ) : (
-          <Empty text="Aucune livraison en cours." />
-        )}
-
-        <div style={{ height: 22 }} />
-        <Section title="Disponibles" count={online ? available.length : 0} />
-        {!online ? (
-          <Empty text="Vous êtes hors ligne. Activez « En ligne » pour recevoir des courses." />
-        ) : (
-          <button
-            onClick={() => router.push('/driver/requests')}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 14, cursor: 'pointer', textAlign: 'left', boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}
-          >
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Icon name="bell" size={20} color="var(--brand)" />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)' }}>
-                {available.length === 0 ? 'Aucune demande' : `${available.length} demande${available.length > 1 ? 's' : ''} disponible${available.length > 1 ? 's' : ''}`}
-              </div>
-              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>
-                {available.length === 0 ? 'Vous recevrez les nouvelles courses ici.' : 'Voir et accepter les courses'}
-              </div>
-            </div>
-            <Icon name="right" size={18} color="var(--muted)" />
-          </button>
-        )}
+        {/* Disponibles */}
+        <div>
+          <SectionTitle aside={online ? `${available.length} disponible${available.length > 1 ? 's' : ''}` : 'hors ligne'}>
+            Demandes
+          </SectionTitle>
+          {!online ? (
+            <EmptyLine title="Vous êtes hors ligne." hint="Activez « En ligne » pour recevoir des courses." />
+          ) : (
+            <Panel padding={0}>
+              <button
+                onClick={() => router.push('/driver/requests')}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: 'transparent', border: 'none', borderRadius: 20, padding: 16, cursor: 'pointer', textAlign: 'left' }}
+              >
+                <div style={{ width: 44, height: 44, borderRadius: 14, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon name="bell" size={20} color="var(--ink)" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ ...text, fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
+                    {available.length === 0 ? 'Aucune demande' : `${available.length} course${available.length > 1 ? 's' : ''} à prendre`}
+                  </div>
+                  <div style={{ ...text, fontSize: 12.5, color: 'var(--muted)' }}>
+                    {available.length === 0 ? 'Vous recevrez les nouvelles courses ici.' : 'Voir et accepter les courses'}
+                  </div>
+                </div>
+                <Icon name="right" size={18} color="var(--muted)" />
+              </button>
+            </Panel>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', borderRadius: 14, padding: '10px 12px' }}>
-      <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: '#fff' }}>{value}</div>
-      <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'rgba(255,255,255,0.7)' }}>{label}</div>
-    </div>
-  );
-}
-
-function Section({ title, count }: { title: string; count: number }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-      <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 17, color: 'var(--ink)', margin: 0 }}>{title}</h2>
-      <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)' }}>{count}</span>
-    </div>
-  );
-}
-
-function Empty({ text }: { text: string }) {
-  return (
-    <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', background: '#fff', border: '1px dashed var(--line)', borderRadius: 18, padding: '18px 16px', textAlign: 'center' }}>
-      {text}
-    </div>
-  );
-}
-
-// Rich "current delivery" card — stage badge, address, total, ETA, and a clear
-// call-to-action to open the full course (where the state machine + GPS live).
+// Carte de la course en cours — état, adresse, créneau, encaissement, action.
 function ActiveCard({ data, onOpen }: { data: DriverOrder; onOpen: () => void }) {
   const { order, tracking } = data;
   const eta = etaMinutes(tracking?.eta_at ?? order.eta_at);
   const isDelivery = order.mode === 'livraison';
   const stage = tracking?.stage ?? 0;
+  const slot = slotShortLabel(order.slot_at);
+  const cash = (order.payment_method ?? 'cod') === 'cod' ? order.total_dh : 0;
+
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>{order.code}</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--soft)', borderRadius: 999, padding: '5px 11px' }}>
-          <span className="lv-livedot" style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--brand)' }} />
-          <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--brand)' }}>{STAGE_LABEL[stage] ?? '—'}</span>
-        </span>
+    <Panel>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+        <span style={{ ...text, fontWeight: 600, fontSize: 16, color: 'var(--ink)' }}>{order.code}</span>
+        <Pill tone="solid">{STAGE_LABEL[stage] ?? '—'}</Pill>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 38, height: 38, borderRadius: 11, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon name={isDelivery ? 'scooter' : 'store'} size={20} color="var(--brand)" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 14, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon name={isDelivery ? 'scooter' : 'store'} size={20} color="var(--ink)" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ ...text, fontSize: 14, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {isDelivery ? order.address ?? 'Adresse de livraison' : 'Retrait en boutique'}
           </div>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)' }}>
+          <div style={{ ...text, fontSize: 12.5, color: 'var(--muted)' }}>
             {formatDH(order.total_dh)}
             {eta !== null ? ` · ~${eta} min` : ''}
+            {slot ? ` · ${slot}` : ''}
           </div>
         </div>
       </div>
 
-      <button
-        onClick={onOpen}
-        style={{ width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--brand)', border: 'none', borderRadius: 999, padding: '13px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: '#fff', boxShadow: '0 8px 20px -8px var(--brand)' }}
-      >
+      {cash > 0 && (
+        <Well style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Icon name="cash" size={17} color="var(--a-accent)" />
+          <span style={{ ...text, fontSize: 13.5, color: 'var(--ink)' }}>
+            <strong style={{ fontWeight: 600 }}>{formatDH(cash)}</strong> à encaisser en espèces
+          </span>
+        </Well>
+      )}
+
+      <PrimaryAction onClick={onOpen} style={{ marginTop: 14 }}>
         Voir la course
-        <Icon name="right" size={18} color="#fff" />
-      </button>
-    </div>
+        <Icon name="right" size={18} color="var(--a-on-white)" />
+      </PrimaryAction>
+    </Panel>
   );
 }
-
