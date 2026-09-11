@@ -1,10 +1,12 @@
 // components/admin/kitchen/StationLoadCard.tsx
-// One station load gauge (Pâtisserie / Restaurant): capacity %, a colored fill
-// bar, "X en cours / Y" and the rough "~Z min d'attente". Pure presentational —
-// fed a StationLoad row built by lib/kitchen.ts. Bar turns red at saturation.
+// One station load gauge (Pâtisserie / Restaurant): capacity %, a fill bar,
+// "X en cours / Y" and the rough "~Z min d'attente". Pure presentational — fed a
+// StationLoad row built by lib/kitchen.ts. The figure and bar turn gold at
+// saturation.
 'use client';
 import type { StationLoad } from '@/lib/kitchen';
 import { Icon } from '@/components/ui/Icon';
+import { IconTile, Meter, SubPanel } from '@/components/admin/ui/Glass';
 
 const STATION_ICON: Record<string, string> = {
   patisserie: 'gift',
@@ -12,68 +14,29 @@ const STATION_ICON: Record<string, string> = {
 };
 
 export function StationLoadCard({ load }: { load: StationLoad }) {
-  const barColor = load.saturated ? '#d24b4b' : load.loadPct >= 75 ? 'var(--gold)' : 'var(--brand)';
-  const tint = load.saturated ? 'rgba(210,75,75,0.12)' : 'rgba(19,124,139,0.10)';
-  const tintColor = load.saturated ? '#d24b4b' : 'var(--brand)';
-
   return (
-    <div
-      style={{
-        background: 'var(--a-card)',
-        border: '1px solid var(--line)',
-        borderRadius: 18,
-        boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)',
-        padding: '18px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 14,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <SubPanel style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              background: tint,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon name={STATION_ICON[load.station] ?? 'store'} size={18} color={tintColor} />
-          </span>
-          <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>
-            {load.label}
-          </span>
+          <IconTile name={STATION_ICON[load.station] ?? 'store'} size={36} />
+          <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>{load.label}</span>
         </div>
-        <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 22, color: barColor }}>
-          {load.loadPct}%
+        <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 300, fontSize: 30, letterSpacing: '-0.02em', color: load.saturated ? 'var(--a-accent)' : 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>
+          {load.loadPct}
+          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--muted)', marginLeft: 2 }}>%</span>
         </span>
       </div>
 
-      <div style={{ height: 9, borderRadius: 999, background: 'var(--soft)', overflow: 'hidden' }}>
-        <div
-          style={{
-            width: `${load.loadPct}%`,
-            height: '100%',
-            borderRadius: 999,
-            background: barColor,
-            transition: 'width .3s ease',
-          }}
-        />
-      </div>
+      <Meter ratio={load.loadPct / 100} label={`${load.label} : charge ${load.loadPct} %`} />
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <span style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>
-          <strong style={{ color: 'var(--ink)' }}>{load.active}</strong> en cours / {load.capacity}
+          <strong style={{ color: 'var(--ink)', fontWeight: 600 }}>{load.active}</strong> en cours / {load.capacity}
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>
-          <Icon name="clock" size={14} color="var(--muted)" />
-          ~{load.waitMinutes} min d&apos;attente
+          <Icon name="clock" size={14} color="var(--muted)" />~{load.waitMinutes} min d&apos;attente
         </span>
       </div>
-    </div>
+    </SubPanel>
   );
 }

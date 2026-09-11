@@ -1,18 +1,19 @@
 // components/admin/reviews/ReviewCard.tsx
-// One review row: star rating, customer + order code + driver, the comment, and
+// One review: star rating, date, customer + order code + driver, the comment, and
 // any tags. Pure presentational — all data is prop-driven.
 import { Icon } from '@/components/ui/Icon';
 import type { ReviewRow } from '@/lib/admin-reviews';
+import { GlassPanel, Pill } from '@/components/admin/ui/Glass';
 
 function dateLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Casablanca' });
 }
 
 function Stars({ rating }: { rating: number }) {
   return (
-    <span style={{ display: 'inline-flex', gap: 2 }} aria-label={`${rating} sur 5`}>
+    <span style={{ display: 'inline-flex', gap: 2 }} role="img" aria-label={`${rating} sur 5`}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <Icon key={i} name="star" size={15} color={i <= rating ? 'var(--gold)' : 'var(--line)'} />
+        <Icon key={i} name="star" size={15} color={i <= rating ? 'var(--a-accent)' : 'rgba(255, 255, 255, 0.25)'} fill={i <= rating} />
       ))}
     </span>
   );
@@ -24,56 +25,31 @@ export interface ReviewCardProps {
 
 export function ReviewCard({ row }: ReviewCardProps) {
   const { review, customerName, orderCode, driverName } = row;
+  const text = { fontFamily: 'var(--ui-font)' } as const;
   return (
-    <div
-      style={{
-        background: 'var(--a-card)',
-        border: '1px solid var(--line)',
-        borderRadius: 18,
-        boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)',
-        padding: '16px 18px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-      }}
-    >
+    <GlassPanel style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '18px 20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <Stars rating={review.rating} />
-        <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)' }}>{dateLabel(review.created_at)}</span>
+        <span style={{ ...text, fontSize: 12, color: 'var(--muted)' }}>{dateLabel(review.created_at)}</span>
       </div>
 
-      <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)', display: 'flex', flexWrap: 'wrap', gap: '2px 8px' }}>
+      <div style={{ ...text, fontSize: 13, color: 'var(--muted)', display: 'flex', flexWrap: 'wrap', gap: '2px 8px' }}>
         <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{customerName || 'Client'}</span>
         {orderCode && <span>· {orderCode}</span>}
         {driverName && <span>· Livré par {driverName}</span>}
       </div>
 
-      {review.comment && (
-        <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--ink)', margin: 0, lineHeight: 1.5 }}>
-          {review.comment}
-        </p>
-      )}
+      {review.comment && <p style={{ ...text, fontSize: 14, color: 'var(--ink)', margin: 0, lineHeight: 1.55 }}>« {review.comment} »</p>}
 
       {review.tags.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {review.tags.map((tag) => (
-            <span
-              key={tag}
-              style={{
-                fontFamily: 'var(--ui-font)',
-                fontSize: 11.5,
-                fontWeight: 600,
-                padding: '3px 10px',
-                borderRadius: 999,
-                background: 'var(--soft)',
-                color: 'var(--brand-d)',
-              }}
-            >
+            <Pill key={tag} tone="outline">
               {tag}
-            </span>
+            </Pill>
           ))}
         </div>
       )}
-    </div>
+    </GlassPanel>
   );
 }

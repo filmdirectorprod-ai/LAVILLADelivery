@@ -100,3 +100,31 @@ export function buildSupportThreads(
   });
   return threads;
 }
+const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** One-tap answers for the reply box. */
+export const QUICK_REPLIES = ['Bien reçu, je regarde.', 'Merci, c’est noté.', 'Appelle-moi dès que possible.', 'La commande est prête au comptoir.'];
+
+export interface SupportTotals {
+  drivers: number;
+  unread: number;
+  /** Conversations whose last message is from the driver (awaiting a reply). */
+  awaiting: number;
+  online: number;
+}
+
+export function supportTotals(threads: SupportThread[]): SupportTotals {
+  const t: SupportTotals = { drivers: threads.length, unread: 0, awaiting: 0, online: 0 };
+  for (const th of threads) {
+    t.unread += th.unread;
+    if (th.messages[th.messages.length - 1]?.sender === 'driver') t.awaiting += 1;
+    if (th.driver.isOnline) t.online += 1;
+  }
+  return t;
+}
+
+/** Threads matching an accent-insensitive driver-name search, optionally only those awaiting a reply. */
+export function filterThreads(threads: SupportThread[], query: string, onlyAwaiting: boolean): SupportThread[] {
+  const q = fold(query.trim());
+  return threads.filter((th) => (!onlyAwaiting || th.messages[th.messages.length - 1]?.sender === 'driver') && (!q || fold(th.driver.name).includes(q)));
+}

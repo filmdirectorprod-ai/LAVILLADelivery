@@ -149,3 +149,30 @@ export function buildKitchenBoard(input: KitchenInput): KitchenBoard {
 
   return { preparing, ready, stations, lateCodes };
 }
+
+export interface ProductionLine {
+  name: string;
+  /** Units to produce across the tickets. */
+  qty: number;
+  /** Tickets containing this item. */
+  orders: number;
+}
+
+/** What the brigade has to make right now: the items of the given tickets summed
+ *  by name, most units first. */
+export function productionList(tickets: KitchenTicket[]): ProductionLine[] {
+  const byName = new Map<string, ProductionLine>();
+  for (const t of tickets) {
+    const seen = new Set<string>();
+    for (const it of t.items) {
+      const cur = byName.get(it.name_snapshot) ?? { name: it.name_snapshot, qty: 0, orders: 0 };
+      cur.qty += it.qty;
+      if (!seen.has(it.name_snapshot)) {
+        cur.orders += 1;
+        seen.add(it.name_snapshot);
+      }
+      byName.set(it.name_snapshot, cur);
+    }
+  }
+  return Array.from(byName.values()).sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name));
+}

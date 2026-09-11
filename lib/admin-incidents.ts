@@ -69,3 +69,42 @@ export function partitionIncidentRows(rows: IncidentRow[]): { open: IncidentRow[
   }
   return { open, resolved };
 }
+
+export const INCIDENT_KIND_LABEL: Record<string, string> = { retard: 'Retard', litige: 'Litige', accident: 'Accident', autre: 'Autre' };
+export const SEVERITY_LABEL: Record<IncidentSeverity, string> = { haute: 'Haute', moyenne: 'Moyenne', basse: 'Basse' };
+
+/** Rows matching a severity and a kind ('all' keeps everything). */
+export function filterIncidentRows(rows: IncidentRow[], severity: IncidentSeverity | 'all', kind: string): IncidentRow[] {
+  return rows.filter((r) => (severity === 'all' || r.incident.severity === severity) && (kind === 'all' || r.incident.kind === kind));
+}
+
+export interface IncidentTotals {
+  open: number;
+  /** Open incidents of high severity. */
+  high: number;
+  /** Resolved during the last 7 days. */
+  resolvedWeek: number;
+  /** Mean hours from report to resolution, one decimal; null when none resolved. */
+  avgResolutionHours: number | null;
+}
+
+export function incidentTotals(rows: IncidentRow[], now: Date = new Date()): IncidentTotals {
+  const weekAgo = now.getTime() - 7 * 86400000;
+  const t: IncidentTotals = { open: 0, high: 0, resolvedWeek: 0, avgResolutionHours: null };
+  let sum = 0;
+  let n = 0;
+  for (const { incident: i } of rows) {
+    if (i.status !== 'resolved') {
+      t.open += 1;
+      if (i.severity === 'haute') t.high += 1;
+      continue;
+    }
+    const done = i.resolved_at ? Date.parse(i.resolved_at) : NaN;
+    if (Number.isNaN(done)) continue;
+    if (done >= weekAgo) t.resolvedWeek += 1;
+    sum += Math.max(0, done - Date.parse(i.created_at));
+    n += 1;
+  }
+  if (n) t.avgResolutionHours = Math.round((sum / n / 3600000) * 10) / 10;
+  return t;
+}

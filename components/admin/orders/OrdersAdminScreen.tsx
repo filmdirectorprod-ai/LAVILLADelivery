@@ -1,23 +1,32 @@
 // components/admin/orders/OrdersAdminScreen.tsx
-// Live container for the admin Commandes screen. Renders the server snapshot as a
-// full-width table with count-badge tabs (Toutes / En cours / À assigner /
-// Terminées), an inline per-row driver assignment, a "Marquer prête" action, sales
-// CSV export, and an optional "Affectation auto" mode that round-robins unassigned
-// ready orders across online drivers. Subscribes to postgres_changes on orders /
-// order_items / order_tracking and refetches the same raw shapes — rebuilt via
-// lib/admin-orders.ts so server and client agree. Staff writes go through the 0015
-// RPCs, then a refetch.
+// Live container for the admin Commandes screen, in the language of the Vue
+// d'ensemble: headline figures (to confirm, in progress, today's revenue and
+// basket), an alert for orders waiting too long, filter chips with counts, agency
+// chips, a search on code or customer, and the orders table in a glass panel with
+// each open order's waiting time, an inline driver assignment, "Vérifier" / "Prête"
+// / "Annuler" actions, sales CSV export and the optional "Affectation auto" mode
+// that round-robins unassigned ready orders across online drivers.
+//
+// Subscribes to postgres_changes on orders / order_items / order_tracking and
+// refetches the same raw shapes — rebuilt via lib/admin-orders.ts so server and
+// client agree. Staff writes go through the 0015 RPCs, then a refetch.
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { formatDH } from '@/lib/format';
-import { orderStatusLabel, orderStatusPill } from '@/lib/order-status';
+import { formatAmount, formatDH } from '@/lib/format';
+import { orderStatusLabel } from '@/lib/order-status';
 import { useBranches } from '@/lib/use-branches';
+import { startOfTodayISO } from '@/lib/admin-overview';
 import {
+  ORDER_WAIT_ALERT_MIN,
+  ageLabel,
   buildAdminOrderRows,
-  filterAdminOrdersByTab,
   countOrdersByTab,
+  isOrderWaitingLong,
+  orderAgeMinutes,
   orderItemsSummary,
+  orderMatchesTab,
+  ordersHeadline,
   ordersToCsv,
   pickAutoAssignments,
   type AdminOrderRow,
@@ -28,6 +37,8 @@ import type { Driver, Order, OrderItem, OrderTracking } from '@/lib/types';
 import { OrderConfirmPanel } from './OrderConfirmPanel';
 import { useRealtime } from '@/lib/use-realtime';
 import { fetchAllIn } from '@/lib/fetch-in-chunks';
+import { HeroStat } from '@/components/admin/overview/HeroStat';
+import { Chip, EmptyState, GhostButton, GlassPanel, Notice, PageHeader, Pill, PrimaryButton, SearchField, Switch, fieldStyle, orderStatusTone } from '@/components/admin/ui/Glass';
 
 const TABS: { value: OrderTab; label: string }[] = [
   { value: 'toconfirm', label: 'À confirmer' },
@@ -37,9 +48,14 @@ const TABS: { value: OrderTab; label: string }[] = [
   { value: 'done', label: 'Terminées' },
 ];
 
+const OPEN = new Set(['pending', 'preparing', 'ready', 'en_route']);
+
 function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Casablanca' });
 }
+
+const TH: CSSProperties = { textAlign: 'left', padding: '12px 18px', fontFamily: 'var(--ui-font)', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--muted)', borderBottom: '1px solid var(--line)', whiteSpace: 'nowrap' };
+const TD: CSSProperties = { padding: '13px 18px', fontFamily: 'var(--ui-font)', verticalAlign: 'middle' };
 
 export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
   const [rows, setRows] = useState<AdminOrderRow[]>(initial.rows);
@@ -51,14 +67,16 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
   const [busy, setBusy] = useState(false);
   const [autoAssign, setAutoAssign] = useState(false);
   const [confirmRow, setConfirmRow] = useState<AdminOrderRow | null>(null);
+  // Waiting times move without any database event: tick once a minute.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    const { data: orders } = await supabase
-      .from('orders')
-      .select('*')
-      .order('placed_at', { ascending: false })
-      .limit(200);
+    const { data: orders } = await supabase.from('orders').select('*').order('placed_at', { ascending: false }).limit(200);
     const list = (orders ?? []) as Order[];
     const ids = list.map((o) => o.id);
     const [itemsRes, trackingRes, driversRes, profilesRes] = await Promise.all([
@@ -69,30 +87,23 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
       supabase.from('profiles').select('id, full_name'),
     ]);
     setDrivers((driversRes.data ?? []) as Driver[]);
-    setRows(
-      buildAdminOrderRows(
-        list,
-        itemsRes,
-        trackingRes,
-        (driversRes.data ?? []) as Driver[],
-        (profilesRes.data ?? []) as { id: string; full_name: string | null }[],
-      ),
-    );
+    setRows(buildAdminOrderRows(list, itemsRes, trackingRes, (driversRes.data ?? []) as Driver[], (profilesRes.data ?? []) as { id: string; full_name: string | null }[]));
   }, []);
 
   useRealtime('admin-orders', [{ table: 'orders' }, { table: 'order_items' }, { table: 'order_tracking' }], refetch);
 
-  const counts = useMemo(() => countOrdersByTab(rows), [rows]);
+  const byBranch = useMemo(() => (branchFilter ? rows.filter((r) => r.order.branch_id === branchFilter) : rows), [rows, branchFilter]);
+  const counts = useMemo(() => countOrdersByTab(byBranch), [byBranch]);
+  const headline = useMemo(() => ordersHeadline(byBranch, startOfTodayISO(now), now), [byBranch, now]);
   const visible = useMemo(() => {
-    const byTab = filterAdminOrdersByTab(rows, tab, query);
-    return branchFilter ? byTab.filter((r) => r.order.branch_id === branchFilter) : byTab;
-  }, [rows, tab, query, branchFilter]);
+    const q = query.trim().toLowerCase();
+    return byBranch.filter((r) => orderMatchesTab(r, tab) && (!q || r.order.code.toLowerCase().includes(q) || (r.customerName ?? '').toLowerCase().includes(q)));
+  }, [byBranch, tab, query]);
 
   const runRpc = useCallback(
     async (fn: string, params: Record<string, unknown>) => {
       setBusy(true);
-      const supabase = createClient();
-      await supabase.rpc(fn, params);
+      await createClient().rpc(fn, params);
       setBusy(false);
       refetch();
     },
@@ -101,7 +112,10 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
 
   const onMarkReady = (orderId: string) => runRpc('admin_mark_order_ready', { p_order: orderId });
   const onAssignDriver = (orderId: string, driverId: string) => runRpc('admin_assign_driver', { p_order: orderId, p_driver: driverId });
-  const onCancel = (orderId: string) => runRpc('admin_set_order_status', { p_order: orderId, p_status: 'cancelled' });
+  const onCancel = (o: Order) => {
+    if (!window.confirm(`Annuler la commande ${o.code} ?`)) return;
+    runRpc('admin_set_order_status', { p_order: o.id, p_status: 'cancelled' });
+  };
 
   // Auto-assign: when on, round-robin unassigned ready/preparing orders across
   // online drivers. Guarded by a ref so the same order isn't dispatched twice while
@@ -137,95 +151,63 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
   }, [visible]);
 
   return (
-    <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 34, letterSpacing: '-0.02em', color: 'var(--a-text)', margin: 0 }}>Commandes</h1>
-          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--a-muted)', marginTop: 6 }}>
-            {counts.toconfirm} à confirmer · {counts.active} en cours · {counts.unassigned} à assigner
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
-            <input type="checkbox" checked={autoAssign} onChange={(e) => setAutoAssign(e.target.checked)} />
-            Affectation auto
-          </label>
-          <button
-            type="button"
-            onClick={exportSales}
-            style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 16px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--ink)', background: 'var(--a-card)' }}
-          >
-            Exporter ventes
-          </button>
-        </div>
+    <div style={{ padding: '30px 32px 40px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <PageHeader
+        title="Commandes"
+        subtitle={`${counts.toconfirm} à confirmer · ${counts.active} en cours · ${counts.unassigned} à assigner`}
+        actions={
+          <>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontFamily: 'var(--ui-font)', fontSize: 13, fontWeight: 600, color: 'var(--a-text)', marginRight: 6 }}>
+              <Switch checked={autoAssign} onChange={setAutoAssign} label="Affectation auto" />
+              Affectation auto
+            </span>
+            <GhostButton onClick={exportSales}>Exporter ventes</GhostButton>
+          </>
+        }
+      />
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px 56px' }}>
+        <HeroStat label="À confirmer" value={String(counts.toconfirm)} />
+        <HeroStat label="En cours" value={String(counts.active)} />
+        <HeroStat label="Chiffre d'affaires du jour" value={formatAmount(headline.todayRevenue)} unit="DH" />
+        <HeroStat label={`Panier moyen · ${headline.todayOrders} cmd`} value={formatAmount(headline.avgBasket)} unit="DH" />
       </div>
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {TABS.map((t) => {
-            const active = tab === t.value;
-            return (
-              <button
-                key={t.value}
-                onClick={() => setTab(t.value)}
-                style={{
-                  border: '1px solid var(--line)',
-                  borderRadius: 999,
-                  padding: '7px 14px',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--ui-font)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 7,
-                  background: active ? 'var(--brand)' : '#fff',
-                  color: active ? '#fff' : 'var(--muted)',
-                }}
-              >
-                {t.label}
-                <span style={{ fontSize: 11.5, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: active ? 'rgba(255,255,255,0.22)' : 'var(--soft)', color: active ? '#fff' : 'var(--muted)' }}>
-                  {counts[t.value]}
-                </span>
-              </button>
-            );
-          })}
+      {headline.waitingLong > 0 && (
+        <Notice icon="clock">
+          {headline.waitingLong} commande{headline.waitingLong > 1 ? 's ouvertes' : ' ouverte'} depuis plus de {ORDER_WAIT_ALERT_MIN} min.
+        </Notice>
+      )}
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div role="group" aria-label="Filtrer les commandes" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {TABS.map((t) => (
+            <Chip key={t.value} on={tab === t.value} onClick={() => setTab(t.value)} count={counts[t.value]}>
+              {t.label}
+            </Chip>
+          ))}
         </div>
         {branches.length > 1 && (
-          <div style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
-            {[{ id: '', name: 'Toutes les agences' }, ...branches].map((b) => {
-              const active = branchFilter === b.id;
-              return (
-                <button
-                  key={b.id || 'all'}
-                  onClick={() => setBranchFilter(b.id)}
-                  style={{ border: `1px solid ${active ? 'var(--brand)' : 'var(--line)'}`, borderRadius: 999, padding: '7px 13px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, background: active ? 'rgba(19,124,139,0.08)' : '#fff', color: active ? 'var(--brand)' : 'var(--muted)' }}
-                >
-                  {b.name.replace(/ —.*$/, '')}
-                </button>
-              );
-            })}
+          <div role="group" aria-label="Filtrer par agence" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {[{ id: '', name: 'Toutes les agences' }, ...branches].map((b) => (
+              <Chip key={b.id || 'all'} on={branchFilter === b.id} onClick={() => setBranchFilter(b.id)}>
+                {b.name.replace(/ —.*$/, '')}
+              </Chip>
+            ))}
           </div>
         )}
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Rechercher un code…"
-          style={{ marginLeft: branches.length > 1 ? 0 : 'auto', border: '1px solid var(--line)', borderRadius: 12, padding: '9px 14px', fontFamily: 'var(--ui-font)', fontSize: 14, minWidth: 220 }}
-        />
+        <SearchField value={query} onChange={setQuery} label="Rechercher une commande" placeholder="Code ou client…" style={{ maxWidth: 320, marginLeft: 'auto' }} />
       </div>
 
-      <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)', overflowX: 'auto' }}>
+      <GlassPanel padding={0} style={{ overflowX: 'auto' }}>
         {visible.length === 0 ? (
-          <div style={{ padding: '36px 22px', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', textAlign: 'center' }}>
-            Aucune commande.
-          </div>
+          <EmptyState title="Aucune commande." hint={query ? 'Essayez un autre code ou un autre nom.' : undefined} />
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 880 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 940 }}>
             <thead>
               <tr>
                 {['Commande', 'Client', 'Articles', 'Total', 'Livreur', 'Statut', ''].map((h, i) => (
-                  <th key={i} style={{ textAlign: 'left', padding: '12px 18px', fontFamily: 'var(--ui-font)', fontSize: 11.5, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--muted)', background: 'var(--soft)' }}>
+                  <th key={i} style={TH}>
                     {h}
                   </th>
                 ))}
@@ -233,71 +215,63 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
             </thead>
             <tbody>
               {visible.map((r) => {
-                const pill = orderStatusPill(r.order.status);
-                const canCancel = r.order.status !== 'delivered' && r.order.status !== 'cancelled';
-                const canAssign = r.order.status === 'preparing' || r.order.status === 'ready' || r.order.status === 'en_route';
+                const o = r.order;
+                const canCancel = o.status !== 'delivered' && o.status !== 'cancelled';
+                const canAssign = o.status === 'preparing' || o.status === 'ready' || o.status === 'en_route';
+                const waitingLong = isOrderWaitingLong(o, now);
                 return (
-                  <tr key={r.order.id} style={{ borderTop: '1px solid var(--line)' }}>
-                    <td style={{ padding: '12px 18px' }}>
-                      <div style={{ fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{r.order.code}</div>
-                      <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>{timeLabel(r.order.placed_at)}</div>
+                  <tr key={o.id} style={{ borderTop: '1px solid var(--line)' }}>
+                    <td style={TD}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{o.code}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2, whiteSpace: 'nowrap' }}>
+                        {timeLabel(o.placed_at)}
+                        {OPEN.has(o.status) && (
+                          <span style={{ color: waitingLong ? 'var(--a-accent)' : 'var(--muted)', fontWeight: waitingLong ? 600 : 400 }}> · {ageLabel(orderAgeMinutes(o, now))}</span>
+                        )}
+                      </div>
                     </td>
-                    <td style={{ padding: '12px 18px', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>{r.customerName ?? '—'}</td>
-                    <td style={{ padding: '12px 18px', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)', maxWidth: 220 }}>{orderItemsSummary(r.items)}</td>
-                    <td style={{ padding: '12px 18px', fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{formatDH(r.order.total_dh)}</td>
-                    <td style={{ padding: '12px 18px' }}>
+                    <td style={TD}>
+                      <div style={{ fontSize: 13.5, color: 'var(--ink)' }}>{r.customerName ?? '—'}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>{o.mode === 'livraison' ? 'Livraison' : 'Retrait'}</div>
+                    </td>
+                    <td style={{ ...TD, fontSize: 13, color: 'var(--ink)', maxWidth: 240 }}>{orderItemsSummary(r.items)}</td>
+                    <td style={{ ...TD, fontSize: 14, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap' }}>{formatDH(o.total_dh)}</td>
+                    <td style={TD}>
                       {canAssign ? (
                         <select
+                          aria-label={`Livreur de la commande ${o.code}`}
                           value={r.tracking?.driver_id ?? ''}
                           disabled={busy}
-                          onChange={(e) => e.target.value && onAssignDriver(r.order.id, e.target.value)}
-                          style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '7px 10px', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)', background: 'var(--a-card)', maxWidth: 170 }}
+                          onChange={(e) => e.target.value && onAssignDriver(o.id, e.target.value)}
+                          style={{ ...fieldStyle, padding: '7px 10px', fontSize: 13, width: 'auto', maxWidth: 180 }}
                         >
                           <option value="">Assigner…</option>
                           {drivers.map((d) => (
-                            <option key={d.id} value={d.id}>{d.name}{d.is_online ? ' ·●' : ''}</option>
+                            <option key={d.id} value={d.id}>
+                              {d.name}
+                              {d.is_online ? ' · en ligne' : ''}
+                            </option>
                           ))}
                         </select>
                       ) : (
-                        <span style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>{r.driverName ?? '—'}</span>
+                        <span style={{ fontSize: 13, color: 'var(--muted)' }}>{r.driverName ?? '—'}</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 18px' }}>
-                      <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: pill.bg, color: pill.fg }}>
-                        {orderStatusLabel(r.order.status)}
-                      </span>
+                    <td style={TD}>
+                      <Pill tone={orderStatusTone(o.status)}>{orderStatusLabel(o.status)}</Pill>
                     </td>
-                    <td style={{ padding: '12px 18px', whiteSpace: 'nowrap' }}>
+                    <td style={{ ...TD, whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
-                        {r.order.status === 'pending' && (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmRow(r)}
-                            style={{ border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 700, color: '#fff', background: '#2f9e6f' }}
-                          >
-                            Vérifier
-                          </button>
-                        )}
-                        {r.order.status === 'preparing' && (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => onMarkReady(r.order.id)}
-                            style={{ border: 'none', borderRadius: 8, padding: '6px 12px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#fff', background: 'var(--brand)', opacity: busy ? 0.6 : 1 }}
-                          >
+                        {o.status === 'pending' && <PrimaryButton onClick={() => setConfirmRow(r)}>Vérifier</PrimaryButton>}
+                        {o.status === 'preparing' && (
+                          <PrimaryButton disabled={busy} onClick={() => onMarkReady(o.id)}>
                             Prête
-                          </button>
+                          </PrimaryButton>
                         )}
-                        {r.order.status !== 'pending' && canCancel && (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => onCancel(r.order.id)}
-                            title="Annuler la commande"
-                            style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '6px 10px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#a23', background: 'var(--a-card)', opacity: busy ? 0.6 : 1 }}
-                          >
+                        {o.status !== 'pending' && canCancel && (
+                          <GhostButton disabled={busy} onClick={() => onCancel(o)} aria-label={`Annuler la commande ${o.code}`}>
                             Annuler
-                          </button>
+                          </GhostButton>
                         )}
                       </div>
                     </td>
@@ -307,7 +281,7 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
             </tbody>
           </table>
         )}
-      </div>
+      </GlassPanel>
 
       {confirmRow && (
         <OrderConfirmPanel

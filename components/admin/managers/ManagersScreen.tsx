@@ -16,6 +16,7 @@ import { credentialsText, lastSeenLabel, type BranchActivity } from '@/lib/admin
 import type { Branch } from '@/lib/types';
 import { HeroStat, MiniStat } from '@/components/admin/overview/HeroStat';
 import { EmptyState, GhostButton, GlassPanel, PageHeader, PanelTitle, PrimaryButton, SubPanel, fieldStyle, labelStyle } from '@/components/admin/ui/Glass';
+import { CopyButton } from '@/components/admin/ui/CopyButton';
 
 export type ManagerRow = {
   id: string;
@@ -28,42 +29,6 @@ export type ManagerRow = {
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const shortName = (name: string) => name.replace(/ —.*$/, '');
 const text = { fontFamily: 'var(--ui-font)' } as const;
-
-/** The Clipboard API only exists on https / localhost; the admin is often opened
- *  over the LAN in plain http, so fall back to a hidden textarea. */
-async function copyText(value: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(value);
-      return true;
-    }
-  } catch {
-    // fall through to the textarea
-  }
-  try {
-    const ta = document.createElement('textarea');
-    ta.value = value;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand('copy');
-    document.body.removeChild(ta);
-    return ok;
-  } catch {
-    return false;
-  }
-}
-
-function CopyButton({ value }: { value: string }) {
-  const [state, setState] = useState<'idle' | 'ok' | 'ko'>('idle');
-  return (
-    <GhostButton onClick={async () => setState((await copyText(value)) ? 'ok' : 'ko')}>
-      {state === 'ok' ? 'Copié ✓' : state === 'ko' ? 'Copie impossible' : 'Copier les identifiants'}
-    </GhostButton>
-  );
-}
 
 /** Masked by default: the super-admin may be sharing their screen. */
 function PasswordField({ id, label, value, onChange, onRegenerate }: { id: string; label: string; value: string; onChange: (v: string) => void; onRegenerate: () => void }) {

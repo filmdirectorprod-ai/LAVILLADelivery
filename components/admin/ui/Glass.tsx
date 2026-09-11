@@ -5,7 +5,8 @@
 // Colours come from the admin tokens only — the ink tokens are white inside the
 // admin, so everything here reads on the dark cards.
 'use client';
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, type CSSProperties, type ReactNode } from 'react';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 export function GlassPanel({ children, style, padding = 22 }: { children: ReactNode; style?: CSSProperties; padding?: number | string }) {
   return (
@@ -216,6 +217,148 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
     <div style={{ padding: '30px 16px', textAlign: 'center' }}>
       <div style={{ fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{title}</div>
       {hint && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', marginTop: 6 }}>{hint}</div>}
+    </div>
+  );
+}
+
+export type PillTone = 'solid' | 'outline' | 'accent' | 'muted';
+
+const PILL_TONE: Record<PillTone, CSSProperties> = {
+  solid: { background: '#ffffff', color: 'var(--a-on-white)', border: '1px solid #ffffff' },
+  outline: { background: 'transparent', color: 'var(--ink)', border: '1px solid var(--a-glass-line)' },
+  accent: { background: 'transparent', color: 'var(--a-accent)', border: '1px solid var(--a-accent)' },
+  muted: { background: 'transparent', color: 'var(--muted)', border: '1px solid var(--line)' },
+};
+
+/** Small state label. White = live / needs a driver, gold = needs a look,
+ *  outline = in progress, muted = finished. */
+export function Pill({ children, tone = 'outline', title }: { children: ReactNode; tone?: PillTone; title?: string }) {
+  return (
+    <span
+      title={title}
+      style={{
+        ...PILL_TONE[tone],
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        fontFamily: 'var(--ui-font)',
+        fontSize: 11.5,
+        fontWeight: 600,
+        padding: '3px 10px',
+        borderRadius: 999,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Order status → pill tone, in the admin palette (the shared orderStatusPill
+ *  carries the customer app's green / red, which the admin does not use). */
+export function orderStatusTone(status: string): PillTone {
+  switch (status) {
+    case 'pending':
+      return 'accent';
+    case 'ready':
+      return 'solid';
+    case 'preparing':
+    case 'en_route':
+      return 'outline';
+    default:
+      return 'muted';
+  }
+}
+
+/** Rounded square holding an icon, for card headers. */
+export function IconTile({ name, size = 40 }: { name: IconName; size?: number }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: size * 0.32, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <Icon name={name} size={Math.round(size * 0.45)} color="var(--ink)" />
+    </div>
+  );
+}
+
+/** "Temps réel" badge for live screens. */
+export function LiveBadge() {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--a-text)', border: '1px solid var(--a-glass-line)', padding: '7px 13px', borderRadius: 999 }}>
+      <span style={{ width: 8, height: 8, borderRadius: 999, background: '#ffffff', boxShadow: '0 0 0 3px rgba(255, 255, 255, 0.2)' }} />
+      Temps réel
+    </span>
+  );
+}
+
+/** A line that asks for attention (late orders, saturation): gold outline. */
+export function Notice({ children, icon = 'info' }: { children: ReactNode; icon?: IconName }) {
+  return (
+    <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--a-accent)', borderRadius: 18, padding: '12px 16px', background: 'rgba(0, 0, 0, 0.35)' }}>
+      <Icon name={icon} size={18} color="var(--a-accent)" />
+      <span style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, fontWeight: 600, color: 'var(--a-text)' }}>{children}</span>
+    </div>
+  );
+}
+
+/** Search input with an accessible name. */
+export function SearchField({ value, onChange, label, placeholder, style }: { value: string; onChange: (v: string) => void; label: string; placeholder?: string; style?: CSSProperties }) {
+  return (
+    <input
+      type="search"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label={label}
+      placeholder={placeholder ?? `${label}…`}
+      style={{ ...fieldStyle, width: 'auto', flex: '1 1 220px', ...style }}
+    />
+  );
+}
+
+/** Centered glass sheet over a dimmed page. Escape and a click outside close it. */
+export function Modal({ title, onClose, children, width = 480 }: { title: string; onClose: () => void; children: ReactNode; width?: number }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0, 0, 0, 0.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: `min(${width}px, 100%)`,
+          maxHeight: '92vh',
+          overflow: 'auto',
+          background: 'linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)), var(--a-ground)',
+          border: '1px solid var(--a-glass-line)',
+          borderRadius: 26,
+          padding: 24,
+          boxShadow: '0 30px 80px -30px rgba(0, 0, 0, 0.8)',
+          color: 'var(--ink)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+          <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 19, color: 'var(--ink)', margin: 0 }}>{title}</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: '1px solid var(--a-glass-line)', background: 'transparent', borderRadius: 999, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name="x" size={15} color="var(--ink)" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Error line under a form. */
+export function FormError({ children }: { children: ReactNode }) {
+  return (
+    <div role="alert" style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--a-accent)', marginTop: 12 }}>
+      {children}
     </div>
   );
 }

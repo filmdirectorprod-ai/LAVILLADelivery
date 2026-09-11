@@ -1,18 +1,24 @@
 // components/admin/incidents/IncidentCard.tsx
-// One incident: severity + status pills, title, linked driver/order, detail, and a
-// "Résoudre" action when still open. Pure presentational — the action is a callback.
+// One incident: severity + status pills, date, title, type and linked
+// driver/order, detail, time to resolve, and a "Résoudre" action while open.
+// Pure presentational — the action is a callback.
 'use client';
-import type { IncidentRow } from '@/lib/admin-incidents';
+import { INCIDENT_KIND_LABEL, SEVERITY_LABEL, type IncidentRow } from '@/lib/admin-incidents';
 import type { IncidentSeverity } from '@/lib/types';
+import { Pill, PrimaryButton, SubPanel, type PillTone } from '@/components/admin/ui/Glass';
 
-const SEVERITY_COLOR: Record<IncidentSeverity, { bg: string; fg: string; label: string }> = {
-  haute: { bg: 'rgba(192,57,43,0.12)', fg: '#c0392b', label: 'Haute' },
-  moyenne: { bg: 'rgba(168,151,35,0.16)', fg: 'var(--gold)', label: 'Moyenne' },
-  basse: { bg: 'var(--soft)', fg: 'var(--muted)', label: 'Basse' },
-};
+const SEVERITY_TONE: Record<IncidentSeverity, PillTone> = { haute: 'accent', moyenne: 'outline', basse: 'muted' };
 
 function dateLabel(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Casablanca' });
+}
+
+function durationLabel(fromIso: string, toIso: string): string {
+  const mins = Math.max(0, Math.round((Date.parse(toIso) - Date.parse(fromIso)) / 60000));
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  if (h < 48) return `${h} h`;
+  return `${Math.round(h / 24)} j`;
 }
 
 export interface IncidentCardProps {
@@ -23,57 +29,36 @@ export interface IncidentCardProps {
 
 export function IncidentCard({ row, busy, onResolve }: IncidentCardProps) {
   const { incident, driverName, orderCode } = row;
-  const sev = SEVERITY_COLOR[incident.severity];
   const resolved = incident.status === 'resolved';
+  const text = { fontFamily: 'var(--ui-font)' } as const;
 
   return (
-    <div
-      style={{
-        background: 'var(--a-card)',
-        border: '1px solid var(--line)',
-        borderRadius: 18,
-        boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)',
-        padding: '16px 18px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        opacity: resolved ? 0.7 : 1,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, fontWeight: 600, padding: '3px 10px', borderRadius: 999, background: sev.bg, color: sev.fg }}>
-          {sev.label}
-        </span>
-        <span style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, fontWeight: 600, padding: '3px 10px', borderRadius: 999, background: resolved ? 'rgba(43,182,115,0.14)' : 'rgba(19,124,139,0.12)', color: resolved ? '#1f8a54' : 'var(--brand-d)' }}>
-          {resolved ? 'Résolu' : 'Ouvert'}
-        </span>
-        <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{dateLabel(incident.created_at)}</span>
+    <SubPanel style={{ display: 'flex', flexDirection: 'column', gap: 10, opacity: resolved ? 0.75 : 1, border: !resolved && incident.severity === 'haute' ? '1px solid var(--a-accent)' : '1px solid transparent' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <Pill tone={SEVERITY_TONE[incident.severity]}>{SEVERITY_LABEL[incident.severity]}</Pill>
+        <Pill tone={resolved ? 'muted' : 'solid'}>{resolved ? 'Résolu' : 'Ouvert'}</Pill>
+        <span style={{ ...text, fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{dateLabel(incident.created_at)}</span>
       </div>
 
-      <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>{incident.title}</div>
+      <h3 style={{ ...text, margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>{incident.title}</h3>
 
-      <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', display: 'flex', flexWrap: 'wrap', gap: '2px 8px' }}>
-        <span>{incident.kind}</span>
+      <div style={{ ...text, fontSize: 12.5, color: 'var(--muted)', display: 'flex', flexWrap: 'wrap', gap: '2px 8px' }}>
+        <span>{INCIDENT_KIND_LABEL[incident.kind] ?? incident.kind}</span>
         {driverName && <span>· Livreur {driverName}</span>}
         {orderCode && <span>· {orderCode}</span>}
       </div>
 
-      {incident.detail && (
-        <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--ink)', margin: 0, lineHeight: 1.5 }}>{incident.detail}</p>
-      )}
+      {incident.detail && <p style={{ ...text, fontSize: 13.5, color: 'var(--ink)', margin: 0, lineHeight: 1.5 }}>{incident.detail}</p>}
 
-      {!resolved && (
+      {resolved ? (
+        incident.resolved_at && <span style={{ ...text, fontSize: 12, color: 'var(--muted)' }}>Résolu en {durationLabel(incident.created_at, incident.resolved_at)}</span>
+      ) : (
         <div>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onResolve(incident.id)}
-            style={{ border: 'none', borderRadius: 10, padding: '8px 16px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: '#fff', background: 'var(--brand)', opacity: busy ? 0.6 : 1 }}
-          >
+          <PrimaryButton disabled={busy} onClick={() => onResolve(incident.id)} aria-label={`Résoudre « ${incident.title} »`}>
             Résoudre
-          </button>
+          </PrimaryButton>
         </div>
       )}
-    </div>
+    </SubPanel>
   );
 }

@@ -1,22 +1,33 @@
 // components/admin/products/ProductsScreen.tsx
-// Live container for the admin Produits screen. Renders the server snapshot of the
-// catalogue grouped by category as a photo grid, subscribes to postgres_changes on
-// products / categories and refetches the same raw shapes on any change, and turns
-// each edit into an admin_update_product RPC (0016) and each creation into an
-// admin_create_product RPC (0019). Grouping and counts come from
-// lib/admin-products.ts so server and client agree. Real-time: a price/visibility
-// change or a new product here propagates to the customer app instantly.
+// Live container for the admin Produits screen, in the language of the Vue
+// d'ensemble: headline figures (catalogue, on sale, out of stock, average price),
+// a notice for out-of-stock products, state chips with counts (en vente, masqués,
+// rupture, signatures, sans photo), universe chips, a search, and the catalogue
+// grouped by category as photo cards. Subscribes to postgres_changes on products /
+// categories and refetches on any change; each edit is an admin_update_product RPC
+// (0016) and each creation an admin_create_product RPC (0019). A price, visibility
+// or stock change here reaches the customer app at once.
 'use client';
 import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { buildProductGroups, catalogueStats } from '@/lib/admin-products';
+import { formatAmount } from '@/lib/format';
+import { PRODUCT_FILTER_LABEL, averagePrice, buildProductGroups, filterProducts, productFilterCounts, type ProductFilter } from '@/lib/admin-products';
 import type { AdminProductsData } from '@/lib/queries';
-import type { Product, Category } from '@/lib/types';
+import type { Product, Category, Universe } from '@/lib/types';
 import { ProductCard } from './ProductCard';
 import { ProductForm, type ProductDraft } from './ProductForm';
 import { ProductEditModal } from './ProductEditModal';
 import { useRealtime } from '@/lib/use-realtime';
 import { revalidateCatalogue } from '@/lib/revalidate-catalogue';
+import { HeroStat } from '@/components/admin/overview/HeroStat';
+import { Chip, EmptyState, GlassPanel, Notice, PageHeader, PanelTitle, PrimaryButton, SearchField } from '@/components/admin/ui/Glass';
+
+const FILTERS: ProductFilter[] = ['all', 'active', 'hidden', 'out', 'signature', 'nophoto'];
+const UNIVERSES: { value: Universe | 'all'; label: string }[] = [
+  { value: 'all', label: 'Tous les univers' },
+  { value: 'patisserie', label: 'Pâtisserie' },
+  { value: 'restaurant', label: 'Restaurant' },
+];
 
 export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
   const [products, setProducts] = useState<Product[]>(initial.products);
@@ -24,13 +35,13 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [filter, setFilter] = useState<ProductFilter>('all');
+  const [universe, setUniverse] = useState<Universe | 'all'>('all');
+  const [query, setQuery] = useState('');
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    const [productsRes, categoriesRes] = await Promise.all([
-      supabase.from('products').select('*').order('name'),
-      supabase.from('categories').select('*').order('sort'),
-    ]);
+    const [productsRes, categoriesRes] = await Promise.all([supabase.from('products').select('*').order('name'), supabase.from('categories').select('*').order('sort')]);
     setProducts((productsRes.data ?? []) as Product[]);
     setCategories((categoriesRes.data ?? []) as Category[]);
   }, []);
@@ -42,8 +53,9 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
   const update = useCallback(
     async (product: Product, patch: { active?: boolean; price_dh?: number; is_signature?: boolean; in_stock?: boolean }) => {
       setBusy(true);
-      const supabase = createClient();
-      await supabase.rpc('admin_update_product', {
+      // Optimistic: the switch moves at once, the refetch settles it.
+      setProducts((list) => list.map((p) => (p.id === product.id ? { ...p, ...patch } : p)));
+      await createClient().rpc('admin_update_product', {
         p_product: product.id,
         p_active: patch.active ?? product.active,
         p_price_dh: patch.price_dh ?? product.price_dh,
@@ -61,8 +73,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
     async (p: Product) => {
       if (!window.confirm(`Supprimer « ${p.name} » du catalogue ? Cette action est irréversible.`)) return;
       setBusy(true);
-      const supabase = createClient();
-      const { error } = await supabase.rpc('admin_delete_product', { p_product: p.id });
+      const { error } = await createClient().rpc('admin_delete_product', { p_product: p.id });
       setBusy(false);
       if (error) window.alert('Suppression échouée : ' + error.message);
       else {
@@ -91,9 +102,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
         const file = draft.imageFile;
         const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
         const path = `${newId}/${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from('product-images')
-          .upload(path, file, { upsert: true, contentType: file.type });
+        const { error: upErr } = await supabase.storage.from('product-images').upload(path, file, { upsert: true, contentType: file.type });
         if (!upErr) {
           const { data } = supabase.storage.from('product-images').getPublicUrl(path);
           await supabase.rpc('admin_set_product_image', { p_product: newId, p_image_url: data.publicUrl });
@@ -112,47 +121,67 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
   const onToggleStock = useCallback((p: Product) => update(p, { in_stock: !p.in_stock }), [update]);
   const onSavePrice = useCallback((p: Product, price_dh: number) => update(p, { price_dh }), [update]);
 
-  const groups = useMemo(() => buildProductGroups(products, categories), [products, categories]);
-  const stats = useMemo(() => catalogueStats(products), [products]);
+  const counts = useMemo(() => productFilterCounts(products), [products]);
+  const visible = useMemo(() => filterProducts(products, filter, universe, query), [products, filter, universe, query]);
+  const groups = useMemo(() => buildProductGroups(visible, categories), [visible, categories]);
+  const avg = useMemo(() => averagePrice(products), [products]);
 
   return (
-    <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 34, letterSpacing: '-0.02em', color: 'var(--a-text)', margin: 0 }}>Produits</h1>
-          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--a-muted)', marginTop: 6 }}>
-            {stats.total} produit{stats.total > 1 ? 's' : ''} · {stats.active} en vente · {stats.signature} signature{stats.signature > 1 ? 's' : ''}
-          </p>
-        </div>
-        {!showForm && (
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            style={{ border: 'none', borderRadius: 10, padding: '10px 18px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: '#fff', background: 'var(--brand)' }}
-          >
-            + Ajouter un produit
-          </button>
-        )}
+    <div style={{ padding: '30px 32px 40px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <PageHeader
+        title="Produits"
+        subtitle="Le catalogue de l'app client : prix, visibilité, stock et mises en avant."
+        actions={!showForm ? <PrimaryButton onClick={() => setShowForm(true)}>+ Ajouter un produit</PrimaryButton> : undefined}
+      />
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px 56px' }}>
+        <HeroStat label={`Au catalogue · ${counts.signature} signature${counts.signature > 1 ? 's' : ''}`} value={String(counts.all)} />
+        <HeroStat label="En vente" value={String(counts.active)} />
+        <HeroStat label="En rupture" value={String(counts.out)} />
+        <HeroStat label="Prix moyen en vente" value={formatAmount(avg)} unit="DH" />
       </div>
 
-      {showForm && (
-        <ProductForm categories={categories} busy={busy} onCreate={onCreate} onCancel={() => setShowForm(false)} />
+      {counts.out > 0 && filter !== 'out' && (
+        <Notice icon="info">
+          {counts.out} produit{counts.out > 1 ? 's sont' : ' est'} en rupture de stock et {counts.out > 1 ? 'affichés' : 'affiché'} comme tel{counts.out > 1 ? 's' : ''} aux clients.
+        </Notice>
       )}
 
-      {groups.length === 0 ? (
-        <div style={{ background: 'var(--a-card)', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
-          Aucun produit au catalogue.
+      {showForm && <ProductForm categories={categories} busy={busy} onCreate={onCreate} onCancel={() => setShowForm(false)} />}
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div role="group" aria-label="Filtrer les produits" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {FILTERS.map((f) => (
+            <Chip key={f} on={filter === f} onClick={() => setFilter(f)} count={counts[f]}>
+              {PRODUCT_FILTER_LABEL[f]}
+            </Chip>
+          ))}
         </div>
+        <div role="group" aria-label="Filtrer par univers" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {UNIVERSES.map((u) => (
+            <Chip key={u.value} on={universe === u.value} onClick={() => setUniverse(u.value)}>
+              {u.label}
+            </Chip>
+          ))}
+        </div>
+        <SearchField value={query} onChange={setQuery} label="Rechercher un produit" style={{ maxWidth: 300, marginLeft: 'auto' }} />
+      </div>
+
+      {products.length === 0 ? (
+        <GlassPanel>
+          <EmptyState title="Aucun produit au catalogue." hint="Ajoutez un premier produit : il apparaîtra aussitôt dans l'app client." />
+        </GlassPanel>
+      ) : groups.length === 0 ? (
+        <GlassPanel>
+          <EmptyState title="Aucun produit ne correspond." hint="Changez de filtre ou de recherche." />
+        </GlassPanel>
       ) : (
         groups.map((group) => (
-          <div key={group.key} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-              <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 16, color: 'var(--ink)', margin: 0 }}>{group.label}</h2>
-              <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 12.5, color: 'var(--muted)' }}>
-                {group.products.length} produit{group.products.length > 1 ? 's' : ''}
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16, alignItems: 'start' }}>
+          <section key={group.key} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <PanelTitle aside={`${group.products.length} produit${group.products.length > 1 ? 's' : ''}`}>
+              <span style={{ color: 'var(--a-text)', fontSize: 17 }}>{group.label}</span>
+            </PanelTitle>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 16, alignItems: 'start' }}>
               {group.products.map((p) => (
                 <ProductCard
                   key={p.id}
@@ -167,7 +196,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
                 />
               ))}
             </div>
-          </div>
+          </section>
         ))
       )}
 
