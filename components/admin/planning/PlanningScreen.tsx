@@ -1,17 +1,24 @@
 // components/admin/planning/PlanningScreen.tsx
-// Live container for the admin Planning screen. Renders the server snapshot of the
-// weekly shift grid, subscribes to postgres_changes on driver_shifts and refetches
-// on any change, supports prev/next week navigation, and writes through staff RLS
-// (0018): add a shift, delete a shift. The grid is built by lib/admin-planning.ts
-// (UTC day buckets) so server and client agree.
+// Live container for the admin Planning screen, in the language of the Vue
+// d'ensemble: headline figures for the week (shifts, hours, drivers scheduled,
+// days with nobody), a notice for uncovered days, prev / today / next week
+// navigation, and the driver × day grid in a glass panel with each driver's weekly
+// hours and a coverage row. Subscribes to postgres_changes on driver_shifts and
+// refetches on any change; writes go through staff RLS (0018): add a shift, delete
+// a shift. The grid is built by lib/admin-planning.ts (UTC day buckets) so server
+// and client agree.
 'use client';
-import { useCallback, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState, type CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { buildShiftWeek, isoDate, type ShiftRow } from '@/lib/admin-planning';
+import { buildShiftWeek, formatHours, isoDate, mondayOf, rowHours, weekTotals, type ShiftRow } from '@/lib/admin-planning';
 import type { AdminPlanningData } from '@/lib/queries';
 import type { DriverShift } from '@/lib/types';
 import { ShiftForm, type ShiftDraft } from './ShiftForm';
 import { useRealtime } from '@/lib/use-realtime';
+import { HeroStat } from '@/components/admin/overview/HeroStat';
+import { EmptyState, GhostButton, GlassPanel, Notice, PageHeader, PrimaryButton } from '@/components/admin/ui/Glass';
+
+const text = { fontFamily: 'var(--ui-font)' } as const;
 
 function mondayFromISO(weekStart: string): Date {
   return new Date(`${weekStart}T00:00:00Z`);
@@ -33,15 +40,9 @@ export function PlanningScreen({ initial }: { initial: AdminPlanningData }) {
 
   const refetch = useCallback(
     async (startISO: string) => {
-      const supabase = createClient();
       const monday = mondayFromISO(startISO);
       const nextMonday = new Date(monday.getTime() + 7 * 24 * 3600 * 1000);
-      const { data } = await supabase
-        .from('driver_shifts')
-        .select('*')
-        .gte('starts_at', monday.toISOString())
-        .lt('starts_at', nextMonday.toISOString())
-        .order('starts_at');
+      const { data } = await createClient().from('driver_shifts').select('*').gte('starts_at', monday.toISOString()).lt('starts_at', nextMonday.toISOString()).order('starts_at');
       setWeek(buildShiftWeek((data ?? []) as DriverShift[], drivers, monday));
     },
     [drivers],
@@ -50,21 +51,19 @@ export function PlanningScreen({ initial }: { initial: AdminPlanningData }) {
   const refetchWeek = useCallback(() => refetch(weekStart), [refetch, weekStart]);
   useRealtime('admin-planning', [{ table: 'driver_shifts' }], refetchWeek);
 
-  const shiftWeek = useCallback(
-    (deltaDays: number) => {
-      const monday = mondayFromISO(weekStart);
-      const next = isoDate(new Date(monday.getTime() + deltaDays * 24 * 3600 * 1000));
-      setWeekStart(next);
-      refetch(next);
+  const goTo = useCallback(
+    (startISO: string) => {
+      setWeekStart(startISO);
+      refetch(startISO);
     },
-    [weekStart, refetch],
+    [refetch],
   );
+  const shiftWeek = (deltaDays: number) => goTo(isoDate(new Date(mondayFromISO(weekStart).getTime() + deltaDays * 24 * 3600 * 1000)));
 
   const onAdd = useCallback(
     async (draft: ShiftDraft) => {
       setBusy(true);
-      const supabase = createClient();
-      await supabase.from('driver_shifts').insert(draft);
+      await createClient().from('driver_shifts').insert(draft);
       setBusy(false);
       setShowForm(false);
       refetch(weekStart);
@@ -75,116 +74,139 @@ export function PlanningScreen({ initial }: { initial: AdminPlanningData }) {
   const onDelete = useCallback(
     async (id: string) => {
       setBusy(true);
-      const supabase = createClient();
-      await supabase.from('driver_shifts').delete().eq('id', id);
+      await createClient().from('driver_shifts').delete().eq('id', id);
       setBusy(false);
       refetch(weekStart);
     },
     [refetch, weekStart],
   );
 
+  const totals = useMemo(() => weekTotals(week), [week]);
+  const today = isoDate(new Date());
+  const currentMonday = isoDate(mondayOf(new Date()));
+  const isPastWeek = weekStart < currentMonday;
   const weekLabel = `${dayHeader(week.days[0])} – ${dayHeader(week.days[6])}`;
 
   return (
-    <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--ink)', margin: 0 }}>Planning</h1>
-          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>Semaine du {weekLabel}</p>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button type="button" onClick={() => shiftWeek(-7)} style={navBtn}>← Précédente</button>
-          <button type="button" onClick={() => shiftWeek(7)} style={navBtn}>Suivante →</button>
-          {!showForm && (
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              style={{ border: 'none', borderRadius: 10, padding: '10px 18px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: '#fff', background: 'var(--brand)' }}
-            >
-              + Ajouter un créneau
-            </button>
-          )}
-        </div>
+    <div style={{ padding: '30px 32px 40px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <PageHeader
+        title="Planning"
+        subtitle={`Semaine du ${weekLabel}`}
+        actions={
+          <>
+            <GhostButton onClick={() => shiftWeek(-7)} aria-label="Semaine précédente">
+              ← Précédente
+            </GhostButton>
+            {weekStart !== currentMonday && <GhostButton onClick={() => goTo(currentMonday)}>Cette semaine</GhostButton>}
+            <GhostButton onClick={() => shiftWeek(7)} aria-label="Semaine suivante">
+              Suivante →
+            </GhostButton>
+            {!showForm && <PrimaryButton onClick={() => setShowForm(true)}>+ Ajouter un créneau</PrimaryButton>}
+          </>
+        }
+      />
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px 56px' }}>
+        <HeroStat label="Créneaux" value={String(totals.shifts)} />
+        <HeroStat label="Heures planifiées" value={formatHours(totals.hours)} />
+        <HeroStat label={`Livreurs planifiés · sur ${drivers.length}`} value={String(totals.drivers)} />
+        <HeroStat label="Jours sans livreur" value={String(totals.uncoveredDays)} />
       </div>
 
-      {showForm && (
-        <ShiftForm drivers={drivers} days={week.days} busy={busy} onAdd={onAdd} onCancel={() => setShowForm(false)} />
+      {!isPastWeek && drivers.length > 0 && totals.uncoveredDays > 0 && (
+        <Notice icon="calendar">
+          {totals.uncoveredDays} jour{totals.uncoveredDays > 1 ? 's' : ''} sans aucun livreur planifié cette semaine.
+        </Notice>
       )}
 
+      {showForm && <ShiftForm drivers={drivers} days={week.days} busy={busy} onAdd={onAdd} onCancel={() => setShowForm(false)} />}
+
       {drivers.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: '40px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>
-          Aucun livreur à planifier.
-        </div>
+        <GlassPanel>
+          <EmptyState title="Aucun livreur à planifier." hint="Ajoutez d'abord des livreurs dans la page Livreurs." />
+        </GlassPanel>
       ) : (
-        <div style={{ overflowX: 'auto', background: '#fff', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '160px repeat(7, minmax(120px, 1fr))', minWidth: 1000 }}>
+        <GlassPanel padding={0} style={{ overflowX: 'auto' }}>
+          <div role="table" aria-label={`Planning de la semaine du ${weekLabel}`} style={{ display: 'grid', gridTemplateColumns: '170px repeat(7, minmax(118px, 1fr)) 86px', minWidth: 1080 }}>
             <div style={headerCell} />
             {week.days.map((d) => (
-              <div key={d} style={{ ...headerCell, textTransform: 'capitalize' }}>{dayHeader(d)}</div>
+              <div key={d} style={{ ...headerCell, textTransform: 'capitalize', color: d === today ? 'var(--a-text)' : 'var(--muted)', boxShadow: d === today ? 'inset 0 -2px 0 var(--a-accent)' : undefined }}>
+                {dayHeader(d)}
+                {d === today && <span style={{ fontWeight: 500, color: 'var(--a-accent)' }}> · aujourd&apos;hui</span>}
+              </div>
             ))}
+            <div style={{ ...headerCell, textAlign: 'right' }}>Total</div>
+
             {week.rows.map((row) => (
-              <PlanningRow key={row.driver.id} row={row} busy={busy} onDelete={onDelete} />
+              <PlanningRow key={row.driver.id} row={row} busy={busy} today={today} onDelete={onDelete} />
             ))}
+
+            <div style={{ ...footerCell, fontWeight: 600, color: 'var(--ink)' }}>Livreurs par jour</div>
+            {totals.perDay.map((n, i) => (
+              <div key={week.days[i]} style={{ ...footerCell, color: n === 0 ? 'var(--a-accent)' : 'var(--ink)', fontWeight: 600 }}>
+                {n}
+              </div>
+            ))}
+            <div style={{ ...footerCell, textAlign: 'right', fontWeight: 600, color: 'var(--ink)' }}>{formatHours(totals.hours)}</div>
           </div>
-        </div>
+        </GlassPanel>
       )}
     </div>
   );
 }
 
-function PlanningRow({ row, busy, onDelete }: { row: ShiftRow; busy: boolean; onDelete: (id: string) => void }) {
+function PlanningRow({ row, busy, today, onDelete }: { row: ShiftRow; busy: boolean; today: string; onDelete: (id: string) => void }) {
+  const hours = rowHours(row);
   return (
-    <>
-      <div style={{ ...bodyCell, fontWeight: 600, color: 'var(--ink)', position: 'sticky', left: 0, background: '#fff' }}>{row.driver.name}</div>
+    <Fragment>
+      <div style={{ ...bodyCell, fontWeight: 600, color: 'var(--ink)', position: 'sticky', left: 0, background: 'rgba(0, 0, 0, 0.55)', zIndex: 1 }}>{row.driver.name}</div>
       {row.days.map((cell) => (
-        <div key={cell.date} style={bodyCell}>
+        <div key={cell.date} style={{ ...bodyCell, background: cell.date === today ? 'rgba(255, 255, 255, 0.04)' : undefined }}>
           {cell.shifts.map((s) => (
-            <div key={s.id} style={{ background: 'rgba(19,124,139,0.10)', borderRadius: 8, padding: '5px 8px', marginBottom: 5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div key={s.id} style={{ background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 10, padding: '5px 8px', marginBottom: 5, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--brand-d)' }}>{timeRange(s)}</span>
+                <span style={{ ...text, fontSize: 12, fontWeight: 600, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{timeRange(s)}</span>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => onDelete(s.id)}
-                  title="Supprimer"
-                  style={{ border: 'none', background: 'transparent', cursor: busy ? 'default' : 'pointer', color: 'var(--muted)', fontSize: 14, lineHeight: 1, padding: 0 }}
+                  aria-label={`Supprimer le créneau ${timeRange(s)} de ${row.driver.name}`}
+                  style={{ border: 'none', background: 'transparent', cursor: busy ? 'default' : 'pointer', color: 'var(--muted)', fontSize: 15, lineHeight: 1, padding: 0 }}
                 >
                   ×
                 </button>
               </div>
-              {s.note && <span style={{ fontFamily: 'var(--ui-font)', fontSize: 11, color: 'var(--muted)' }}>{s.note}</span>}
+              {s.note && <span style={{ ...text, fontSize: 11, color: 'var(--muted)' }}>{s.note}</span>}
             </div>
           ))}
         </div>
       ))}
-    </>
+      <div style={{ ...bodyCell, textAlign: 'right', fontWeight: 600, color: hours > 0 ? 'var(--ink)' : 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{hours > 0 ? formatHours(hours) : '—'}</div>
+    </Fragment>
   );
 }
 
-const navBtn: React.CSSProperties = {
-  border: '1px solid var(--line)',
-  borderRadius: 10,
-  padding: '9px 14px',
-  cursor: 'pointer',
-  fontFamily: 'var(--ui-font)',
-  fontWeight: 600,
-  fontSize: 13,
-  color: 'var(--ink)',
-  background: '#fff',
-};
-const headerCell: React.CSSProperties = {
-  padding: '12px 14px',
+const headerCell: CSSProperties = {
+  padding: '14px 14px',
   borderBottom: '1px solid var(--line)',
   fontFamily: 'var(--ui-font)',
   fontSize: 12.5,
-  fontWeight: 700,
+  fontWeight: 600,
   color: 'var(--muted)',
 };
-const bodyCell: React.CSSProperties = {
+const bodyCell: CSSProperties = {
   padding: '10px 12px',
   borderBottom: '1px solid var(--line)',
   borderLeft: '1px solid var(--line)',
   minHeight: 64,
   fontFamily: 'var(--ui-font)',
   fontSize: 13,
+};
+const footerCell: CSSProperties = {
+  padding: '12px 14px',
+  borderLeft: '1px solid var(--line)',
+  fontFamily: 'var(--ui-font)',
+  fontSize: 12.5,
+  color: 'var(--muted)',
+  fontVariantNumeric: 'tabular-nums',
 };

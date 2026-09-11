@@ -1,19 +1,16 @@
 // components/admin/drivers/DriverAccountModal.tsx
-// Admin modal to provision a driver login. Two modes:
+// Admin sheet to provision a driver login. Two modes:
 //   'new'  → creates a brand-new driver (name + identifiant + password + infos)
 //   'link' → creates credentials for an existing driver row (identifiant + password)
 // Posts to /api/admin/drivers (staff-gated, service-role server side). On success
-// it shows the credentials once so the admin can pass them to the driver.
+// it shows the credentials once, with a copy button, so the admin can pass them on.
 'use client';
 import { useEffect, useState } from 'react';
-import { Icon } from '@/components/ui/Icon';
 import { useBranches } from '@/lib/use-branches';
-import {
-  validateIdentifiant,
-  validateDriverPassword,
-  generatePassword,
-  LIVREUR_EMAIL_DOMAIN,
-} from '@/lib/driver-credentials';
+import { validateIdentifiant, validateDriverPassword, generatePassword, LIVREUR_EMAIL_DOMAIN } from '@/lib/driver-credentials';
+import { credentialsText } from '@/lib/admin-managers';
+import { FormError, GhostButton, Modal, PrimaryButton, SubPanel, fieldStyle, labelStyle } from '@/components/admin/ui/Glass';
+import { CopyButton } from '@/components/admin/ui/CopyButton';
 
 export interface DriverAccountModalProps {
   mode: 'new' | 'link';
@@ -22,9 +19,7 @@ export interface DriverAccountModalProps {
   onDone: () => void;
 }
 
-const label: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)' };
-const wrap: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, border: '1.5px solid var(--line)', borderRadius: 12, padding: '11px 12px', marginTop: 6, background: '#fff' };
-const input: React.CSSProperties = { flex: 1, border: 'none', outline: 'none', fontFamily: 'var(--ui-font)', fontSize: 14.5, color: 'var(--ink)', background: 'transparent' };
+const hint = { fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', marginTop: 5 } as const;
 
 export function DriverAccountModal({ mode, driver, onClose, onDone }: DriverAccountModalProps) {
   const [name, setName] = useState('');
@@ -77,131 +72,106 @@ export function DriverAccountModal({ mode, driver, onClose, onDone }: DriverAcco
     }
   }
 
+  const title = mode === 'new' ? 'Nouveau livreur' : `Créer un accès${driver?.name ? ' — ' + driver.name : ''}`;
+
   return (
-    <div
-      onClick={onClose}
-      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(8,28,31,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{ width: 'min(440px, 100%)', background: '#fff', borderRadius: 20, padding: 24, boxShadow: '0 30px 70px -30px rgba(0,0,0,0.6)', maxHeight: '90vh', overflow: 'auto' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: 'var(--ink)', margin: 0 }}>
-            {mode === 'new' ? 'Nouveau livreur' : `Créer un accès${driver?.name ? ' — ' + driver.name : ''}`}
-          </h2>
-          <button onClick={onClose} style={{ border: 'none', background: 'var(--soft)', borderRadius: 999, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="x" size={16} color="var(--ink)" />
-          </button>
-        </div>
-
-        {done ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#2f9e6f', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15 }}>
-              <Icon name="check" size={18} color="#2f9e6f" /> Compte créé
+    <Modal title={title} onClose={onClose} width={460}>
+      {done ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--ink)', margin: 0 }}>Compte créé. Communique ces identifiants au livreur — ils ne seront plus affichés :</p>
+          <SubPanel style={{ fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--ink)', lineHeight: 1.8 }}>
+            <div>
+              <span style={{ color: 'var(--muted)' }}>Identifiant :</span> <strong style={{ fontWeight: 600 }}>{done.identifiant}</strong>
             </div>
-            <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', margin: 0 }}>
-              Communique ces identifiants au livreur (ils ne seront plus affichés) :
-            </p>
-            <div style={{ background: 'var(--soft)', borderRadius: 12, padding: '14px 16px', fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--ink)', lineHeight: 1.7 }}>
-              <div><strong>Identifiant :</strong> {done.identifiant}</div>
-              <div><strong>Mot de passe :</strong> {done.password}</div>
+            <div>
+              <span style={{ color: 'var(--muted)' }}>Mot de passe :</span> <strong style={{ fontWeight: 600 }}>{done.password}</strong>
             </div>
-            <button
-              onClick={onDone}
-              style={{ marginTop: 4, border: 'none', borderRadius: 12, padding: '12px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: '#fff', background: 'var(--brand)' }}
-            >
+          </SubPanel>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <CopyButton value={credentialsText(done.identifiant, done.password)} />
+            <PrimaryButton onClick={onDone} style={{ flex: 1 }}>
               Terminé
-            </button>
+            </PrimaryButton>
           </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {mode === 'new' && (
-              <div>
-                <label style={label}>Nom complet</label>
-                <div style={wrap}>
-                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Karim Benali" style={input} />
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {mode === 'new' && (
+            <div>
+              <label style={labelStyle} htmlFor="drv-name">
+                Nom complet
+              </label>
+              <input id="drv-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Karim Benali" style={fieldStyle} />
+            </div>
+          )}
+
+          <div>
+            <label style={labelStyle} htmlFor="drv-identifiant">
+              Identifiant de connexion
+            </label>
+            <input id="drv-identifiant" value={identifiant} onChange={(e) => setIdentifiant(e.target.value)} placeholder="karim" autoCapitalize="none" spellCheck={false} style={fieldStyle} />
+            <div style={hint}>
+              Le livreur se connecte avec « {identifiant.trim().toLowerCase() || 'identifiant'} » (interne : …@{LIVREUR_EMAIL_DOMAIN})
+            </div>
+          </div>
+
+          <div>
+            <label style={labelStyle} htmlFor="drv-password">
+              Mot de passe
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input id="drv-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="au moins 6 caractères" autoComplete="new-password" style={{ ...fieldStyle, flex: 1, width: 'auto', minWidth: 0 }} />
+              <GhostButton onClick={() => setPassword(generatePassword(10))}>Générer</GhostButton>
+            </div>
+          </div>
+
+          {mode === 'new' && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={labelStyle} htmlFor="drv-phone">
+                    Téléphone
+                  </label>
+                  <input id="drv-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="06 12 34 56 78" style={fieldStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle} htmlFor="drv-vehicle">
+                    Véhicule
+                  </label>
+                  <input id="drv-vehicle" value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder="Scooter" style={fieldStyle} />
                 </div>
               </div>
-            )}
 
-            <div>
-              <label style={label}>Identifiant de connexion</label>
-              <div style={wrap}>
-                <input
-                  value={identifiant}
-                  onChange={(e) => setIdentifiant(e.target.value)}
-                  placeholder="karim"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  style={input}
-                />
-              </div>
-              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', marginTop: 5 }}>
-                Le livreur se connecte avec « {identifiant.trim().toLowerCase() || 'identifiant'} » (interne : …@{LIVREUR_EMAIL_DOMAIN})
-              </div>
-            </div>
-
-            <div>
-              <label style={label}>Mot de passe</label>
-              <div style={wrap}>
-                <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="au moins 6 caractères" style={input} />
-                <button
-                  type="button"
-                  onClick={() => setPassword(generatePassword(10))}
-                  style={{ border: 'none', background: 'rgba(19,124,139,0.12)', color: 'var(--brand)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 12 }}
-                >
-                  Générer
-                </button>
-              </div>
-            </div>
-
-            {mode === 'new' && (
-              <>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={label}>Téléphone</label>
-                    <div style={wrap}><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="06 12 34 56 78" style={input} /></div>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={label}>Véhicule</label>
-                    <div style={wrap}><input value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder="Scooter" style={input} /></div>
-                  </div>
+              {branches.length > 1 && (
+                <div>
+                  <label style={labelStyle} htmlFor="drv-branch">
+                    Agence
+                  </label>
+                  <select id="drv-branch" value={branchId} onChange={(e) => setBranchId(e.target.value)} style={fieldStyle}>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={hint}>Le livreur ne verra que les commandes de cette agence.</div>
                 </div>
+              )}
+            </>
+          )}
 
-                {branches.length > 1 && (
-                  <div>
-                    <label style={label}>Agence</label>
-                    <div style={wrap}>
-                      <Icon name="store" size={16} color="var(--muted)" />
-                      <select value={branchId} onChange={(e) => setBranchId(e.target.value)} style={{ ...input, cursor: 'pointer' }}>
-                        {branches.map((b) => (
-                          <option key={b.id} value={b.id}>{b.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', marginTop: 5 }}>
-                      Le livreur ne verra que les commandes de cette agence.
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+          {error && <FormError>{error}</FormError>}
 
-            {error && (
-              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600 }}>{error}</div>
-            )}
-
-            <button
-              onClick={submit}
-              disabled={busy}
-              style={{ marginTop: 4, border: 'none', borderRadius: 12, padding: '12px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: '#fff', background: 'var(--brand)', opacity: busy ? 0.6 : 1 }}
-            >
+          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            <GhostButton onClick={onClose} disabled={busy} style={{ flex: 1 }}>
+              Annuler
+            </GhostButton>
+            <PrimaryButton onClick={submit} disabled={busy} style={{ flex: 1.4 }}>
               {busy ? 'Création…' : mode === 'new' ? 'Créer le livreur' : "Créer l'accès"}
-            </button>
+            </PrimaryButton>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </Modal>
   );
 }

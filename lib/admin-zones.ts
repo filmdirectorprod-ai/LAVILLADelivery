@@ -40,3 +40,24 @@ export function validateZoneDraft(draft: ZoneDraft): ZoneValidation {
   }
   return { ok: true };
 }
+
+export interface ZoneTotals {
+  count: number;
+  avgFee: number;
+  minFee: number;
+  maxFee: number;
+  /** Mean of each zone's ETA midpoint, minutes. */
+  avgEta: number;
+}
+
+export function zoneTotals(zones: Zone[]): ZoneTotals {
+  if (zones.length === 0) return { count: 0, avgFee: 0, minFee: 0, maxFee: 0, avgEta: 0 };
+  const fees = zones.map((z) => Number(z.fee_dh));
+  return {
+    count: zones.length,
+    avgFee: Math.round(fees.reduce((a, b) => a + b, 0) / zones.length),
+    minFee: Math.min(...fees),
+    maxFee: Math.max(...fees),
+    avgEta: Math.round(zones.reduce((n, z) => n + (z.eta_min + z.eta_max) / 2, 0) / zones.length),
+  };
+}

@@ -4,6 +4,8 @@
 // same day column buildShiftWeek bucketed by. Reports a validated draft via onAdd.
 'use client';
 import { useState } from 'react';
+import { formatHours, shiftHours } from '@/lib/admin-planning';
+import { FormError, GhostButton, GlassPanel, PanelTitle, PrimaryButton, fieldStyle, labelStyle } from '@/components/admin/ui/Glass';
 
 export interface ShiftDraft {
   driver_id: string;
@@ -21,20 +23,8 @@ export interface ShiftFormProps {
   onCancel: () => void;
 }
 
-const field: React.CSSProperties = {
-  fontFamily: 'var(--ui-font)',
-  fontSize: 13.5,
-  padding: '8px 10px',
-  border: '1px solid var(--line)',
-  borderRadius: 8,
-  color: 'var(--ink)',
-  width: '100%',
-  background: '#fff',
-};
-const labelStyle: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', fontWeight: 600 };
-
 function dayLabel(iso: string): string {
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: '2-digit', timeZone: 'UTC' });
 }
 
 export function ShiftForm({ drivers, days, busy, onAdd, onCancel }: ShiftFormProps) {
@@ -45,65 +35,66 @@ export function ShiftForm({ drivers, days, busy, onAdd, onCancel }: ShiftFormPro
   const [note, setNote] = useState('');
 
   const valid = driverId !== '' && date !== '' && start !== '' && end !== '' && end > start;
+  const startsAt = date && start ? new Date(`${date}T${start}:00Z`).toISOString() : '';
+  const endsAt = date && end ? new Date(`${date}T${end}:00Z`).toISOString() : '';
+  const hours = valid ? shiftHours({ starts_at: startsAt, ends_at: endsAt }) : 0;
 
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--brand)', borderRadius: 18, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>Ajouter un créneau</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr 1fr', gap: 12 }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <span style={labelStyle}>Livreur</span>
-          <select style={field} value={driverId} disabled={busy} onChange={(e) => setDriverId(e.target.value)}>
+    <GlassPanel>
+      <PanelTitle aside={valid ? `Durée : ${formatHours(hours)}` : undefined}>Ajouter un créneau</PanelTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
+        <div>
+          <label style={labelStyle} htmlFor="shift-driver">
+            Livreur
+          </label>
+          <select id="shift-driver" style={fieldStyle} value={driverId} disabled={busy} onChange={(e) => setDriverId(e.target.value)}>
             {drivers.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
             ))}
           </select>
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <span style={labelStyle}>Jour</span>
-          <select style={field} value={date} disabled={busy} onChange={(e) => setDate(e.target.value)}>
+        </div>
+        <div>
+          <label style={labelStyle} htmlFor="shift-day">
+            Jour
+          </label>
+          <select id="shift-day" style={{ ...fieldStyle, textTransform: 'capitalize' }} value={date} disabled={busy} onChange={(e) => setDate(e.target.value)}>
             {days.map((d) => (
-              <option key={d} value={d}>{dayLabel(d)}</option>
+              <option key={d} value={d}>
+                {dayLabel(d)}
+              </option>
             ))}
           </select>
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <span style={labelStyle}>Début</span>
-          <input style={field} type="time" value={start} disabled={busy} onChange={(e) => setStart(e.target.value)} />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <span style={labelStyle}>Fin</span>
-          <input style={field} type="time" value={end} disabled={busy} onChange={(e) => setEnd(e.target.value)} />
-        </label>
+        </div>
+        <div>
+          <label style={labelStyle} htmlFor="shift-start">
+            Début
+          </label>
+          <input id="shift-start" style={fieldStyle} type="time" value={start} disabled={busy} onChange={(e) => setStart(e.target.value)} />
+        </div>
+        <div>
+          <label style={labelStyle} htmlFor="shift-end">
+            Fin
+          </label>
+          <input id="shift-end" style={fieldStyle} type="time" value={end} disabled={busy} onChange={(e) => setEnd(e.target.value)} />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={labelStyle} htmlFor="shift-note">
+            Note (optionnel)
+          </label>
+          <input id="shift-note" style={fieldStyle} value={note} disabled={busy} onChange={(e) => setNote(e.target.value)} placeholder="Secteur Médina" />
+        </div>
       </div>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <span style={labelStyle}>Note (optionnel)</span>
-        <input style={field} value={note} disabled={busy} onChange={(e) => setNote(e.target.value)} placeholder="Secteur Médina" />
-      </label>
-      <div style={{ display: 'flex', gap: 10 }}>
-        <button
-          type="button"
-          disabled={busy || !valid}
-          onClick={() =>
-            onAdd({
-              driver_id: driverId,
-              starts_at: new Date(`${date}T${start}:00Z`).toISOString(),
-              ends_at: new Date(`${date}T${end}:00Z`).toISOString(),
-              note: note.trim(),
-            })
-          }
-          style={{ border: 'none', borderRadius: 10, padding: '9px 18px', cursor: busy || !valid ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: '#fff', background: 'var(--brand)', opacity: valid && !busy ? 1 : 0.5 }}
-        >
+      {start && end && end <= start && <FormError>L&apos;heure de fin doit être après l&apos;heure de début.</FormError>}
+      <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+        <PrimaryButton disabled={busy || !valid} onClick={() => onAdd({ driver_id: driverId, starts_at: startsAt, ends_at: endsAt, note: note.trim() })}>
           Ajouter
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onCancel}
-          style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '9px 18px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: 'var(--ink)', background: '#fff' }}
-        >
+        </PrimaryButton>
+        <GhostButton disabled={busy} onClick={onCancel}>
           Annuler
-        </button>
+        </GhostButton>
       </div>
-    </div>
+    </GlassPanel>
   );
 }

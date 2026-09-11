@@ -8,7 +8,7 @@
      into a plain response: a Response with `redirected === true` cannot be returned
      to a navigation — the browser fails it and shows a BLANK page.
    Bump CACHE_VERSION to force-refresh clients. */
-const CACHE_VERSION = 'lavilla-v5';
+const CACHE_VERSION = 'lavilla-v6';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 self.addEventListener('install', (event) => {
@@ -26,7 +26,23 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/* En développement, l'URL d'une feuille de style ne change pas d'un rechargement
+   à l'autre : la mettre en cache d'abord fait servir l'ANCIEN CSS indéfiniment.
+   La structure de la page évolue, les couleurs non — un piège coûteux à
+   diagnostiquer depuis un téléphone. On ne met donc rien en cache quand le site
+   est servi depuis une machine du réseau local. */
+function isDevHost(url) {
+  return (
+    url.hostname === 'localhost' ||
+    url.hostname === '127.0.0.1' ||
+    /^192\.168\./.test(url.hostname) ||
+    /^10\./.test(url.hostname) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(url.hostname)
+  );
+}
+
 function isStaticAsset(url) {
+  if (isDevHost(url)) return false;
   return (
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.startsWith('/icons/') ||

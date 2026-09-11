@@ -136,9 +136,9 @@ export function NotificationBell() {
           position: 'relative',
           width: 40,
           height: 40,
-          borderRadius: 12,
-          border: '1px solid var(--line)',
-          background: '#fff',
+          borderRadius: 999,
+          border: '1px solid var(--a-glass-line)',
+          background: 'var(--a-card)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -156,11 +156,11 @@ export function NotificationBell() {
               height: 18,
               padding: '0 5px',
               borderRadius: 999,
-              background: 'var(--brand)',
-              color: '#fff',
+              background: '#ffffff',
+              color: 'var(--a-on-white)',
               fontFamily: 'var(--ui-font)',
               fontSize: 11,
-              fontWeight: 700,
+              fontWeight: 600,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -182,27 +182,27 @@ export function NotificationBell() {
               width: 320,
               maxHeight: 420,
               overflow: 'auto',
-              background: '#fff',
-              border: '1px solid var(--line)',
-              borderRadius: 16,
-              boxShadow: '0 12px 30px -12px rgba(0,0,0,0.35)',
+              background: 'var(--a-card)',
+              border: '1px solid var(--a-glass-line)',
+              borderRadius: 20,
+              boxShadow: '0 20px 50px -20px rgba(0,0,0,0.7)',
               zIndex: 50,
               padding: 8,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px 10px' }}>
-              <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>
+              <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>
                 Notifications
               </span>
               {pushOn ? (
-                <span style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--brand)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Icon name="check" size={14} color="var(--brand)" /> Activées
+                <span style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--ink)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Icon name="check" size={14} color="var(--ink)" /> Activées
                 </span>
               ) : (
                 <button
                   type="button"
                   onClick={enablePush}
-                  style={{ border: 'none', background: 'var(--brand)', color: '#fff', borderRadius: 999, padding: '5px 10px', fontFamily: 'var(--ui-font)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}
+                  style={{ border: 'none', background: '#ffffff', color: 'var(--a-on-white)', borderRadius: 999, padding: '5px 10px', fontFamily: 'var(--ui-font)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}
                 >
                   Activer son + alertes
                 </button>
@@ -227,13 +227,13 @@ export function NotificationBell() {
                       height: 30,
                       flexShrink: 0,
                       borderRadius: 8,
-                      background: n.kind === 'order' ? 'rgba(19,124,139,0.12)' : 'rgba(168,151,35,0.16)',
+                      background: 'var(--soft)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <Icon name={n.kind === 'order' ? 'bag' : 'info'} size={16} color={n.kind === 'order' ? 'var(--brand)' : 'var(--gold)'} />
+                    <Icon name={n.kind === 'order' ? 'bag' : 'info'} size={16} color={n.kind === 'order' ? 'var(--ink)' : 'var(--a-accent)'} />
                   </span>
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: 'block', fontFamily: 'var(--ui-font)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>

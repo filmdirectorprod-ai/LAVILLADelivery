@@ -1,16 +1,19 @@
 // components/admin/drivers/DriverCard.tsx
-// One livreur card: identity (name + vehicle), online presence dot, rating, and
-// today's deliveries + earnings. Pure presentational — all data is prop-driven.
+// One livreur card: identity (name + vehicle), status pill, rating and phone,
+// today's deliveries + earnings, the current run, app access and the actions.
+// Pure presentational — all data is prop-driven.
 import { Icon } from '@/components/ui/Icon';
-import { formatDH } from '@/lib/format';
+import { formatAmount } from '@/lib/format';
 import { orderStatusLabel } from '@/lib/order-status';
 import { isDriverOnline, driverStatus, type DriverStatus } from '@/lib/admin-presence';
 import type { DriverRow } from '@/lib/admin-drivers';
+import { MiniStat } from '@/components/admin/overview/HeroStat';
+import { GhostButton, GlassPanel, IconTile, Pill, SubPanel, type PillTone } from '@/components/admin/ui/Glass';
 
-const STATUS_UI: Record<DriverStatus, { label: string; bg: string; fg: string; dot: string }> = {
-  delivering: { label: 'En livraison', bg: 'rgba(168,151,35,0.16)', fg: '#8a7a14', dot: 'var(--gold)' },
-  available: { label: 'Disponible', bg: 'rgba(47,158,111,0.14)', fg: '#2f9e6f', dot: '#2bb673' },
-  offline: { label: 'Hors ligne', bg: 'var(--soft)', fg: 'var(--muted)', dot: 'var(--muted)' },
+const STATUS_UI: Record<DriverStatus, { label: string; tone: PillTone }> = {
+  delivering: { label: 'En livraison', tone: 'solid' },
+  available: { label: 'Disponible', tone: 'outline' },
+  offline: { label: 'Hors ligne', tone: 'muted' },
 };
 
 function lastSeenLabel(iso: string | null | undefined): string {
@@ -36,141 +39,69 @@ export function DriverCard({ row, onCreateAccess, onEdit, onDelete }: DriverCard
   const online = isDriverOnline(driver);
   const status = STATUS_UI[driverStatus(driver, Boolean(currentRoute))];
   const hasAccount = Boolean(driver.user_id);
+  const text = { fontFamily: 'var(--ui-font)' } as const;
+
   return (
-    <div
-      style={{
-        background: '#fff',
-        border: '1px solid var(--line)',
-        borderRadius: 18,
-        boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 12,
-            background: 'var(--soft)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <Icon name="scooter" size={22} color="var(--brand-d)" />
-        </div>
+    <GlassPanel padding={0} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ padding: '18px 18px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <IconTile name="scooter" size={44} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {driver.name}
-          </div>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
-            {driver.vehicle || 'Véhicule non précisé'}
-          </div>
+          <h3 style={{ ...text, margin: 0, fontWeight: 600, fontSize: 16, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{driver.name}</h3>
+          <div style={{ ...text, fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>{driver.vehicle || 'Véhicule non précisé'}</div>
         </div>
-        <span
-          style={{
-            fontFamily: 'var(--ui-font)',
-            fontSize: 11.5,
-            fontWeight: 600,
-            padding: '4px 10px',
-            borderRadius: 999,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            background: status.bg,
-            color: status.fg,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <span style={{ width: 7, height: 7, borderRadius: 999, background: status.dot }} />
-          {status.label}
-        </span>
+        <Pill tone={status.tone}>{status.label}</Pill>
       </div>
 
-      <div style={{ padding: '0 18px', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Icon name="star" size={15} color="var(--gold)" />
-        <span style={{ fontFamily: 'var(--ui-font)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
-          {driver.rating.toFixed(1)}
-        </span>
+      <div style={{ padding: '12px 18px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Icon name="star" size={15} color="var(--a-accent)" fill />
+        <span style={{ ...text, fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{Number(driver.rating ?? 0).toFixed(1)}</span>
         {driver.phone && (
-          <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <a href={`tel:${driver.phone.replace(/[^0-9+]/g, '')}`} style={{ ...text, fontSize: 12.5, color: 'var(--muted)', marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, textDecoration: 'none' }}>
             <Icon name="phone" size={14} color="var(--muted)" />
             {driver.phone}
-          </span>
+          </a>
         )}
       </div>
 
-      <div style={{ padding: '14px 18px 16px', marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <div style={{ background: 'var(--soft)', borderRadius: 12, padding: '10px 12px' }}>
-          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: 'var(--ink)' }}>{deliveries}</div>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
-            Livraison{deliveries > 1 ? 's' : ''} aujourd&apos;hui
-          </div>
-        </div>
-        <div style={{ background: 'var(--soft)', borderRadius: 12, padding: '10px 12px' }}>
-          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: 'var(--ink)' }}>{formatDH(earnings)}</div>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>Gains du jour</div>
-        </div>
+      <div style={{ padding: '16px 18px 0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <MiniStat label={`Livraison${deliveries > 1 ? 's' : ''} aujourd'hui`} value={String(deliveries)} />
+        <MiniStat label="Gains du jour" value={formatAmount(earnings)} unit="DH" />
       </div>
 
-      <div style={{ padding: '0 18px 16px' }}>
+      <div style={{ padding: '14px 18px 16px' }}>
         {currentRoute ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(19,124,139,0.10)', borderRadius: 12, padding: '9px 12px' }}>
-            <Icon name="scooter" size={16} color="var(--brand-d)" />
-            <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--brand-d)' }}>{currentRoute.code}</span>
-            <span style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--brand-d)', marginLeft: 'auto' }}>{orderStatusLabel(currentRoute.status)}</span>
-          </div>
+          <SubPanel style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 14 }}>
+            <Icon name="scooter" size={16} color="var(--ink)" />
+            <span style={{ ...text, fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{currentRoute.code}</span>
+            <span style={{ ...text, fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{orderStatusLabel(currentRoute.status)}</span>
+          </SubPanel>
         ) : (
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)' }}>
-            {online ? 'Disponible — aucune course en cours' : lastSeenLabel(driver.last_seen)}
-          </div>
+          <div style={{ ...text, fontSize: 12, color: 'var(--muted)' }}>{online ? 'Disponible — aucune course en cours' : lastSeenLabel(driver.last_seen)}</div>
         )}
       </div>
 
-      <div style={{ borderTop: '1px solid var(--line)', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ borderTop: '1px solid var(--line)', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         {hasAccount ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: '#2f9e6f' }}>
-            <Icon name="check" size={14} color="#2f9e6f" /> Accès actif
+          <span style={{ ...text, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>
+            <Icon name="check" size={14} color="var(--ink)" /> Accès actif
           </span>
         ) : (
-          <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)' }}>Pas d&apos;accès</span>
+          <span style={{ ...text, fontSize: 12, fontWeight: 600, color: 'var(--a-accent)' }}>Pas d&apos;accès</span>
         )}
-
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
           {!hasAccount && (
-            <button type="button" onClick={onCreateAccess} style={actionBtn('var(--brand)')}>
-              <Icon name="plus" size={13} color="var(--brand)" /> Accès
-            </button>
+            <GhostButton onClick={onCreateAccess} aria-label={`Créer un accès pour ${driver.name}`} style={{ padding: '6px 11px', fontSize: 12 }}>
+              + Accès
+            </GhostButton>
           )}
-          <button type="button" onClick={onEdit} style={actionBtn('var(--ink)')}>
-            <Icon name="edit" size={13} color="var(--ink)" /> Modifier
-          </button>
-          <button type="button" onClick={onDelete} style={actionBtn('#C0392B')}>
-            <Icon name="x" size={13} color="#C0392B" /> Supprimer
-          </button>
+          <GhostButton onClick={onEdit} aria-label={`Modifier ${driver.name}`} style={{ padding: '6px 11px', fontSize: 12 }}>
+            Modifier
+          </GhostButton>
+          <GhostButton onClick={onDelete} aria-label={`Supprimer ${driver.name}`} style={{ padding: '6px 9px' }}>
+            <Icon name="x" size={13} color="var(--ink)" />
+          </GhostButton>
         </div>
       </div>
-    </div>
+    </GlassPanel>
   );
-}
-
-function actionBtn(color: string): React.CSSProperties {
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 5,
-    border: '1px solid var(--line)',
-    borderRadius: 9,
-    padding: '6px 10px',
-    cursor: 'pointer',
-    fontFamily: 'var(--ui-font)',
-    fontWeight: 600,
-    fontSize: 12,
-    color,
-    background: '#fff',
-  };
 }

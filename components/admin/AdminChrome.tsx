@@ -1,7 +1,9 @@
 'use client';
-// Desktop admin shell: fixed left sidebar (brand-d) with the section nav and the
-// manager identity, plus a scrollable content area. Marker class .lv-admin-root
-// tells globals.css to drop the phone-frame sizing.
+// Desktop admin shell: fixed left sidebar with the section nav and the manager
+// identity, plus a scrollable content area on a dark ground. The screens' own
+// white cards then read as the lit surfaces, the way a control room does — the
+// data is what glows. Marker class .lv-admin-root drops the phone-frame sizing
+// and carries the dark tokens (see globals.css).
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -20,101 +22,72 @@ export function AdminChrome({ children, managerName, agencyLabel = 'Gérant' }: 
     router.replace('/auth/admin');
   }
   return (
-    <div className="lv-admin-root" style={{ display: 'flex', height: '100dvh', width: '100%' }}>
-      <aside
-        style={{
-          width: 260,
-          flexShrink: 0,
-          background: 'var(--brand-d)',
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '22px 14px',
-          overflow: 'auto',
-        }}
-      >
-        <div style={{ padding: '0 10px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 2px' }}>
-            <Image
-              src="/brand/logo.png"
-              alt="La Villa — Maison de Qualité, depuis 2007"
-              width={190}
-              height={96}
-              priority
-              style={{ width: '100%', maxWidth: 190, height: 'auto', display: 'block' }}
-            />
-          </div>
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11, letterSpacing: 1.5, color: 'var(--gold)', fontWeight: 600, marginTop: 10, textAlign: 'center' }}>
-            ADMINISTRATION
-          </div>
-        </div>
-
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-          {ADMIN_NAV.map((item) => {
-            const active = isActiveNav(pathname, item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '12px 12px',
-                  borderRadius: 12,
-                  textDecoration: 'none',
-                  fontFamily: 'var(--ui-font)',
-                  fontSize: 14.5,
-                  fontWeight: 600,
-                  color: active ? 'var(--brand-d)' : 'rgba(255,255,255,0.85)',
-                  background: active ? '#fff' : 'transparent',
-                }}
-              >
-                <Icon name={item.icon} size={19} color={active ? 'var(--brand)' : 'rgba(255,255,255,0.85)'} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 10px 0', borderTop: '1px solid rgba(255,255,255,0.12)', marginTop: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 999, background: 'rgba(255,255,255,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Icon name="user" size={18} color="#fff" />
-          </div>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {managerName}
-            </div>
-            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{agencyLabel}</div>
-          </div>
-          <button
-            onClick={signOut}
-            title="Se déconnecter"
-            aria-label="Se déconnecter"
-            style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.12)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Icon name="logout" size={17} color="rgba(255,255,255,0.85)" />
-          </button>
-        </div>
-      </aside>
-
-      <main style={{ flex: 1, minWidth: 0, overflow: 'auto', background: 'var(--soft)' }}>
-        <div
-          style={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 30,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: 12,
-            padding: '12px 32px',
-            background: 'rgba(246,247,247,0.92)',
-            backdropFilter: 'blur(6px)',
-            borderBottom: '1px solid var(--line)',
-          }}
+    <div className="lv-admin-root" style={{ display: 'flex', flexDirection: 'column', height: '100dvh', width: '100%' }}>
+      {/* Un seul défileur : la barre est collante À L'INTÉRIEUR, pour que le
+          contenu glisse dessous et que le verre dépoli ait quelque chose à
+          flouter — c'est tout l'effet d'une barre de navigation iOS. */}
+      <main style={{ flex: 1, minWidth: 0, overflow: 'auto', background: 'transparent' }}>
+        <header
+          className="lv-ios-bar"
+          style={{ position: 'sticky', top: 0, zIndex: 40, display: 'flex', alignItems: 'center', gap: 18, padding: '14px 24px' }}
         >
-          <NotificationBell />
-        </div>
+          <Image
+            src="/brand/logo-ondark.png"
+            alt="La Villa — Maison de Qualité, depuis 2007"
+            width={104}
+            height={53}
+            priority
+            style={{ width: 104, height: 'auto', display: 'block', flexShrink: 0 }}
+          />
+
+          {/* Contrôle segmenté : les sections tiennent sur une ligne et défilent
+              latéralement sur un écran étroit. */}
+          <nav
+            className="lv-ios-segmented"
+            style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 2, overflowX: 'auto', scrollbarWidth: 'none' }}
+          >
+            {ADMIN_NAV.map((item) => {
+              const active = isActiveNav(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  title={item.label}
+                  aria-current={active ? 'page' : undefined}
+                  className={active ? 'lv-ios-segment is-active' : 'lv-ios-segment'}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}
+                >
+                  <Icon name={item.icon} size={15} color={active ? 'var(--a-accent)' : 'var(--a-muted)'} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            <NotificationBell />
+            <div
+              title={`${managerName} · ${agencyLabel}`}
+              style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--a-glass)', border: '1px solid var(--a-glass-line)', borderRadius: 'var(--a-r-pill)', padding: '5px 5px 5px 14px' }}
+            >
+              <div style={{ minWidth: 0, textAlign: 'right' }}>
+                <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--a-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>
+                  {managerName}
+                </div>
+                <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11, color: 'var(--a-muted)', whiteSpace: 'nowrap' }}>{agencyLabel}</div>
+              </div>
+              <button
+                onClick={signOut}
+                title="Se déconnecter"
+                aria-label="Se déconnecter"
+                style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 999, border: 'none', background: 'rgba(255, 255, 255, 0.16)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Icon name="logout" size={15} color="var(--a-text)" />
+              </button>
+            </div>
+          </div>
+        </header>
+
         {children}
       </main>
     </div>

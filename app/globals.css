@@ -128,11 +128,163 @@ body {
 /* Admin renders full-width, outside the centered phone frame. The marker class
    lives on AdminChrome's root; :has() lifts the .lv-frame constraints only when
    an admin page is mounted. */
+/* ── Administration — thème sombre ────────────────────────────────────────────
+   Même transposition que pour l'espace livreur : le turquoise de la maison
+   devient le sol, l'or l'accent. Les cartes des écrans restent blanches — sur ce
+   fond, le blanc devient l'accent le plus fort, et c'est lui qui porte les
+   données. Ces jetons ne s'appliquent QUE sous .lv-admin-root. */
+.lv-admin-root {
+  /* Palette stricte : turquoise #137C8B, or #A89723, blanc #FFFFFF.
+     Les variations ne sont que des OPACITÉS de ces trois couleurs — aucune
+     teinte supplémentaire n'est introduite.
+     L'or n'est jamais un fond porteur de texte : blanc sur #A89723 plafonne à
+     2,6:1, sous le seuil de lisibilité. Il sert d'accent — point actif, liseré,
+     chiffre clé — et la pilule de section active est blanche à texte turquoise
+     (4,6:1).
+     Le sol prend le turquoise FONCÉ de la maison (#0F606B, déjà présent sous
+     --brand-d) : sur une pleine page, le #137C8B vibre et fatigue ; foncé, il
+     laisse les cartes blanches porter le regard. Le turquoise clair reste la
+     couleur des actions, sur ces cartes. */
+  /* Style iOS : la police système d'Apple (SF Pro sur Mac et iPhone, la police
+     système ailleurs) remplace Poppins et Playfair dans l'admin seulement. */
+  --ui-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  --a-ground: #0f606b;
+  --a-panel: rgba(255, 255, 255, 0.08);
+  --a-panel-2: rgba(255, 255, 255, 0.14);
+  --a-line: rgba(255, 255, 255, 0.18);
+  --a-text: #ffffff;
+  --a-muted: rgba(255, 255, 255, 0.68);
+  --a-accent: #a89723;
+  --a-accent-ink: #ffffff;
+  /* Inversion des jetons d'encre de la maison, dans l'admin seulement : les
+     écrans colorent leur texte, leurs bordures et leurs puits via --ink,
+     --muted, --line et --soft. Les redéfinir ici fait passer tout le contenu
+     des cartes noires en blanc sans réécrire les écrans un par un. */
+  --ink: #ffffff;
+  --muted: rgba(255, 255, 255, 0.66);
+  --line: rgba(255, 255, 255, 0.12);
+  --soft: rgba(255, 255, 255, 0.06);
+  /* Le turquoise foncé sert d'encre d'accent à 5 libellés ; sur carte noire il
+     tomberait à ~2:1. L'or de la palette y atteint ~7:1. */
+  --brand-d: #a89723;
+  /* Contrôles natifs (listes déroulantes, dates, cases) en thème sombre, pour
+     que les champs sans fond explicite ne restent pas blancs sous du texte
+     blanc. */
+  color-scheme: dark;
+  --a-on-white: #137c8b;
+  /* Cartes en noir à 70 % (panneaux sombres du modèle visionOS) : le
+     turquoise du sol transparaît à 30 %, assez pour que le flou du verre se
+     voie. Leur contenu passe en blanc par l'inversion des jetons d'encre
+     ci-dessous. */
+  --a-card: rgba(0, 0, 0, 0.70);
+  /* Verre (style visionOS) : blanc à faible opacité + liseré lumineux. */
+  --a-glass: rgba(255, 255, 255, 0.10);
+  --a-glass-strong: rgba(255, 255, 255, 0.16);
+  --a-glass-line: rgba(255, 255, 255, 0.22);
+  --a-r-card: 20px;
+  --a-r-pill: 999px;
+  /* Le verre a besoin de relief derrière lui : un aplat ne donne rien à flouter.
+     Des halos des couleurs de la palette (turquoise, or à faible opacité) sur
+     le turquoise foncé remplacent la photo floutée du modèle. Le fond reste
+     immobile pendant que le contenu défile par-dessus. */
+  /* Plus foncé : #0F606B domine. Les halos ne sont plus que des reflets (juste
+     assez pour que le verre ait du relief à flouter), et un assombrissement
+     vers les bords descend sous #0F606B — du noir à faible opacité, une ombre,
+     pas une nouvelle couleur. */
+  background:
+    radial-gradient(120% 95% at 50% 35%, transparent 45%, rgba(0, 0, 0, 0.42) 100%),
+    radial-gradient(50% 40% at 12% 8%, rgba(19, 124, 139, 0.38), transparent 70%),
+    radial-gradient(38% 32% at 88% 14%, rgba(168, 151, 35, 0.13), transparent 70%),
+    radial-gradient(45% 45% at 72% 92%, rgba(19, 124, 139, 0.26), transparent 70%),
+    var(--a-ground);
+  color: var(--a-text);
+}
+
+/* Barre de navigation iOS : verre dépoli. Elle est collante à l'intérieur du
+   défileur, pour que le contenu passe dessous et que le flou ait quelque chose
+   à flouter. Le teint est #0F606B à 72 % — la palette reste stricte. */
+.lv-ios-bar {
+  background: rgba(15, 96, 107, 0.55);
+  -webkit-backdrop-filter: saturate(170%) blur(30px);
+  backdrop-filter: saturate(170%) blur(30px);
+  border-bottom: 1px solid var(--a-glass-line);
+}
+
+/* Contrôle segmenté iOS : un rail translucide, le segment actif en blanc avec
+   l'ombre douce d'iOS (une profondeur, pas une couleur). */
+.lv-ios-segmented {
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--a-glass);
+  border: 1px solid var(--a-glass-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.lv-ios-segment {
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-family: var(--ui-font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--a-muted);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.lv-ios-segment:hover {
+  color: var(--a-text);
+}
+.lv-ios-segment.is-active {
+  background: #ffffff;
+  color: var(--a-on-white);
+  font-weight: 600;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04);
+}
+
 .lv-frame:has(.lv-admin-root) {
   max-width: none;
   height: 100dvh;
   margin: 0;
   border-radius: 0;
   box-shadow: none;
-  background: var(--soft);
+  background: #0f606b;
+}
+
+/* Cartes des écrans admin en verre clair : elles lisent toutes leur fond depuis
+   --a-card, ce qui permet de leur donner flou, liseré lumineux et ombre douce
+   depuis ici, sans toucher aux 91 cartes une par une. Un style en ligne
+   (bordure, ombre) posé sur une carte garde la priorité. */
+.lv-admin-root [style*="--a-card"] {
+  -webkit-backdrop-filter: saturate(160%) blur(22px);
+  backdrop-filter: saturate(160%) blur(22px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 12px 36px -12px rgba(0, 0, 0, 0.55);
+}
+
+/* Listes déroulantes : Safari (Mac, iPhone) ignore color-scheme et garde un
+   contrôle gris clair natif. On retire l'apparence native et on dessine un
+   chevron blanc. !important parce que les champs reçoivent leur fond en ligne
+   (fieldStyle), dont le raccourci `background` effacerait l'image. */
+.lv-admin-root select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+  background-size: 12px 8px !important;
+  padding-right: 34px !important;
+  cursor: pointer;
+}
+.lv-admin-root select option {
+  color: #0f606b;
+  background: #ffffff;
+}
+
+/* Champs numériques (prix, frais, quotas) : sans les flèches natives. */
+.lv-admin-root input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.lv-admin-root input[type='number']::-webkit-inner-spin-button,
+.lv-admin-root input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }

@@ -4,6 +4,7 @@
 // and stays unit testable. No React, no I/O.
 
 import type { Driver } from '@/lib/types';
+import { driverStatus, isDriverOnline, type DriverStatus } from '@/lib/admin-presence';
 
 interface StatsOrder {
   id: string;
@@ -126,4 +127,45 @@ export function driverRoutesToCsv(rows: DriverRow[]): string {
       .join(','),
   );
   return [header.map(esc).join(','), ...lines].join('\n');
+}
+const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+export type DriverFilter = 'all' | DriverStatus;
+
+/** Roster counts per status filter (freshness-aware presence). */
+export function driverFilterCounts(rows: DriverRow[], now: Date = new Date()): Record<DriverFilter, number> {
+  const out: Record<DriverFilter, number> = { all: rows.length, available: 0, delivering: 0, offline: 0 };
+  for (const r of rows) out[driverStatus(r.driver, Boolean(r.currentRoute), now)] += 1;
+  return out;
+}
+
+/** Rows matching a status filter and a name / phone / vehicle search. */
+export function filterDriverRows(rows: DriverRow[], filter: DriverFilter, query: string, now: Date = new Date()): DriverRow[] {
+  const q = fold(query.trim());
+  return rows.filter((r) => {
+    if (filter !== 'all' && driverStatus(r.driver, Boolean(r.currentRoute), now) !== filter) return false;
+    if (!q) return true;
+    return [r.driver.name, r.driver.phone ?? '', r.driver.vehicle ?? ''].some((v) => fold(v).includes(q));
+  });
+}
+
+export interface RosterTotals {
+  online: number;
+  delivering: number;
+  deliveries: number;
+  earnings: number;
+  /** Drivers with no login yet. */
+  withoutAccess: number;
+}
+
+export function rosterTotals(rows: DriverRow[], now: Date = new Date()): RosterTotals {
+  const t: RosterTotals = { online: 0, delivering: 0, deliveries: 0, earnings: 0, withoutAccess: 0 };
+  for (const r of rows) {
+    if (isDriverOnline(r.driver, now)) t.online += 1;
+    if (r.currentRoute) t.delivering += 1;
+    t.deliveries += r.deliveries;
+    t.earnings += r.earnings;
+    if (!r.driver.user_id) t.withoutAccess += 1;
+  }
+  return t;
 }

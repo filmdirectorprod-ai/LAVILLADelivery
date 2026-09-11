@@ -1,26 +1,18 @@
 // components/admin/orders/OrderConfirmPanel.tsx
-// Gérant confirmation modal for a PENDING order. Lets the gérant adjust quantities,
+// Gérant confirmation sheet for a PENDING order. Lets the gérant adjust quantities,
 // remove / add items and correct the delivery address + zone, with a live total
 // preview (lib/order-confirm.ts). On "Confirmer" it persists any change via the
 // edit RPCs (server recomputes authoritatively) then admin_confirm_order; "Annuler"
 // calls admin_cancel_order with a reason. Fetches products + zones on open.
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
 import { Icon } from '@/components/ui/Icon';
-import {
-  toConfirmItems,
-  recomputeTotals,
-  setItemQty,
-  removeItem,
-  addItem,
-  canConfirm,
-  toItemsPayload,
-  type ConfirmItem,
-} from '@/lib/order-confirm';
+import { toConfirmItems, recomputeTotals, setItemQty, removeItem, addItem, canConfirm, toItemsPayload, type ConfirmItem } from '@/lib/order-confirm';
 import type { AdminOrderRow } from '@/lib/admin-orders';
 import type { Product, Zone } from '@/lib/types';
+import { FormError, GhostButton, Modal, PrimaryButton, SubPanel, fieldStyle, labelStyle } from '@/components/admin/ui/Glass';
 
 export interface OrderConfirmPanelProps {
   row: AdminOrderRow;
@@ -28,7 +20,7 @@ export interface OrderConfirmPanelProps {
   onDone: () => void;
 }
 
-const label: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--muted)' };
+const section: CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', margin: '0 0 8px' };
 
 export function OrderConfirmPanel({ row, onClose, onDone }: OrderConfirmPanelProps) {
   const order = row.order;
@@ -45,10 +37,7 @@ export function OrderConfirmPanel({ row, onClose, onDone }: OrderConfirmPanelPro
   useEffect(() => {
     const supabase = createClient();
     (async () => {
-      const [p, z] = await Promise.all([
-        supabase.from('products').select('*').eq('active', true).order('name'),
-        supabase.from('delivery_zones').select('*').order('fee_dh'),
-      ]);
+      const [p, z] = await Promise.all([supabase.from('products').select('*').eq('active', true).order('name'), supabase.from('delivery_zones').select('*').order('fee_dh')]);
       setProducts((p.data ?? []) as Product[]);
       setZones((z.data ?? []) as Zone[]);
     })();
@@ -58,10 +47,7 @@ export function OrderConfirmPanel({ row, onClose, onDone }: OrderConfirmPanelPro
   const discountDh = order.discount_dh;
   const pointsDiscountDh = Math.max(0, order.subtotal_dh + order.delivery_fee_dh - order.discount_dh - order.total_dh);
   const zoneFee = useMemo(() => zones.find((z) => z.id === zoneId)?.fee_dh, [zones, zoneId]);
-  const totals = useMemo(
-    () => recomputeTotals(items, { mode: order.mode, zoneFee, discountDh, pointsDiscountDh }),
-    [items, order.mode, zoneFee, discountDh, pointsDiscountDh],
-  );
+  const totals = useMemo(() => recomputeTotals(items, { mode: order.mode, zoneFee, discountDh, pointsDiscountDh }), [items, order.mode, zoneFee, discountDh, pointsDiscountDh]);
 
   const itemsChanged = useMemo(() => {
     const orig = toConfirmItems(row.items);
@@ -106,98 +92,117 @@ export function OrderConfirmPanel({ row, onClose, onDone }: OrderConfirmPanelPro
   }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(8,28,31,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(560px, 100%)', maxHeight: '92vh', overflow: 'auto', background: '#fff', borderRadius: 20, padding: 24, boxShadow: '0 30px 70px -30px rgba(0,0,0,0.6)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: 'var(--ink)', margin: 0 }}>Confirmer {order.code}</h2>
-          <button onClick={onClose} style={{ border: 'none', background: 'var(--soft)', borderRadius: 999, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="x" size={16} color="var(--ink)" />
-          </button>
-        </div>
-        <p style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', margin: '0 0 16px' }}>
-          {row.customerName ?? 'Client'} · {order.mode === 'livraison' ? 'Livraison' : 'Retrait'}
-        </p>
+    <Modal title={`Confirmer ${order.code}`} onClose={onClose} width={560}>
+      <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)', margin: '-8px 0 18px' }}>
+        {row.customerName ?? 'Client'} · {order.mode === 'livraison' ? 'Livraison' : 'Retrait'}
+        {order.phone ? ` · ${order.phone}` : ''}
+      </p>
 
-        {/* Items */}
-        <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>Articles</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {items.map((it) => (
-            <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--soft)', borderRadius: 12, padding: '8px 12px' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.name}</div>
-                <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)' }}>{formatDH(it.price)}</div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <button onClick={() => setItems((x) => setItemQty(x, it.id, it.qty - 1))} style={stepBtn}>−</button>
-                <span style={{ fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 700, minWidth: 18, textAlign: 'center' }}>{it.qty}</span>
-                <button onClick={() => setItems((x) => setItemQty(x, it.id, it.qty + 1))} style={stepBtn}>+</button>
-              </div>
-              <button onClick={() => setItems((x) => removeItem(x, it.id))} title="Retirer" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#a23' }}>
-                <Icon name="x" size={15} color="#a23" />
+      <h3 style={section}>Articles</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.map((it) => (
+          <SubPanel key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.name}</div>
+              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)' }}>{formatDH(it.price)}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button type="button" aria-label={`Retirer un ${it.name}`} onClick={() => setItems((x) => setItemQty(x, it.id, it.qty - 1))} style={stepBtn}>
+                −
+              </button>
+              <span style={{ fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 600, minWidth: 18, textAlign: 'center', color: 'var(--ink)' }}>{it.qty}</span>
+              <button type="button" aria-label={`Ajouter un ${it.name}`} onClick={() => setItems((x) => setItemQty(x, it.id, it.qty + 1))} style={stepBtn}>
+                +
               </button>
             </div>
-          ))}
-          {items.length === 0 && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#a23' }}>Aucun article — ajoutez-en un.</div>}
+            <button type="button" onClick={() => setItems((x) => removeItem(x, it.id))} aria-label={`Supprimer ${it.name}`} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4 }}>
+              <Icon name="x" size={15} color="var(--a-accent)" />
+            </button>
+          </SubPanel>
+        ))}
+        {items.length === 0 && <FormError>Aucun article — ajoutez-en un.</FormError>}
+      </div>
+
+      {adding ? (
+        <SubPanel style={{ marginTop: 10, padding: 10 }}>
+          <input autoFocus value={pquery} onChange={(e) => setPquery(e.target.value)} placeholder="Rechercher un produit…" aria-label="Rechercher un produit" style={{ ...fieldStyle, marginBottom: 8 }} />
+          <div style={{ maxHeight: 180, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {filteredProducts.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setItems((x) => addItem(x, { id: p.id, name: p.name, price: p.price_dh }));
+                  setAdding(false);
+                  setPquery('');
+                }}
+                style={{ textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer', padding: '8px 8px', borderRadius: 10, fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)', display: 'flex', justifyContent: 'space-between', gap: 10 }}
+              >
+                <span>{p.name}</span>
+                <span style={{ color: 'var(--muted)' }}>{formatDH(p.price_dh)}</span>
+              </button>
+            ))}
+          </div>
+        </SubPanel>
+      ) : (
+        <GhostButton onClick={() => setAdding(true)} style={{ marginTop: 10, width: '100%', borderStyle: 'dashed' }}>
+          + Ajouter un article
+        </GhostButton>
+      )}
+
+      {order.mode === 'livraison' && (
+        <div style={{ marginTop: 18 }}>
+          <h3 style={section}>Livraison</h3>
+          <label style={labelStyle} htmlFor="confirm-address">
+            Adresse
+          </label>
+          <input id="confirm-address" value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...fieldStyle, marginBottom: 12 }} />
+          <label style={labelStyle} htmlFor="confirm-zone">
+            Zone
+          </label>
+          <select id="confirm-zone" value={zoneId ?? ''} onChange={(e) => setZoneId(e.target.value || null)} style={fieldStyle}>
+            <option value="">Zone…</option>
+            {zones.map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.name} · {formatDH(z.fee_dh)}
+              </option>
+            ))}
+          </select>
         </div>
+      )}
 
-        {/* Add item */}
-        {adding ? (
-          <div style={{ marginTop: 10, border: '1px solid var(--line)', borderRadius: 12, padding: 10 }}>
-            <input autoFocus value={pquery} onChange={(e) => setPquery(e.target.value)} placeholder="Rechercher un produit…" style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 9, padding: '8px 10px', fontFamily: 'var(--ui-font)', fontSize: 13, marginBottom: 8 }} />
-            <div style={{ maxHeight: 180, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {filteredProducts.map((p) => (
-                <button key={p.id} onClick={() => { setItems((x) => addItem(x, { id: p.id, name: p.name, price: p.price_dh })); setAdding(false); setPquery(''); }} style={{ textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer', padding: '7px 8px', borderRadius: 8, fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{p.name}</span><span style={{ color: 'var(--muted)' }}>{formatDH(p.price_dh)}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <button onClick={() => setAdding(true)} style={{ marginTop: 10, border: '1px dashed var(--brand)', borderRadius: 10, padding: '9px', width: '100%', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 13, fontWeight: 600, color: 'var(--brand)', background: '#fff' }}>+ Ajouter un article</button>
-        )}
-
-        {/* Delivery */}
-        {order.mode === 'livraison' && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>Livraison</div>
-            <label style={label}>Adresse</label>
-            <input value={address} onChange={(e) => setAddress(e.target.value)} style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 10, padding: '9px 11px', fontFamily: 'var(--ui-font)', fontSize: 13.5, marginTop: 5, marginBottom: 10 }} />
-            <label style={label}>Zone</label>
-            <select value={zoneId ?? ''} onChange={(e) => setZoneId(e.target.value || null)} style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 10, padding: '9px 11px', fontFamily: 'var(--ui-font)', fontSize: 13.5, marginTop: 5, background: '#fff' }}>
-              <option value="">Zone…</option>
-              {zones.map((z) => <option key={z.id} value={z.id}>{z.name} · {formatDH(z.fee_dh)}</option>)}
-            </select>
-          </div>
-        )}
-
-        {/* Totals */}
-        <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 12, fontFamily: 'var(--ui-font)', fontSize: 13.5 }}>
-          <Row k="Sous-total" v={formatDH(totals.subtotal)} />
-          {order.mode === 'livraison' && <Row k="Livraison" v={formatDH(totals.deliveryFee)} />}
-          {discountDh > 0 && <Row k="Remise" v={'− ' + formatDH(discountDh)} />}
-          {pointsDiscountDh > 0 && <Row k="Points" v={'− ' + formatDH(pointsDiscountDh)} />}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>
-            <span>Total</span><span>{formatDH(totals.total)}</span>
-          </div>
-        </div>
-
-        {error && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 12 }}>{error}</div>}
-
-        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-          <button onClick={() => run('cancel')} disabled={busy} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 12, padding: '12px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: '#a23', background: '#fff', opacity: busy ? 0.6 : 1 }}>Annuler la commande</button>
-          <button onClick={() => run('confirm')} disabled={busy || !canConfirm(items)} style={{ flex: 1.4, border: 'none', borderRadius: 12, padding: '12px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, color: '#fff', background: '#2f9e6f', opacity: busy || !canConfirm(items) ? 0.6 : 1 }}>{busy ? '…' : 'Confirmer → cuisine'}</button>
+      <div style={{ marginTop: 18, borderTop: '1px solid var(--line)', paddingTop: 12, fontFamily: 'var(--ui-font)', fontSize: 13.5 }}>
+        <Row k="Sous-total" v={formatDH(totals.subtotal)} />
+        {order.mode === 'livraison' && <Row k="Livraison" v={formatDH(totals.deliveryFee)} />}
+        {discountDh > 0 && <Row k="Remise" v={'− ' + formatDH(discountDh)} />}
+        {pointsDiscountDh > 0 && <Row k="Points" v={'− ' + formatDH(pointsDiscountDh)} />}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontWeight: 600, fontSize: 17, color: 'var(--ink)' }}>
+          <span>Total</span>
+          <span>{formatDH(totals.total)}</span>
         </div>
       </div>
-    </div>
+
+      {error && <FormError>{error}</FormError>}
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+        <GhostButton onClick={() => run('cancel')} disabled={busy} style={{ flex: 1, color: 'var(--a-accent)' }}>
+          Annuler la commande
+        </GhostButton>
+        <PrimaryButton onClick={() => run('confirm')} disabled={busy || !canConfirm(items)} style={{ flex: 1.4 }}>
+          {busy ? '…' : 'Confirmer → cuisine'}
+        </PrimaryButton>
+      </div>
+    </Modal>
   );
 }
 
-const stepBtn: React.CSSProperties = { border: '1px solid var(--line)', background: '#fff', borderRadius: 8, width: 26, height: 26, cursor: 'pointer', fontSize: 16, fontWeight: 700, color: 'var(--ink)', lineHeight: 1 };
+const stepBtn: CSSProperties = { border: '1px solid var(--a-glass-line)', background: 'transparent', borderRadius: 999, width: 28, height: 28, cursor: 'pointer', fontSize: 16, fontWeight: 600, color: 'var(--ink)', lineHeight: 1 };
 
 function Row({ k, v }: { k: string; v: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginBottom: 3 }}>
-      <span>{k}</span><span>{v}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginBottom: 4 }}>
+      <span>{k}</span>
+      <span>{v}</span>
     </div>
   );
 }

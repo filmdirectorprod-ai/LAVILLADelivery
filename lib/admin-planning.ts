@@ -76,3 +76,46 @@ export function buildShiftWeek(
 
   return { days, rows };
 }
+
+/** Length of a shift in hours (0 when the bounds are inverted or unreadable). */
+export function shiftHours(s: Pick<DriverShift, 'starts_at' | 'ends_at'>): number {
+  const ms = Date.parse(s.ends_at) - Date.parse(s.starts_at);
+  return Number.isFinite(ms) && ms > 0 ? ms / 3600000 : 0;
+}
+
+/** Hours scheduled for one driver over the week. */
+export function rowHours(row: ShiftRow): number {
+  return row.days.reduce((n, c) => n + c.shifts.reduce((m, s) => m + shiftHours(s), 0), 0);
+}
+
+export interface WeekTotals {
+  shifts: number;
+  hours: number;
+  /** Drivers with at least one shift. */
+  drivers: number;
+  /** Drivers on shift, per day (Monday → Sunday). */
+  perDay: number[];
+  /** Days with nobody scheduled. */
+  uncoveredDays: number;
+}
+
+export function weekTotals(week: ShiftWeek): WeekTotals {
+  const perDay = week.days.map((_, i) => week.rows.filter((r) => r.days[i].shifts.length > 0).length);
+  let shifts = 0;
+  let hours = 0;
+  let drivers = 0;
+  for (const r of week.rows) {
+    const n = r.days.reduce((m, c) => m + c.shifts.length, 0);
+    shifts += n;
+    hours += rowHours(r);
+    if (n > 0) drivers += 1;
+  }
+  return { shifts, hours, drivers, perDay, uncoveredDays: perDay.filter((n) => n === 0).length };
+}
+
+/** 7.5 → "7 h 30", 8 → "8 h". */
+export function formatHours(h: number): string {
+  const total = Math.round(h * 60);
+  const m = total % 60;
+  return `${Math.floor(total / 60)} h${m ? ` ${String(m).padStart(2, '0')}` : ''}`;
+}

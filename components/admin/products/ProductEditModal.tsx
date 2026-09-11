@@ -2,6 +2,7 @@
 // Edit a product (name / universe / category / price / description / signature /
 // en-vente / stock) and upload its photo. Image goes to the product-images storage
 // bucket (staff-only write); the public URL is saved via admin_edit_product (0029).
+// With several agencies, stock can be overridden per agency.
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -9,9 +10,9 @@ import { Icon } from '@/components/ui/Icon';
 import { useBranches } from '@/lib/use-branches';
 import type { Category, Product, Universe } from '@/lib/types';
 import { revalidateCatalogue } from '@/lib/revalidate-catalogue';
+import { FormError, GhostButton, Modal, PrimaryButton, Switch, fieldStyle, labelStyle } from '@/components/admin/ui/Glass';
 
-const field: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 14, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--ink)', width: '100%', background: '#fff' };
-const label: React.CSSProperties = { fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', fontWeight: 600 };
+const text = { fontFamily: 'var(--ui-font)' } as const;
 
 export function ProductEditModal({ product, categories, onClose, onDone }: { product: Product; categories: Category[]; onClose: () => void; onDone: () => void }) {
   const [name, setName] = useState(product.name);
@@ -75,8 +76,7 @@ export function ProductEditModal({ product, categories, onClose, onDone }: { pro
     if (!name.trim()) return setError('Le nom est requis.');
     if (!Number.isFinite(parsedPrice) || parsedPrice < 0) return setError('Prix invalide.');
     setBusy(true);
-    const supabase = createClient();
-    const { error: e } = await supabase.rpc('admin_edit_product', {
+    const { error: e } = await createClient().rpc('admin_edit_product', {
       p_product: product.id,
       p_name: name,
       p_universe: universe,
@@ -93,109 +93,128 @@ export function ProductEditModal({ product, categories, onClose, onDone }: { pro
     onDone();
   }
 
+  const toggle = (label: string, checked: boolean, onChange: (v: boolean) => void) => (
+    <span style={{ ...text, display: 'inline-flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--ink)' }}>
+      <Switch checked={checked} onChange={onChange} label={label} />
+      {label}
+    </span>
+  );
+
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(8,28,31,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 100%)', maxHeight: '92vh', overflow: 'auto', background: '#fff', borderRadius: 20, padding: 24, boxShadow: '0 30px 70px -30px rgba(0,0,0,0.6)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 18, color: 'var(--ink)', margin: 0 }}>Modifier le produit</h2>
-          <button onClick={onClose} style={{ border: 'none', background: 'var(--soft)', borderRadius: 999, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="x" size={16} color="var(--ink)" />
-          </button>
+    <Modal title="Modifier le produit" onClose={onClose} width={540}>
+      <div style={{ display: 'flex', gap: 14, marginBottom: 18, alignItems: 'center' }}>
+        <div style={{ width: 110, height: 110, borderRadius: 18, background: 'var(--soft)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {imageUrl ? (
+            // Upload preview: the src can be an object URL, which next/image
+            // cannot optimise — a plain <img> is the right tool here.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <Icon name="camera" size={26} color="var(--muted)" />
+          )}
         </div>
-
-        {/* Photo */}
-        <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
-          <div style={{ width: 110, height: 110, borderRadius: 12, background: 'var(--soft)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {imageUrl ? (
-              // Upload preview: the src can be an object URL, which next/image
-              // cannot optimise — a plain <img> is the right tool here.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <Icon name="camera" size={26} color="var(--line)" />
-            )}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'center' }}>
-            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
-            <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ border: '1px solid var(--brand)', borderRadius: 9, padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: 'var(--brand)', background: '#fff' }}>
-              {uploading ? 'Envoi…' : imageUrl ? 'Changer la photo' : 'Ajouter une photo'}
-            </button>
-            {imageUrl && (
-              <button onClick={() => setImageUrl('')} style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12, color: '#C0392B', textAlign: 'left' }}>Retirer la photo</button>
-            )}
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, gridColumn: '1 / -1' }}>
-            <span style={label}>Nom</span>
-            <input style={field} value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <span style={label}>Univers</span>
-            <select style={field} value={universe} onChange={(e) => setUniverse(e.target.value as Universe)}>
-              <option value="patisserie">Pâtisserie</option>
-              <option value="restaurant">Restaurant</option>
-            </select>
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <span style={label}>Catégorie</span>
-            <select style={field} value={effCategory} onChange={(e) => setCategory(e.target.value)}>
-              {cats.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-            </select>
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <span style={label}>Prix (DH)</span>
-            <input type="number" min={0} step={1} style={{ ...field, textAlign: 'right' }} value={price} onChange={(e) => setPrice(e.target.value)} />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, gridColumn: '1 / -1' }}>
-            <span style={label}>Description</span>
-            <textarea style={{ ...field, minHeight: 64, resize: 'vertical' }} value={description} onChange={(e) => setDescription(e.target.value)} />
-          </label>
-        </div>
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginTop: 14 }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)' }}>
-            <input type="checkbox" checked={isSignature} onChange={(e) => setIsSignature(e.target.checked)} /> Signature
-          </label>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)' }}>
-            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> En vente
-          </label>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)' }}>
-            <input type="checkbox" checked={inStock} onChange={(e) => setInStock(e.target.checked)} /> En stock (toutes agences)
-          </label>
-        </div>
-
-        {branches.length > 1 && (
-          <div style={{ marginTop: 14, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
-            <div style={label}>Stock par agence</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-              {branches.map((b) => {
-                const on = branchStock[b.id] ?? inStock;
-                return (
-                  <label key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)' }}>
-                    <span>{b.name.replace(/ —.*$/, '')}</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, color: on ? '#2f9e6f' : '#d24b4b', fontWeight: 600 }}>
-                      {on ? 'En stock' : 'Rupture'}
-                      <input type="checkbox" checked={on} onChange={(e) => toggleBranchStock(b.id, e.target.checked)} />
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-            <p style={{ fontFamily: 'var(--ui-font)', fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
-              Remplace la disponibilité globale pour chaque agence.
-            </p>
-          </div>
-        )}
-
-        {error &&<div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 14 }}>{error}</div>}
-
-        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-          <button onClick={onClose} disabled={busy} style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 10, padding: '12px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)', background: '#fff' }}>Annuler</button>
-          <button onClick={save} disabled={busy || uploading} style={{ flex: 1.4, border: 'none', borderRadius: 10, padding: '12px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, color: '#fff', background: 'var(--brand)', opacity: busy || uploading ? 0.6 : 1 }}>{busy ? '…' : 'Enregistrer'}</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) upload(f);
+            }}
+          />
+          <GhostButton onClick={() => fileRef.current?.click()} disabled={uploading}>
+            {uploading ? 'Envoi…' : imageUrl ? 'Changer la photo' : 'Ajouter une photo'}
+          </GhostButton>
+          {imageUrl && (
+            <GhostButton onClick={() => setImageUrl('')} style={{ color: 'var(--a-accent)' }}>
+              Retirer la photo
+            </GhostButton>
+          )}
         </div>
       </div>
-    </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={labelStyle} htmlFor="edit-prod-name">
+            Nom
+          </label>
+          <input id="edit-prod-name" style={fieldStyle} value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div>
+          <label style={labelStyle} htmlFor="edit-prod-universe">
+            Univers
+          </label>
+          <select id="edit-prod-universe" style={fieldStyle} value={universe} onChange={(e) => setUniverse(e.target.value as Universe)}>
+            <option value="patisserie">Pâtisserie</option>
+            <option value="restaurant">Restaurant</option>
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle} htmlFor="edit-prod-category">
+            Catégorie
+          </label>
+          <select id="edit-prod-category" style={fieldStyle} value={effCategory} onChange={(e) => setCategory(e.target.value)}>
+            {cats.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle} htmlFor="edit-prod-price">
+            Prix (DH)
+          </label>
+          <input id="edit-prod-price" type="number" min={0} step={1} style={{ ...fieldStyle, textAlign: 'right' }} value={price} onChange={(e) => setPrice(e.target.value)} />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={labelStyle} htmlFor="edit-prod-description">
+            Description
+          </label>
+          <textarea id="edit-prod-description" style={{ ...fieldStyle, minHeight: 72, resize: 'vertical' }} value={description} onChange={(e) => setDescription(e.target.value)} />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, marginTop: 16 }}>
+        {toggle('Signature', isSignature, setIsSignature)}
+        {toggle('En vente', active, setActive)}
+        {toggle('En stock (toutes agences)', inStock, setInStock)}
+      </div>
+
+      {branches.length > 1 && (
+        <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+          <div style={labelStyle}>Stock par agence</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+            {branches.map((b) => {
+              const on = branchStock[b.id] ?? inStock;
+              const short = b.name.replace(/ —.*$/, '');
+              return (
+                <div key={b.id} style={{ ...text, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 13, color: 'var(--ink)' }}>
+                  <span>{short}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: on ? 'var(--ink)' : 'var(--a-accent)', fontWeight: 600 }}>
+                    {on ? 'En stock' : 'Rupture'}
+                    <Switch checked={on} onChange={(next) => toggleBranchStock(b.id, next)} label={`Stock à ${short}`} />
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <p style={{ ...text, fontSize: 11.5, color: 'var(--muted)', margin: '8px 0 0' }}>Remplace la disponibilité globale pour chaque agence.</p>
+        </div>
+      )}
+
+      {error && <FormError>{error}</FormError>}
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+        <GhostButton onClick={onClose} disabled={busy} style={{ flex: 1 }}>
+          Annuler
+        </GhostButton>
+        <PrimaryButton onClick={save} disabled={busy || uploading} style={{ flex: 1.4 }}>
+          {busy ? '…' : 'Enregistrer'}
+        </PrimaryButton>
+      </div>
+    </Modal>
   );
 }

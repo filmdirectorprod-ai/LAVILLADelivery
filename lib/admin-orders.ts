@@ -168,3 +168,52 @@ export function pickAutoAssignments(rows: AdminOrderRow[], onlineDriverIds: stri
     driverId: onlineDriverIds[i % onlineDriverIds.length],
   }));
 }
+
+/** An open order waiting longer than this deserves a look. */
+export const ORDER_WAIT_ALERT_MIN = 30;
+
+const OPEN_STATUSES: OrderStatus[] = ['pending', 'preparing', 'ready', 'en_route'];
+
+/** Whole minutes since the order was placed (never negative). */
+export function orderAgeMinutes(order: Pick<Order, 'placed_at'>, now: Date = new Date()): number {
+  const t = Date.parse(order.placed_at);
+  if (Number.isNaN(t)) return 0;
+  return Math.max(0, Math.floor((now.getTime() - t) / 60000));
+}
+
+/** "à l'instant", "12 min", "1 h 05". */
+export function ageLabel(minutes: number): string {
+  if (minutes < 1) return "à l'instant";
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  return `${h} h ${String(minutes % 60).padStart(2, '0')}`;
+}
+
+/** True for an order still open and waiting past ORDER_WAIT_ALERT_MIN. */
+export function isOrderWaitingLong(order: Pick<Order, 'placed_at' | 'status'>, now: Date = new Date()): boolean {
+  return OPEN_STATUSES.includes(order.status) && orderAgeMinutes(order, now) >= ORDER_WAIT_ALERT_MIN;
+}
+
+export interface OrdersHeadline {
+  /** Non-cancelled orders placed since `since`. */
+  todayOrders: number;
+  todayRevenue: number;
+  avgBasket: number;
+  /** Open orders waiting past the alert threshold. */
+  waitingLong: number;
+}
+
+/** Headline figures for the Commandes screen; `since` is the agency's midnight. */
+export function ordersHeadline(rows: AdminOrderRow[], since: string, now: Date = new Date()): OrdersHeadline {
+  const from = Date.parse(since);
+  let todayOrders = 0;
+  let todayRevenue = 0;
+  let waitingLong = 0;
+  for (const r of rows) {
+    if (isOrderWaitingLong(r.order, now)) waitingLong += 1;
+    if (r.order.status === 'cancelled' || Date.parse(r.order.placed_at) < from) continue;
+    todayOrders += 1;
+    todayRevenue += Number(r.order.total_dh) || 0;
+  }
+  return { todayOrders, todayRevenue, avgBasket: todayOrders ? Math.round(todayRevenue / todayOrders) : 0, waitingLong };
+}

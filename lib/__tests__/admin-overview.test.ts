@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { computeOverviewDetail } from '@/lib/admin-overview';
 import {
   startOfTodayISO,
   bucketOrdersByHour,
@@ -125,5 +126,32 @@ describe('driversToPositions', () => {
       { id: 'd', name: 'Sans coords', is_online: true, lat: null, lng: null, position_at: '2026-06-20T11:59:30Z' },
     ];
     expect(driversToPositions(drivers, now).map((p) => p.id)).toEqual(['a']);
+  });
+});
+
+describe('computeOverviewDetail', () => {
+  it('compte les statuts, les livrées, le panier moyen hors annulées et l’heure de pointe', () => {
+    const orders = [
+      { status: 'delivered', total_dh: 100 },
+      { status: 'delivered', total_dh: 50 },
+      { status: 'cancelled', total_dh: 999 },
+      { status: 'en_route', total_dh: 30 },
+    ];
+    const buckets = new Array(24).fill(0);
+    buckets[19] = 3;
+    buckets[12] = 1;
+    const d = computeOverviewDetail(orders, buckets);
+    expect(d.delivered).toBe(2);
+    expect(d.statusCounts).toEqual({ delivered: 2, cancelled: 1, en_route: 1 });
+    expect(d.avgBasket).toBe(60); // (100 + 50 + 30) / 3, la commande annulée est exclue
+    expect(d.peakHour).toBe(19);
+  });
+
+  it('n’a ni heure de pointe ni panier sur une journée vide', () => {
+    const d = computeOverviewDetail([], new Array(24).fill(0));
+    expect(d.peakHour).toBeNull();
+    expect(d.avgBasket).toBe(0);
+    expect(d.delivered).toBe(0);
+    expect(d.statusCounts).toEqual({});
   });
 });

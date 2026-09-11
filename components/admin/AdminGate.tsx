@@ -1,33 +1,27 @@
 // Shown when a signed-in non-staff user hits /admin. Friendly dead-end, no nav.
+// Rendered outside AdminChrome, so it carries .lv-admin-root itself to get the
+// admin ground and ink tokens.
 import Link from 'next/link';
+import { GlassPanel } from '@/components/admin/ui/Glass';
 
 export function AdminGate() {
   return (
     <div
+      className="lv-admin-root"
       style={{
         minHeight: '100dvh',
+        width: '100%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: 24,
-        background: 'var(--soft)',
+        boxSizing: 'border-box',
+        background: 'var(--a-ground)',
       }}
     >
-      <div
-        style={{
-          background: '#fff',
-          border: '1px solid var(--line)',
-          borderRadius: 18,
-          boxShadow: '0 6px 18px -14px rgba(0,0,0,0.3)',
-          padding: '28px 24px',
-          maxWidth: 420,
-          textAlign: 'center',
-        }}
-      >
-        <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 18, color: 'var(--ink)' }}>
-          Accès réservé
-        </div>
-        <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', margin: '8px 0 18px' }}>
+      <GlassPanel padding="32px 28px" style={{ maxWidth: 420, textAlign: 'center' }}>
+        <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 24, letterSpacing: '-0.01em', color: 'var(--ink)', margin: 0 }}>Accès réservé</h1>
+        <p style={{ fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--muted)', margin: '10px 0 22px', lineHeight: 1.5 }}>
           Cet espace est réservé à l’administration de La Villa.
         </p>
         <Link
@@ -37,8 +31,8 @@ export function AdminGate() {
             fontFamily: 'var(--ui-font)',
             fontWeight: 600,
             fontSize: 14,
-            color: '#fff',
-            background: 'var(--brand)',
+            color: 'var(--a-on-white)',
+            background: '#ffffff',
             borderRadius: 999,
             padding: '11px 22px',
             textDecoration: 'none',
@@ -46,7 +40,7 @@ export function AdminGate() {
         >
           Retour à l’application
         </Link>
-      </div>
+      </GlassPanel>
     </div>
   );
 }

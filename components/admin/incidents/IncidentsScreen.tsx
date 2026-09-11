@@ -1,17 +1,25 @@
 // components/admin/incidents/IncidentsScreen.tsx
-// Live container for the admin Incidents screen. Renders the server snapshot,
-// subscribes to postgres_changes on incidents and refetches the same shapes on any
-// change, and writes through the staff RLS (0018): inserting a new incident and
-// flipping one to resolved. Ordering/joins come from lib/admin-incidents.ts.
+// Live container for the admin Incidents screen, in the language of the Vue
+// d'ensemble: headline figures (open, high severity, resolved over 7 days, mean
+// time to resolve), a notice for high-severity incidents, severity and type chips,
+// then "À traiter" and "Résolus" panels. Subscribes to postgres_changes on
+// incidents and refetches on any change; writes go through the staff RLS (0018):
+// inserting a new incident and flipping one to resolved. Ordering/joins come from
+// lib/admin-incidents.ts.
 'use client';
 import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { buildIncidentRows, openIncidentCount, partitionIncidentRows } from '@/lib/admin-incidents';
+import { INCIDENT_KIND_LABEL, SEVERITY_LABEL, buildIncidentRows, filterIncidentRows, incidentTotals, partitionIncidentRows } from '@/lib/admin-incidents';
 import type { AdminIncidentsData } from '@/lib/queries';
-import type { Incident } from '@/lib/types';
+import type { Incident, IncidentSeverity } from '@/lib/types';
 import { IncidentCard } from './IncidentCard';
 import { IncidentForm, type IncidentDraft } from './IncidentForm';
 import { useRealtime } from '@/lib/use-realtime';
+import { HeroStat } from '@/components/admin/overview/HeroStat';
+import { Chip, EmptyState, GlassPanel, Notice, PageHeader, PanelTitle, PrimaryButton } from '@/components/admin/ui/Glass';
+
+const SEVERITIES: IncidentSeverity[] = ['haute', 'moyenne', 'basse'];
+const oneDecimal = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
 
 export function IncidentsScreen({ initial }: { initial: AdminIncidentsData }) {
   const [rows, setRows] = useState<AdminIncidentsData['rows']>(initial.rows);
@@ -19,6 +27,8 @@ export function IncidentsScreen({ initial }: { initial: AdminIncidentsData }) {
   const [orders, setOrders] = useState(initial.orders);
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [severity, setSeverity] = useState<IncidentSeverity | 'all'>('all');
+  const [kind, setKind] = useState('all');
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
@@ -60,71 +70,96 @@ export function IncidentsScreen({ initial }: { initial: AdminIncidentsData }) {
   const onResolve = useCallback(
     async (id: string) => {
       setBusy(true);
-      const supabase = createClient();
-      await supabase.from('incidents').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', id);
+      await createClient().from('incidents').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', id);
       setBusy(false);
       refetch();
     },
     [refetch],
   );
 
-  const openCount = useMemo(() => openIncidentCount(rows.map((r) => r.incident)), [rows]);
-  const { open, resolved } = useMemo(() => partitionIncidentRows(rows), [rows]);
+  const totals = useMemo(() => incidentTotals(rows), [rows]);
+  const kinds = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const r of rows) seen.set(r.incident.kind, (seen.get(r.incident.kind) ?? 0) + 1);
+    return Array.from(seen.entries());
+  }, [rows]);
+  const severityCounts = useMemo(() => {
+    const c: Record<IncidentSeverity, number> = { haute: 0, moyenne: 0, basse: 0 };
+    for (const r of rows) c[r.incident.severity] += 1;
+    return c;
+  }, [rows]);
+  const { open, resolved } = useMemo(() => partitionIncidentRows(filterIncidentRows(rows, severity, kind)), [rows, severity, kind]);
 
   return (
-    <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-        <div>
-          <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--ink)', margin: 0 }}>Incidents</h1>
-          <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>
-            {openCount} ouvert{openCount > 1 ? 's' : ''} · {rows.length} au total
-          </p>
-        </div>
-        {!showForm && (
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            style={{ border: 'none', borderRadius: 10, padding: '10px 18px', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13.5, color: '#fff', background: 'var(--brand)' }}
-          >
-            + Signaler un incident
-          </button>
-        )}
+    <div style={{ padding: '30px 32px 40px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <PageHeader
+        title="Incidents"
+        subtitle="Retards, litiges et accidents signalés sur les livraisons."
+        actions={!showForm ? <PrimaryButton onClick={() => setShowForm(true)}>+ Signaler un incident</PrimaryButton> : undefined}
+      />
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px 56px' }}>
+        <HeroStat label={`Ouverts · ${rows.length} au total`} value={String(totals.open)} />
+        <HeroStat label="Gravité haute" value={String(totals.high)} />
+        <HeroStat label="Résolus · 7 jours" value={String(totals.resolvedWeek)} />
+        <HeroStat label="Délai moyen de résolution" value={totals.avgResolutionHours === null ? '—' : oneDecimal(totals.avgResolutionHours)} unit={totals.avgResolutionHours === null ? undefined : 'h'} />
       </div>
 
-      {showForm && (
-        <IncidentForm drivers={drivers} orders={orders} busy={busy} onCreate={onCreate} onCancel={() => setShowForm(false)} />
+      {totals.high > 0 && (
+        <Notice icon="flame">
+          {totals.high} incident{totals.high > 1 ? 's' : ''} de gravité haute à traiter.
+        </Notice>
       )}
 
-      {/* À traiter */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 16, color: 'var(--ink)', margin: 0 }}>
-          À traiter · {open.length}
-        </h2>
-        {open.length === 0 ? (
-          <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 18, padding: '32px 22px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--muted)' }}>
-            Aucun incident ouvert 🎉
+      {showForm && <IncidentForm drivers={drivers} orders={orders} busy={busy} onCreate={onCreate} onCancel={() => setShowForm(false)} />}
+
+      {rows.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div role="group" aria-label="Filtrer par gravité" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Chip on={severity === 'all'} onClick={() => setSeverity('all')} count={rows.length}>
+              Toutes gravités
+            </Chip>
+            {SEVERITIES.map((s) => (
+              <Chip key={s} on={severity === s} onClick={() => setSeverity(s)} count={severityCounts[s]}>
+                {SEVERITY_LABEL[s]}
+              </Chip>
+            ))}
           </div>
+          <div role="group" aria-label="Filtrer par type" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Chip on={kind === 'all'} onClick={() => setKind('all')}>
+              Tous types
+            </Chip>
+            {kinds.map(([k, n]) => (
+              <Chip key={k} on={kind === k} onClick={() => setKind(k)} count={n}>
+                {INCIDENT_KIND_LABEL[k] ?? k}
+              </Chip>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <GlassPanel>
+        <PanelTitle aside={`${open.length} incident${open.length > 1 ? 's' : ''}`}>À traiter</PanelTitle>
+        {open.length === 0 ? (
+          <EmptyState title="Aucun incident ouvert." hint={severity !== 'all' || kind !== 'all' ? 'Pour ces filtres.' : 'Tout est sous contrôle.'} />
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, alignItems: 'start' }}>
             {open.map((row) => (
               <IncidentCard key={row.incident.id} row={row} busy={busy} onResolve={onResolve} />
             ))}
           </div>
         )}
-      </div>
+      </GlassPanel>
 
-      {/* Résolus */}
       {resolved.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 16, color: 'var(--muted)', margin: 0 }}>
-            Résolus · {resolved.length}
-          </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18, alignItems: 'start' }}>
+        <GlassPanel>
+          <PanelTitle aside={`${resolved.length} incident${resolved.length > 1 ? 's' : ''}`}>Résolus</PanelTitle>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, alignItems: 'start' }}>
             {resolved.map((row) => (
               <IncidentCard key={row.incident.id} row={row} busy={busy} onResolve={onResolve} />
             ))}
           </div>
-        </div>
+        </GlassPanel>
       )}
     </div>
   );
