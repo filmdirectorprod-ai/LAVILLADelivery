@@ -106,8 +106,8 @@ export default function AdminAuthPage() {
             </button>
           </div>
 
-          {error && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 16 }}>{error}</div>}
-          {info && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#2f9e6f', fontWeight: 600, marginTop: 16 }}>{info}</div>}
+          {error && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--a-accent)', fontWeight: 600, marginTop: 16 }}>{error}</div>}
+          {info && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--ink)', fontWeight: 600, marginTop: 16 }}>{info}</div>}
 
           <div style={{ marginTop: 22 }}>
             <button onClick={submit} disabled={busy} style={{ width: '100%', border: 'none', borderRadius: 12, padding: '14px', cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, letterSpacing: 1, color: '#ffffff', background: 'var(--a-on-white)', opacity: busy ? 0.6 : 1 }}>

@@ -137,7 +137,7 @@ export function LiveDriverMap({ apiKey, positions }: LiveDriverMapProps) {
           ) : (
             positions.map((p) => (
               <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ width: 9, height: 9, borderRadius: 999, background: 'var(--brand)' }} />
+                <span style={{ width: 9, height: 9, borderRadius: 999, background: '#ffffff' }} />
                 <span style={{ fontFamily: 'var(--ui-font)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{p.name}</span>
                 <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)' }}>
                   {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
@@ -152,7 +152,7 @@ export function LiveDriverMap({ apiKey, positions }: LiveDriverMapProps) {
 
   return (
     <div style={shellStyle}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1, padding: '14px 22px', background: 'linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0))' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1, padding: '14px 22px', background: 'linear-gradient(180deg, rgba(0,0,0,0.7), rgba(0,0,0,0))' }}>
         <h2 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 16, color: 'var(--ink)', margin: 0 }}>
           Suivi des livreurs · en direct
         </h2>

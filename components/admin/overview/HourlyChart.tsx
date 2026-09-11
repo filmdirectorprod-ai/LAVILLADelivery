@@ -32,7 +32,7 @@ export function HourlyChart({ buckets }: HourlyChartProps) {
                 width: '100%',
                 height: `${count > 0 ? Math.max(6, (count / max) * 100) : 4}px`,
                 borderRadius: 6,
-                background: anyOrders && h === peak ? 'var(--gold)' : '#ffffff',
+                background: anyOrders && h === peak ? 'var(--a-accent)' : '#ffffff',
                 opacity: count > 0 ? (anyOrders && h === peak ? 1 : 0.55) : 0.1,
                 transition: 'height 0.3s ease',
               }}
