@@ -13,6 +13,11 @@ interface OrderItemInput {
   customization?: Record<string, unknown>;
 }
 
+/** Moyens de paiement acceptés (0054). Seul 'cod' encaisse réellement pour
+ *  l'instant ; les autres restent des intentions, enregistrées telles quelles. */
+const PAYMENT_METHODS = ['cod', 'cmi', 'hps', 'cashplus', 'virement'] as const;
+type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
 interface PlaceOrderBody {
   items: OrderItemInput[];
   mode: 'livraison' | 'retrait';
@@ -24,6 +29,14 @@ interface PlaceOrderBody {
   promo_code?: string | null;
   redeem_pts?: number;
   redeem_dh?: number;
+  /** Moyen de paiement choisi ; 'cod' par défaut (0054). */
+  payment?: string | null;
+  /** Créneau choisi : instant ISO, null = au plus vite (0054). */
+  slot_at?: string | null;
+  slot_label?: string | null;
+  /** Coordonnées de l'adresse choisie, pour une arrivée mesurée (0054). */
+  dest_lat?: number | null;
+  dest_lng?: number | null;
 }
 
 export async function POST(request: NextRequest) {
@@ -49,6 +62,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
   }
 
+  // Moyen de paiement : validé ici, revalidé par la RPC. Une valeur inconnue
+  // retombe sur les espèces plutôt que de faire échouer la commande.
+  const payment = (PAYMENT_METHODS as readonly string[]).includes(body.payment ?? '')
+    ? (body.payment as PaymentMethod)
+    : 'cod';
+
   const { data, error } = await supabase.rpc('place_order', {
     p_user: user.id,
     p_items: body.items,
@@ -61,6 +80,11 @@ export async function POST(request: NextRequest) {
     p_phone: body.phone ?? null,
     p_branch_slug: body.branch_slug ?? null,
     p_promo_code: body.promo_code ?? null,
+    p_payment: payment,
+    p_slot_at: body.slot_at ?? null,
+    p_slot_label: body.slot_label ?? null,
+    p_dest_lat: body.dest_lat ?? null,
+    p_dest_lng: body.dest_lng ?? null,
   });
 
   if (error) {

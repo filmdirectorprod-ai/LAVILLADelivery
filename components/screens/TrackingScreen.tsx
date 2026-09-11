@@ -1,8 +1,12 @@
 'use client';
-// SUIVI DE COMMANDE — live tracking. Ported from the prototype
-// (screens-order.jsx Tracking), driven by Supabase Realtime instead of the
-// in-memory mover: we subscribe to order_tracking UPDATEs and re-render the
-// map marker + timeline as the server-side mover advances `progress`.
+// SUIVI DE COMMANDE — live tracking, piloté par Supabase Realtime : on s'abonne
+// aux UPDATE de order_tracking et on redessine la carte + la frise.
+//
+// 0054 : l'arrivée annoncée ne vient plus d'un trajet d'exemple. Dès que le
+// livreur partage sa position ET que la commande porte les coordonnées de
+// l'adresse, la distance et les minutes sont MESURÉES (lib/eta). Sinon l'écran
+// affiche l'heure prévue et le dit. S'y ajoutent le code de remise à donner au
+// livreur, le créneau demandé, l'état annulé et un bouton d'aide qui marche.
 //
 // DB stage is 0..4; the 5-step timeline uses ids 1..5, so active = stage + 1.
 import { useEffect, useState } from 'react';
@@ -10,7 +14,9 @@ import { useRouter } from 'next/navigation';
 import type { Driver, Order, OrderItem, OrderTracking } from '@/lib/types';
 import { formatDH } from '@/lib/format';
 import { TRACK_STEPS } from '@/lib/constants';
-import { LV_ROUTE, LV_ROUTE_TOTAL_KM, LV_ROUTE_TOTAL_MIN, lvPosAt } from '@/lib/route';
+import { LV_ROUTE, lvPosAt } from '@/lib/route';
+import { liveEta, minutesUntil } from '@/lib/eta';
+import { slotShortLabel } from '@/lib/checkout-slots';
 import { createClient } from '@/lib/supabase/client';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
@@ -36,8 +42,9 @@ export interface TrackingScreenProps {
   driver: Driver | null;
 }
 
-export function TrackingScreen({ order, items, tracking, driver }: TrackingScreenProps) {
+export function TrackingScreen({ order: initialOrder, items, tracking, driver }: TrackingScreenProps) {
   const router = useRouter();
+  const [order, setOrder] = useState<Order>(initialOrder);
   const [track, setTrack] = useState<OrderTracking | null>(tracking);
   // GPS readout for the chip — fed by the real map when present, else the SVG route.
   const [gps, setGps] = useState<{ lat: number; lng: number }>(() => {
@@ -54,24 +61,37 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
         { event: 'UPDATE', schema: 'public', table: 'order_tracking', filter: `order_id=eq.${order.id}` },
         (payload) => setTrack(payload.new as OrderTracking),
       )
+      // Le statut change aussi côté commande : annulation par le gérant,
+      // confirmation, livraison. L'écran doit le dire sans rechargement.
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${order.id}` },
+        (payload) => setOrder((o) => ({ ...o, ...(payload.new as Order) })),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [order.id]);
 
+  const cancelled = order.status === 'cancelled';
   const stage = track?.stage ?? 0;
   const active = stage + 1; // map DB stage (0..4) onto the 1..5 timeline
-  const delivered = active >= 5;
+  const delivered = active >= 5 || order.status === 'delivered';
   const prog = track?.progress ?? 0;
   const pos = lvPosAt(prog);
   // Real driver GPS (0008): present once a real livreur is streaming position.
   const driverPos =
     track?.lat != null && track?.lng != null ? { lat: track.lat, lng: track.lng } : null;
   const gpsShown = driverPos ?? (MAPS_KEY ? gps : { lat: pos.lat, lng: pos.lng });
-  const remainKm = Math.max(0, 1 - prog) * LV_ROUTE_TOTAL_KM;
-  const remainMin = Math.max(1, Math.round(Math.max(0, 1 - prog) * LV_ROUTE_TOTAL_MIN));
+  // Destination réelle de la commande (0054) — absente des commandes passées
+  // avant la migration, auquel cas on retombe sur l'heure prévue.
+  const destination =
+    order.dest_lat != null && order.dest_lng != null ? { lat: order.dest_lat, lng: order.dest_lng } : null;
+  const eta = liveEta(driverPos, destination, minutesUntil(track?.eta_at ?? order.eta_at));
   const itemCount = items.reduce((n, it) => n + it.qty, 0);
+  const slot = slotShortLabel(order.slot_at);
+  const showCode = !delivered && !cancelled && order.mode === 'livraison' && !!order.delivery_code;
 
   const toVB = (p: { x: number; y: number }) => ({ x: (p.x / 100) * 400, y: (p.y / 100) * 280 });
   const vbPts = LV_ROUTE.map(toVB);
@@ -201,122 +221,162 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
         }}
       >
         {/* ETA */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>
-              {delivered ? 'Commande livrée' : 'Arrivée estimée'}
+              {cancelled ? 'Commande annulée' : delivered ? 'Commande livrée' : eta?.real ? 'Arrivée estimée · position du livreur' : 'Arrivée prévue'}
             </div>
             <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 26, color: 'var(--ink)' }}>
-              {delivered ? (
+              {cancelled ? (
+                'Aucun frais retenu'
+              ) : delivered ? (
                 'Bon appétit !'
-              ) : (
+              ) : eta ? (
                 <>
-                  {remainMin} min{' '}
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--brand)' }}>· {remainKm.toFixed(1)} km</span>
+                  {eta.minutes} min{' '}
+                  {eta.real && (
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--brand)' }}>· {eta.km.toFixed(1)} km</span>
+                  )}
                 </>
+              ) : (
+                'En cours'
               )}
             </div>
+            {slot && !cancelled && !delivered && (
+              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--gold)', fontWeight: 600, marginTop: 3 }}>
+                Créneau demandé {slot}
+              </div>
+            )}
           </div>
           <Badge gold style={{ fontSize: 12, padding: '7px 13px' }}>
-            {delivered ? '✓ Livrée' : '● ' + (TRACK_STEPS[active - 1]?.label ?? 'En route')}
+            {cancelled ? 'Annulée' : delivered ? '✓ Livrée' : '● ' + (TRACK_STEPS[active - 1]?.label ?? 'En route')}
           </Badge>
         </div>
 
-        {/* driver card */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 13, background: 'var(--soft)', borderRadius: 18, padding: 13, marginTop: 16 }}>
-          <PhotoSlot label={driver?.name ?? 'livreur'} src={driver?.avatar_url} style={{ width: 52, height: 52, borderRadius: 999 }} sizes="52px" dim />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
-              {driver?.name ?? "Recherche d'un livreur…"}
+        {cancelled && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'rgba(168,151,35,0.08)', border: '1px solid var(--gold)', borderRadius: 16, padding: '13px 15px', marginTop: 14 }}>
+            <Icon name="info" size={18} color="var(--gold)" />
+            <span style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--ink)', lineHeight: 1.45 }}>
+              Cette commande a été annulée. Les points utilisés vous ont été rendus ; appelez l&apos;agence si vous avez déjà réglé.
+            </span>
+          </div>
+        )}
+
+        {/* Code de remise — le livreur le demande pour clore la course (0054) */}
+        {showCode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 13, border: '1.5px solid var(--brand)', borderRadius: 18, padding: '13px 15px', marginTop: 14 }}>
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(19,124,139,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon name="check" size={20} color="var(--brand)" strokeWidth={2.4} />
             </div>
-            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-              {driver ? (
-                <>
-                  {driver.vehicle} · <Icon name="star" size={12} color="var(--gold)" fill />{' '}
-                  {driver.rating.toFixed(1).replace('.', ',')}
-                </>
-              ) : (
-                'Assignation en cours'
-              )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>Code à donner au livreur</div>
+              <div style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 700, fontSize: 24, letterSpacing: 6, color: 'var(--ink)' }}>
+                {order.delivery_code}
+              </div>
             </div>
           </div>
-          <a
-            href={driver?.phone ? `tel:${driver.phone.replace(/[^0-9+]/g, '')}` : `/call/${order.id}`}
-            aria-label="Appeler le livreur"
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 999,
-              background: 'var(--brand)',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 6px 14px -6px var(--brand)',
-              textDecoration: 'none',
-            }}
-          >
-            <Icon name="phone" size={20} color="#fff" fill />
-          </a>
-          <button
-            onClick={() => router.push(`/chat/${order.id}`)}
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 999,
-              background: '#fff',
-              border: '1.5px solid var(--line)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon name="message" size={20} color="var(--brand)" />
-          </button>
-        </div>
+        )}
+
+        {/* driver card */}
+        {!cancelled && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 13, background: 'var(--soft)', borderRadius: 18, padding: 13, marginTop: 16 }}>
+            <PhotoSlot label={driver?.name ?? 'livreur'} src={driver?.avatar_url} style={{ width: 52, height: 52, borderRadius: 999 }} sizes="52px" dim />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
+                {driver?.name ?? "Recherche d'un livreur…"}
+              </div>
+              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                {driver ? (
+                  <>
+                    {driver.vehicle} · <Icon name="star" size={12} color="var(--gold)" fill />{' '}
+                    {driver.rating.toFixed(1).replace('.', ',')}
+                  </>
+                ) : (
+                  'Assignation en cours'
+                )}
+              </div>
+            </div>
+            <a
+              href={driver?.phone ? `tel:${driver.phone.replace(/[^0-9+]/g, '')}` : `/call/${order.id}`}
+              aria-label="Appeler le livreur"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 999,
+                background: 'var(--brand)',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 6px 14px -6px var(--brand)',
+                textDecoration: 'none',
+              }}
+            >
+              <Icon name="phone" size={20} color="#fff" fill />
+            </a>
+            <button
+              onClick={() => router.push(`/chat/${order.id}`)}
+              aria-label="Écrire au livreur"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 999,
+                background: '#fff',
+                border: '1.5px solid var(--line)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name="message" size={20} color="var(--brand)" />
+            </button>
+          </div>
+        )}
 
         {/* timeline */}
-        <div style={{ marginTop: 22 }}>
-          {TRACK_STEPS.map((s, i) => {
-            const done = s.id < active;
-            const cur = s.id === active;
-            const reached = s.id <= active;
-            return (
-              <div key={s.id} style={{ display: 'flex', gap: 14 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <div
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 999,
-                      flexShrink: 0,
-                      background: reached ? 'var(--brand)' : '#fff',
-                      border: `2px solid ${reached ? 'var(--brand)' : 'var(--line)'}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: cur ? '0 0 0 5px rgba(19,124,139,0.15)' : 'none',
-                    }}
-                  >
-                    {done && <Icon name="check" size={14} color="#fff" strokeWidth={2.6} />}
-                    {cur && <div style={{ width: 9, height: 9, borderRadius: 999, background: '#fff' }} />}
+        {!cancelled && (
+          <div style={{ marginTop: 22 }}>
+            {TRACK_STEPS.map((s, i) => {
+              const done = s.id < active;
+              const cur = s.id === active;
+              const reached = s.id <= active;
+              return (
+                <div key={s.id} style={{ display: 'flex', gap: 14 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 999,
+                        flexShrink: 0,
+                        background: reached ? 'var(--brand)' : '#fff',
+                        border: `2px solid ${reached ? 'var(--brand)' : 'var(--line)'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: cur ? '0 0 0 5px rgba(19,124,139,0.15)' : 'none',
+                      }}
+                    >
+                      {done && <Icon name="check" size={14} color="#fff" strokeWidth={2.6} />}
+                      {cur && <div style={{ width: 9, height: 9, borderRadius: 999, background: '#fff' }} />}
+                    </div>
+                    {i < TRACK_STEPS.length - 1 && (
+                      <div style={{ width: 2, flex: 1, minHeight: 26, background: s.id < active ? 'var(--brand)' : 'var(--line)' }} />
+                    )}
                   </div>
-                  {i < TRACK_STEPS.length - 1 && (
-                    <div style={{ width: 2, flex: 1, minHeight: 26, background: s.id < active ? 'var(--brand)' : 'var(--line)' }} />
-                  )}
-                </div>
-                <div style={{ paddingBottom: 18 }}>
-                  <div style={{ fontFamily: 'var(--ui-font)', fontWeight: cur ? 700 : 500, fontSize: 14.5, color: reached ? 'var(--ink)' : 'var(--muted)' }}>
-                    {s.label}
+                  <div style={{ paddingBottom: 18 }}>
+                    <div style={{ fontFamily: 'var(--ui-font)', fontWeight: cur ? 700 : 500, fontSize: 14.5, color: reached ? 'var(--ink)' : 'var(--muted)' }}>
+                      {s.label}
+                    </div>
+                    <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>{s.sub}</div>
                   </div>
-                  <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>{s.sub}</div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* order recap */}
         <div
@@ -327,12 +387,14 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
             background: 'var(--soft)',
             borderRadius: 16,
             padding: '14px 16px',
+            marginTop: cancelled ? 18 : 0,
           }}
         >
           <div>
             <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>Commande {order.code}</div>
             <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>
               {itemCount} article{itemCount > 1 ? 's' : ''} · {formatDH(order.total_dh)}
+              {order.payment_method === 'cod' ? ' · à régler en espèces' : ''}
             </div>
           </div>
           {delivered && (
@@ -371,6 +433,7 @@ export function TrackingScreen({ order, items, tracking, driver }: TrackingScree
             Besoin d&apos;aide avec cette commande ?
           </span>
           <button
+            onClick={() => router.push('/profile/help')}
             style={{
               border: 'none',
               background: 'none',

@@ -16,18 +16,27 @@ import { Btn } from '@/components/ui/Btn';
 
 export interface CartScreenProps {
   products: Product[];
+  /** Zone de l'adresse par défaut du client — c'est elle qui fixe les frais. */
   zone: Zone | null;
+  /** Adresse par défaut, affichée sous le titre (null si aucune enregistrée). */
+  addressLabel?: string | null;
 }
 
-function CartHeader({ mode }: { mode: string }) {
+function CartHeader({ mode, zone, addressLabel }: { mode: string; zone: Zone | null; addressLabel?: string | null }) {
+  const subtitle =
+    mode === 'retrait'
+      ? 'Retrait en boutique'
+      : addressLabel
+        ? `Livraison · ${addressLabel}${zone ? ` · ${zone.name}` : ''}`
+        : zone
+          ? `Livraison · zone ${zone.name} · ${formatDH(zone.fee_dh)}`
+          : 'Livraison — ajoutez une adresse';
   return (
     <div style={{ padding: `${SAFE_TOP + 6}px 18px 14px`, background: '#fff' }}>
       <h1 style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 24, color: 'var(--ink)', margin: 0 }}>
         Mon panier
       </h1>
-      <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)', margin: '2px 0 0' }}>
-        {mode === 'retrait' ? 'Retrait en boutique' : 'Livraison à Fès, Av. Hassan II'}
-      </p>
+      <p style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)', margin: '2px 0 0' }}>{subtitle}</p>
     </div>
   );
 }
@@ -60,7 +69,7 @@ function Row({
   );
 }
 
-export function CartScreen({ products, zone }: CartScreenProps) {
+export function CartScreen({ products, zone, addressLabel }: CartScreenProps) {
   const router = useRouter();
   const items = useCart((s) => s.items);
   const setQty = useCart((s) => s.setQty);
@@ -79,7 +88,7 @@ export function CartScreen({ products, zone }: CartScreenProps) {
   if (items.length === 0) {
     return (
       <div>
-        <CartHeader mode={mode} />
+        <CartHeader mode={mode} zone={zone} addressLabel={addressLabel} />
         <div
           style={{
             textAlign: 'center',
@@ -117,7 +126,7 @@ export function CartScreen({ products, zone }: CartScreenProps) {
 
   return (
     <div>
-      <CartHeader mode={mode} />
+      <CartHeader mode={mode} zone={zone} addressLabel={addressLabel} />
       <div style={{ padding: '6px 18px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {lines.map((it) => (
           <div

@@ -207,6 +207,18 @@ export interface Order {
   points_redeemed: number;
   placed_at: string;
   eta_at: string | null;
+  /** Moyen de paiement choisi au paiement (0054) : 'cod' | 'cmi' | 'hps' | 'cashplus' | 'virement'. */
+  payment_method?: string | null;
+  /** Créneau demandé par le client (0054), et son libellé lisible. */
+  slot_at?: string | null;
+  slot_label?: string | null;
+  /** Code à 4 chiffres que le client donne au livreur à la remise (0054). */
+  delivery_code?: string | null;
+  /** Photo du dépôt, quand le code n'a pas pu être donné (0054). */
+  proof_url?: string | null;
+  /** Coordonnées de l'adresse de livraison, pour une arrivée mesurée (0054). */
+  dest_lat?: number | null;
+  dest_lng?: number | null;
 }
 
 export interface OrderItem {

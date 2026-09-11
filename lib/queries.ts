@@ -261,6 +261,8 @@ export interface DriverDelivery {
   address: string | null;
   total_dh: number;
   delivery_fee_dh: number;
+  /** 'cod' = encaissé en espèces par le livreur (0054). */
+  payment_method: string;
   delivered_at: string;
   placed_at: string;
 }
@@ -689,4 +691,16 @@ export async function getAdminLoyaltyMembers(): Promise<LoyaltyMember[]> {
     const r = p as { id: string; full_name: string | null; loyalty_points: number | null; loyalty_tier: string | null };
     return { id: r.id, name: r.full_name?.trim() || 'Client', points: r.loyalty_points ?? 0, tier: r.loyalty_tier };
   });
+}
+
+/** Agences actives (0033) — points de retrait proposés au paiement. Publiques
+ *  en lecture, donc un simple select suffit. */
+export async function getBranches(): Promise<import('@/lib/types').Branch[]> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from('branches')
+    .select('*')
+    .eq('is_active', true)
+    .order('slug');
+  return (data ?? []) as import('@/lib/types').Branch[];
 }

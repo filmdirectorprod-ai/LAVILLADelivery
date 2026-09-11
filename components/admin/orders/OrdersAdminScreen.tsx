@@ -17,6 +17,7 @@ import { formatAmount, formatDH } from '@/lib/format';
 import { orderStatusLabel } from '@/lib/order-status';
 import { useBranches } from '@/lib/use-branches';
 import { startOfTodayISO } from '@/lib/admin-overview';
+import { slotShortLabel } from '@/lib/checkout-slots';
 import {
   ORDER_WAIT_ALERT_MIN,
   ageLabel,
@@ -228,11 +229,17 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
                         {OPEN.has(o.status) && (
                           <span style={{ color: waitingLong ? 'var(--a-accent)' : 'var(--muted)', fontWeight: waitingLong ? 600 : 400 }}> · {ageLabel(orderAgeMinutes(o, now))}</span>
                         )}
+                        {slotShortLabel(o.slot_at, now) && (
+                          <span style={{ color: 'var(--a-accent)', fontWeight: 600 }}> · {slotShortLabel(o.slot_at, now)}</span>
+                        )}
                       </div>
                     </td>
                     <td style={TD}>
                       <div style={{ fontSize: 13.5, color: 'var(--ink)' }}>{r.customerName ?? '—'}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>{o.mode === 'livraison' ? 'Livraison' : 'Retrait'}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
+                        {o.mode === 'livraison' ? 'Livraison' : 'Retrait'}
+                        {o.payment_method === 'cod' ? ' · espèces' : o.payment_method === 'cashplus' ? ' · Cash Plus' : o.payment_method === 'virement' ? ' · virement' : ''}
+                      </div>
                     </td>
                     <td style={{ ...TD, fontSize: 13, color: 'var(--ink)', maxWidth: 240 }}>{orderItemsSummary(r.items)}</td>
                     <td style={{ ...TD, fontSize: 14, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap' }}>{formatDH(o.total_dh)}</td>

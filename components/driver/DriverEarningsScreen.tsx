@@ -45,6 +45,10 @@ export function DriverEarningsScreen({
   let week = 0;
   let total = 0;
   let todayCount = 0;
+  // Espèces encaissées aujourd'hui (paiement à la livraison) : c'est ce que le
+  // livreur doit remettre à l'agence en fin de tournée (0054).
+  let cashToday = 0;
+  let cashCount = 0;
   // Hour-of-day distribution across all deliveries (real "à quelles heures je livre").
   const byHour = new Map<number, number>();
   for (const d of deliveries) {
@@ -55,6 +59,10 @@ export function DriverEarningsScreen({
     if (ts >= todayStart) {
       today += fee;
       todayCount += 1;
+      if ((d.payment_method ?? 'cod') === 'cod') {
+        cashToday += d.total_dh ?? 0;
+        cashCount += 1;
+      }
     }
     const h = new Date(ts).getHours();
     byHour.set(h, (byHour.get(h) ?? 0) + 1);
@@ -113,6 +121,34 @@ export function DriverEarningsScreen({
             {todayCount} course{todayCount > 1 ? 's' : ''} aujourd’hui
           </div>
         </div>
+
+        {/* Espèces à remettre à l'agence */}
+        {cashToday > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              background: '#fff',
+              border: '1.5px solid var(--gold)',
+              borderRadius: 18,
+              padding: '14px 16px',
+              marginBottom: 16,
+            }}
+          >
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(168,151,35,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon name="cash" size={20} color="var(--gold)" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
+                {formatDH(cashToday)} à remettre à l’agence
+              </div>
+              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>
+                Encaissé en espèces sur {cashCount} course{cashCount > 1 ? 's' : ''} aujourd’hui
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stat tiles */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>

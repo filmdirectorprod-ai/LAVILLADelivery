@@ -6,6 +6,7 @@
 // call this so first paint and realtime refetch produce identical shapes.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildKitchenBoard, type KitchenBoard } from '@/lib/kitchen';
+import { isScheduledLater } from '@/lib/checkout-slots';
 import { fetchAllIn } from '@/lib/fetch-in-chunks';
 import type { Order, OrderItem, Universe } from '@/lib/types';
 
@@ -22,7 +23,9 @@ export async function loadKitchenBoard(
     .in('status', KITCHEN_STATUSES as unknown as string[])
     .order('placed_at', { ascending: true })
     .limit(200);
-  const orders = (ordersData ?? []) as Order[];
+  // 0054 — une commande demandée pour 19:00 n'encombre pas le plan de travail
+  // à midi : elle entre sur le tableau à l'approche de son créneau.
+  const orders = ((ordersData ?? []) as Order[]).filter((o) => !isScheduledLater(o.slot_at, now));
 
   const orderIds = orders.map((o) => o.id);
   const userIds = Array.from(new Set(orders.map((o) => o.user_id)));

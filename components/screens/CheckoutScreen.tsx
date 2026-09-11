@@ -1,14 +1,24 @@
 'use client';
-// PAIEMENT / CHECKOUT — ported from the prototype (screens-order.jsx Checkout),
-// adapted to the cart/order stores + the server-authoritative place_order RPC
-// (POST /api/orders). The bill shown here is a preview; the server recomputes.
+// PAIEMENT / CHECKOUT — la facture affichée est un aperçu ; le serveur recalcule
+// tout (place_order).
+//
+// 0054, trois corrections de fond :
+//   • Le paiement ne ment plus. L'écran affichait une carte bancaire enregistrée,
+//     un code Cash Plus et un RIB… tous inventés dans le fichier, alors que
+//     choisir « Carte » enregistrait la commande comme un paiement à la
+//     livraison. Les moyens proposés sont désormais ceux qui existent vraiment,
+//     et le choix part avec la commande (payment_method).
+//   • Le créneau choisi est transmis (slot_at) : une commande pour 19:00
+//     n'arrive plus en cuisine à 12:00.
+//   • Les points de retrait viennent des agences en base, et les coordonnées de
+//     l'adresse partent avec la commande pour que le suivi mesure l'arrivée.
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import type { Address, Product, Profile, Zone } from '@/lib/types';
+import type { Address, Branch, Product, Profile, Zone } from '@/lib/types';
 import { formatDH } from '@/lib/format';
 import { computeOrder, REDEEM_PALIERS } from '@/lib/pricing';
-import { LA_VILLA_BRANCHES, DEFAULT_BRANCH, findBranch, branchPickupLabel, branchMapsUrl, branchTelHref } from '@/lib/branches';
+import { slotOptions, slotLabel, type SlotId } from '@/lib/checkout-slots';
 import { useCart } from '@/lib/cart-store';
 import { useOrderMode } from '@/lib/order-store';
 import { useToast } from '@/lib/toast-store';
@@ -21,6 +31,8 @@ export interface CheckoutScreenProps {
   zones: Zone[];
   addresses: Address[];
   profile: Profile | null;
+  /** Agences actives (table branches) — les points de retrait proposés. */
+  branches: Branch[];
 }
 
 /** One-line human address used both for display and the order payload. */
@@ -28,21 +40,24 @@ function formatAddress(a: Address): string {
   return [a.line1, a.details, a.city].filter(Boolean).join(', ');
 }
 
-type Pay = 'cmi' | 'hps' | 'cashplus' | 'virement' | 'cod';
+/** Lien Maps vers une agence : ses coordonnées, sinon son nom. */
+function branchMaps(b: Branch): string {
+  const q = b.lat != null && b.lng != null ? `${b.lat},${b.lng}` : `${b.name} ${b.address ?? ''}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+}
+
+/** Moyens de paiement réellement disponibles aujourd'hui. */
+type Pay = 'cod' | 'cashplus' | 'virement';
+
+const PAY_OPTIONS: { id: Pay; title: string; sub: string; icon: string }[] = [
+  { id: 'cod', title: 'Paiement à la livraison', sub: 'Espèces, à la remise de la commande', icon: 'cash' },
+  { id: 'cashplus', title: 'Cash Plus', sub: "L'agence vous transmet le code après confirmation", icon: 'store' },
+  { id: 'virement', title: 'Virement bancaire', sub: "L'agence vous transmet le RIB après confirmation", icon: 'receipt' },
+];
 
 const PALIER_LABELS: Record<number, string> = { 25: '25 DH', 60: '60 DH', 130: '130 DH' };
 
-function Row({
-  label,
-  value,
-  gold,
-  green,
-}: {
-  label: string;
-  value: string;
-  gold?: boolean;
-  green?: boolean;
-}) {
+function Row({ label, value, gold, green }: { label: string; value: string; gold?: boolean; green?: boolean }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
       <span style={{ fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--muted)' }}>{label}</span>
@@ -60,15 +75,15 @@ function Row({
   );
 }
 
-export function CheckoutScreen({ products, zones, addresses, profile }: CheckoutScreenProps) {
+export function CheckoutScreen({ products, zones, addresses, profile, branches }: CheckoutScreenProps) {
   const router = useRouter();
   const items = useCart((s) => s.items);
   const clearCart = useCart((s) => s.clear);
   const mode = useOrderMode((s) => s.mode);
   const toast = useToast((s) => s.show);
 
-  const [pay, setPay] = useState<Pay>('cmi');
-  const [slot, setSlot] = useState('asap');
+  const [pay, setPay] = useState<Pay>('cod');
+  const [slot, setSlot] = useState<SlotId>('asap');
   const [redeem, setRedeem] = useState<number | null>(null); // palier pts
   const [busy, setBusy] = useState(false);
   // Contact phone for this order — so the driver (and gérant) can call. Prefilled
@@ -86,10 +101,11 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
   const defaultAddressId = addresses[0]?.id ?? null;
   const [addressId, setAddressId] = useState<string | null>(defaultAddressId);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickupBranchId, setPickupBranchId] = useState(DEFAULT_BRANCH.id);
-  const selectedAddress = useMemo(
-    () => addresses.find((a) => a.id === addressId) ?? null,
-    [addresses, addressId],
+  const [pickupBranchId, setPickupBranchId] = useState<string>(branches[0]?.id ?? '');
+  const selectedAddress = useMemo(() => addresses.find((a) => a.id === addressId) ?? null, [addresses, addressId]);
+  const pickupBranch = useMemo(
+    () => branches.find((b) => b.id === pickupBranchId) ?? branches[0] ?? null,
+    [branches, pickupBranchId],
   );
 
   // The delivery zone is derived from the chosen address; if it has no zone (or
@@ -99,6 +115,14 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
     const fromAddress = zones.find((z) => z.id === selectedAddress?.zone_id);
     return fromAddress ?? zones[0] ?? null;
   }, [mode, zones, selectedAddress]);
+
+  // Créneaux calculés à l'heure de Fès : « au plus vite » annonce le délai de la
+  // zone, les deux autres visent la prochaine occurrence de 12:30 / 19:00.
+  const slots = useMemo(
+    () => slotOptions(new Date(), mode === 'retrait' ? 20 : zone?.eta_min ?? 30),
+    [mode, zone],
+  );
+  const chosenSlot = slots.find((s) => s.id === slot) ?? slots[0];
 
   const points = profile?.loyalty_points ?? 0;
   const palier = REDEEM_PALIERS.find((r) => r.pts === redeem) ?? null;
@@ -150,6 +174,10 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
       toast('Choisissez une adresse de livraison.');
       return;
     }
+    if (mode === 'retrait' && !pickupBranch) {
+      toast('Choisissez un point de retrait.');
+      return;
+    }
     if (phone.replace(/[^0-9]/g, '').length < 9) {
       toast('Entrez un numéro de téléphone pour la livraison.');
       return;
@@ -178,17 +206,25 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
           mode,
           address:
             mode === 'retrait'
-              ? branchPickupLabel(findBranch(pickupBranchId))
+              ? pickupBranch
+                ? `Retrait boutique — ${pickupBranch.name}${pickupBranch.address ? ', ' + pickupBranch.address : ''}`
+                : 'Retrait boutique'
               : selectedAddress
                 ? formatAddress(selectedAddress)
                 : '',
           phone: phone.trim(),
-          branch_slug: mode === 'retrait' ? pickupBranchId : null,
+          branch_slug: mode === 'retrait' ? pickupBranch?.slug ?? null : null,
           zone_id: mode === 'retrait' ? null : zone?.id ?? null,
           promo: false,
           promo_code: appliedPromo?.code ?? null,
           redeem_pts: palier?.pts ?? 0,
           redeem_dh: palier?.dh ?? 0,
+          // 0054 — le moyen de paiement, le créneau et la destination suivent la commande.
+          payment: pay,
+          slot_at: chosenSlot?.at ? chosenSlot.at.toISOString() : null,
+          slot_label: chosenSlot ? slotLabel(chosenSlot) : null,
+          dest_lat: mode === 'retrait' ? null : selectedAddress?.lat ?? null,
+          dest_lng: mode === 'retrait' ? null : selectedAddress?.lng ?? null,
         }),
       });
 
@@ -210,11 +246,12 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
     }
   };
 
-  const payOption = (id: Pay, title: string, sub: string, icon: React.ReactNode) => {
-    const on = pay === id;
+  const payOption = (opt: (typeof PAY_OPTIONS)[number]) => {
+    const on = pay === opt.id;
     return (
       <button
-        onClick={() => setPay(id)}
+        key={opt.id}
+        onClick={() => setPay(opt.id)}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -240,11 +277,11 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
             flexShrink: 0,
           }}
         >
-          {icon}
+          <Icon name={opt.icon} size={20} color="var(--brand)" />
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>{title}</div>
-          {sub && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>{sub}</div>}
+          <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>{opt.title}</div>
+          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>{opt.sub}</div>
         </div>
         <div
           style={{
@@ -264,15 +301,6 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
     );
   };
 
-  const ctaLabel =
-    pay === 'cod'
-      ? 'Confirmer la commande'
-      : pay === 'cashplus'
-        ? 'Générer le code'
-        : pay === 'virement'
-          ? 'Confirmer le virement'
-          : 'Payer maintenant';
-
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div
@@ -287,6 +315,7 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
       >
         <button
           onClick={() => router.back()}
+          aria-label="Retour"
           style={{
             width: 40,
             height: 40,
@@ -315,8 +344,11 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
 
           {mode === 'retrait' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {LA_VILLA_BRANCHES.map((b) => {
-                const sel = b.id === pickupBranchId;
+              {branches.length === 0 && (
+                <div style={{ fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>Aucune agence ouverte au retrait.</div>
+              )}
+              {branches.map((b) => {
+                const sel = b.id === pickupBranch?.id;
                 return (
                   <div
                     key={b.id}
@@ -340,12 +372,24 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>{b.name}</div>
-                      <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>{b.address}</div>
+                      {b.address && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>{b.address}</div>}
                       <div style={{ display: 'flex', gap: 14, marginTop: 4 }}>
-                        <a href={branchTelHref(b)} onClick={(e) => e.stopPropagation()} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--ink)', textDecoration: 'none' }}>
-                          <Icon name="phone" size={12} color="var(--muted)" /> {b.phone}
-                        </a>
-                        <a href={branchMapsUrl(b)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--brand)', textDecoration: 'none' }}>
+                        {b.phone && (
+                          <a
+                            href={`tel:${b.phone.replace(/[^0-9+]/g, '')}`}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--ink)', textDecoration: 'none' }}
+                          >
+                            <Icon name="phone" size={12} color="var(--muted)" /> {b.phone}
+                          </a>
+                        )}
+                        <a
+                          href={branchMaps(b)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--ui-font)', fontSize: 12, fontWeight: 600, color: 'var(--brand)', textDecoration: 'none' }}
+                        >
                           <Icon name="pin" size={12} color="var(--brand)" /> Voir sur Maps
                         </a>
                       </div>
@@ -424,7 +468,10 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
                     return (
                       <button
                         key={a.id}
-                        onClick={() => { setAddressId(a.id); setPickerOpen(false); }}
+                        onClick={() => {
+                          setAddressId(a.id);
+                          setPickerOpen(false);
+                        }}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -480,6 +527,7 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
               type="tel"
               inputMode="tel"
               autoComplete="tel"
+              aria-label="Téléphone de contact"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="06 12 34 56 78"
@@ -501,24 +549,19 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
           </p>
         </section>
 
-        {/* time slot */}
+        {/* time slot — transmis avec la commande (0054) */}
         <section>
           <h3 style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14.5, color: 'var(--ink)', margin: '0 0 10px' }}>
             Créneau {mode === 'retrait' ? 'de retrait' : 'de livraison'}
           </h3>
-          <div style={{ display: 'flex', gap: 9 }}>
-            {(
-              [
-                ['asap', 'Au plus vite', mode === 'retrait' ? '15–20 min' : zone ? `~${zone.eta_min} min` : '25–35 min'],
-                ['lunch', '12:30', "Aujourd'hui"],
-                ['eve', '19:00', "Aujourd'hui"],
-              ] as [string, string, string][]
-            ).map(([id, t, s]) => {
-              const on = slot === id;
+          <div role="group" aria-label="Choisir un créneau" style={{ display: 'flex', gap: 9 }}>
+            {slots.map((s) => {
+              const on = slot === s.id;
               return (
                 <button
-                  key={id}
-                  onClick={() => setSlot(id)}
+                  key={s.id}
+                  onClick={() => setSlot(s.id)}
+                  aria-pressed={on}
                   style={{
                     flex: 1,
                     padding: '12px 6px',
@@ -530,13 +573,18 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
                   }}
                 >
                   <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 13, color: on ? 'var(--brand)' : 'var(--ink)' }}>
-                    {t}
+                    {s.label}
                   </div>
-                  <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{s}</div>
+                  <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{s.hint}</div>
                 </button>
               );
             })}
           </div>
+          {chosenSlot?.at && (
+            <p style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', margin: '7px 2px 0' }}>
+              La cuisine préparera votre commande pour {slotLabel(chosenSlot)?.toLowerCase()}.
+            </p>
+          )}
         </section>
 
         {/* payment */}
@@ -545,77 +593,40 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
             Moyen de paiement
           </h3>
 
-          {pay === 'cmi' && (
-            <div
-              style={{
-                borderRadius: 18,
-                padding: '18px 18px',
-                background: 'linear-gradient(120deg, var(--brand), var(--brand-d))',
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-            >
-              <div style={{ position: 'absolute', top: -30, right: -10, width: 120, height: 120, borderRadius: 999, background: 'rgba(168,151,35,0.25)' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
-                <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>Carte enregistrée</span>
-                <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, fontWeight: 700, color: '#F0E4A8', letterSpacing: 1 }}>CMI</span>
-              </div>
-              <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 19, color: '#fff', letterSpacing: 2, margin: '14px 0 12px', position: 'relative' }}>
-                •••• •••• •••• 4291
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative' }}>
-                <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'rgba(255,255,255,0.9)' }}>S. EL AMRANI</span>
-                <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'rgba(255,255,255,0.9)' }}>08/27</span>
+          {PAY_OPTIONS.map(payOption)}
+
+          {/* Le paiement en ligne n'est pas branché : on le dit, au lieu de
+              montrer une carte enregistrée qui n'existe pas. */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 13,
+              border: '1px dashed var(--line)',
+              borderRadius: 16,
+              padding: '14px 15px',
+              opacity: 0.75,
+            }}
+          >
+            <div style={{ width: 40, height: 40, borderRadius: 11, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon name="card" size={20} color="var(--muted)" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: 'var(--ui-font)', fontWeight: 600, fontSize: 14, color: 'var(--muted)' }}>Carte bancaire en ligne</div>
+              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>
+                Bientôt disponible — paiement sécurisé CMI
               </div>
             </div>
-          )}
-          {payOption('cmi', 'Carte bancaire', 'Visa · Mastercard · CMI · •••• 4291', <Icon name="card" size={20} color="var(--brand)" />)}
+          </div>
 
-          {payOption('hps', 'Paiement mobile', 'Wallet / appli bancaire · traité par HPS', <Icon name="phone" size={20} color="var(--brand)" fill />)}
-          {pay === 'hps' && (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'rgba(19,124,139,0.06)', border: '1px solid var(--line)', borderRadius: 14, padding: '12px 14px' }}>
-              <Icon name="info" size={18} color="var(--brand)" />
-              <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.4 }}>
-                Vous serez redirigé vers votre application bancaire (HPS Switch) pour valider en toute sécurité.
+          {pay !== 'cod' && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'rgba(168,151,35,0.07)', border: '1px solid rgba(168,151,35,0.3)', borderRadius: 14, padding: '12px 14px' }}>
+              <Icon name="info" size={18} color="var(--gold)" />
+              <span style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.45 }}>
+                L&apos;agence vous appelle après confirmation pour finaliser le paiement. La commande n&apos;est préparée qu&apos;une fois le règlement convenu.
               </span>
             </div>
           )}
-
-          {payOption('cashplus', 'Cash Plus', 'Payer en espèces en agence', <Icon name="store" size={20} color="var(--brand)" />)}
-          {pay === 'cashplus' && (
-            <div style={{ background: 'rgba(168,151,35,0.07)', border: '1px solid rgba(168,151,35,0.3)', borderRadius: 14, padding: '13px 14px' }}>
-              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>Code de paiement Cash Plus</div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-                <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 700, fontSize: 19, color: 'var(--ink)', letterSpacing: 2 }}>8842 1097 36</span>
-                <Icon name="tag" size={18} color="var(--gold)" />
-              </div>
-              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>
-                À régler sous 24 h dans n&apos;importe quelle agence Cash Plus.
-              </div>
-            </div>
-          )}
-
-          {payOption('virement', 'Virement bancaire', 'Par RIB · validation sous 24 h', <Icon name="receipt" size={20} color="var(--brand)" />)}
-          {pay === 'virement' && (
-            <div style={{ background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 14, padding: '13px 14px' }}>
-              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)' }}>RIB — La Villa SARL · Attijariwafa Bank</div>
-              <div style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 700, fontSize: 14.5, color: 'var(--ink)', letterSpacing: 0.5, marginTop: 6 }}>
-                007 780 0001234567890123 45
-              </div>
-              <div style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>
-                Indiquez votre numéro de commande en référence du virement.
-              </div>
-            </div>
-          )}
-
-          {payOption('cod', 'Paiement à la livraison', 'Espèces à la réception', <Icon name="cash" size={20} color="var(--brand)" />)}
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 }}>
-            <Icon name="check" size={15} color="var(--brand)" strokeWidth={2.4} />
-            <span style={{ fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)' }}>
-              Paiements 100 % sécurisés · CMI · HPS · 3-D Secure
-            </span>
-          </div>
         </section>
 
         {/* loyalty redemption paliers */}
@@ -669,12 +680,12 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
             Code promo
           </h3>
           {appliedPromo ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(35,158,111,0.1)', border: '1px solid rgba(35,158,111,0.4)', borderRadius: 14, padding: '12px 14px' }}>
-              <Icon name="tag" size={18} color="#1f7a49" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(19,124,139,0.07)', border: '1px solid var(--brand)', borderRadius: 14, padding: '12px 14px' }}>
+              <Icon name="tag" size={18} color="var(--brand)" />
               <div style={{ flex: 1, fontFamily: 'var(--ui-font)', fontSize: 13.5, color: 'var(--ink)' }}>
                 <strong>{appliedPromo.code}</strong> appliqué · −{formatDH(appliedPromo.discount)}
               </div>
-              <button onClick={clearPromo} style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#C0392B' }}>
+              <button onClick={clearPromo} style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--gold)' }}>
                 Retirer
               </button>
             </div>
@@ -686,6 +697,7 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
                   onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
                   onKeyDown={(e) => e.key === 'Enter' && applyPromo()}
                   placeholder="Entrez votre code"
+                  aria-label="Code promo"
                   style={{ flex: 1, padding: '12px 14px', borderRadius: 12, border: '1.5px solid var(--line)', background: '#fff', fontFamily: 'var(--ui-font)', fontSize: 14, color: 'var(--ink)', letterSpacing: 0.5, textTransform: 'uppercase', outline: 'none' }}
                 />
                 <button
@@ -714,14 +726,16 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
               green={bill.deliveryFee === 0}
             />
             {bill.discount > 0 && (
-              <Row label={appliedPromo ? `Code ${appliedPromo.code}` : 'Remise (-15 %)'} value={`– ${formatDH(bill.discount)}`} gold />
+              <Row label={appliedPromo ? `Code ${appliedPromo.code}` : 'Remise'} value={`– ${formatDH(bill.discount)}`} gold />
             )}
             {bill.pointsDiscount > 0 && palier && (
               <Row label={`Points fidélité (−${palier.pts} pts)`} value={`– ${formatDH(bill.pointsDiscount)}`} gold />
             )}
             <div style={{ height: 1, background: 'var(--line)', margin: '9px 0' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>Total à payer</span>
+              <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>
+                {pay === 'cod' ? 'À régler à la livraison' : 'Total à payer'}
+              </span>
               <span style={{ fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 20, color: 'var(--brand)' }}>{formatDH(bill.total)}</span>
             </div>
           </div>
@@ -737,7 +751,7 @@ export function CheckoutScreen({ products, zones, addresses, profile }: Checkout
         }}
       >
         <Btn full size="lg" onClick={confirm} disabled={busy || items.length === 0}>
-          {busy ? 'Traitement…' : `${ctaLabel} · ${formatDH(bill.total)}`}
+          {busy ? 'Traitement…' : `Confirmer la commande · ${formatDH(bill.total)}`}
         </Btn>
       </div>
     </div>

@@ -15,6 +15,10 @@ export function customerMessage(raw: string): string {
   if (raw.includes('unknown product')) return "Un article du panier n'existe plus. Videz le panier et réessayez.";
   if (raw.includes('empty order')) return 'Votre panier est vide.';
   if (raw.includes('invalid mode')) return 'Mode de commande invalide.';
+  if (raw.includes('invalid slot')) return "Ce créneau n'est plus disponible. Choisissez-en un autre.";
+  if (raw.includes('invalid payment')) return 'Moyen de paiement invalide.';
+  // Côté livreur (0054) : la course se clôt avec le code du client ou une photo.
+  if (raw.includes('bad delivery code')) return 'Code incorrect. Demandez au client le code affiché sur son suivi, ou prenez une photo du dépôt.';
   if (raw.includes('forbidden')) return 'Session expirée. Reconnectez-vous puis réessayez.';
   // Anything unmapped stays as-is rather than hiding a real fault behind a
   // vague message — the server logs keep the original either way.

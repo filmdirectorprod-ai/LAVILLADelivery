@@ -295,6 +295,65 @@ try {
   if (rewardActive === false) ok('admin_set_reward_active lets the super-admin switch a reward off');
   else bad(`reward still active after the super-admin switched it off`);
 
+  // ── 0054 : paiement, créneau, code de remise, incident livreur ─────────────
+  const slotAt = new Date(Date.now() + 3 * 3600 * 1000).toISOString();
+  const oid54 = (await asUser(c, A, () => c.query(
+    `select place_order($1, $2::jsonb, 'livraison', 'Fes', null, false, 0, 0, '0600000000', null, null,
+                        'cod', $3::timestamptz, 'Aujourd''hui 19:00', 34.0389, -4.9986) as id`,
+    [A, JSON.stringify([{ product_id: tajine.id, qty: 1 }]), slotAt]))).rows[0].id;
+  const o54 = (await c.query('select * from orders where id = $1', [oid54])).rows[0];
+  if (o54.payment_method === 'cod' && o54.slot_label === "Aujourd'hui 19:00" && o54.slot_at !== null)
+    ok('place_order stores the payment method and the chosen slot (0054)');
+  else bad(`payment/slot wrong: ${o54.payment_method} / ${o54.slot_label} / ${o54.slot_at}`);
+  if (/^\d{4}$/.test(o54.delivery_code ?? '') && Number(o54.dest_lat) === 34.0389)
+    ok('place_order generates a 4-digit delivery code and keeps the destination coordinates');
+  else bad(`code/dest wrong: ${o54.delivery_code} / ${o54.dest_lat},${o54.dest_lng}`);
+  await expectThrow('place_order refuses a slot in the past',
+    () => asUser(c, A, () => c.query(
+      `select place_order($1, $2::jsonb, 'livraison', 'Fes', null, false, 0, 0, null, null, null,
+                          'cod', now() - interval '2 hours', 'hier', null, null)`,
+      [A, JSON.stringify([{ product_id: tajine.id, qty: 1 }])])), 'invalid slot');
+  await expectThrow('place_order refuses an unknown payment method',
+    () => asUser(c, A, () => c.query(
+      `select place_order($1, $2::jsonb, 'livraison', 'Fes', null, false, 0, 0, null, null, null,
+                          'bitcoin', null, null, null, null)`,
+      [A, JSON.stringify([{ product_id: tajine.id, qty: 1 }])])), 'invalid payment');
+
+  // Un livreur réel prend la course.
+  const DU = (await c.query(`insert into auth.users (raw_user_meta_data) values ('{"full_name":"Livreur Karim"}') returning id`)).rows[0].id;
+  await c.query(`insert into drivers (name, user_id, vehicle, is_online) values ('Karim', $1, 'Scooter', true)`, [DU]);
+  await c.query(`update orders set status = 'ready' where id = $1`, [oid54]);
+  await asUser(c, DU, () => c.query('select driver_accept_order($1)', [oid54]));
+  await asUser(c, DU, () => c.query('select driver_update_status($1, 2)', [oid54]));
+  await asUser(c, DU, () => c.query('select driver_update_status($1, 3)', [oid54]));
+
+  await expectThrow('driver_update_status refuses to close a delivery with a wrong code',
+    () => asUser(c, DU, () => c.query('select driver_update_status($1, 4, $2, null)', [oid54, '0000'.replace(o54.delivery_code, '1111')])), 'bad delivery code');
+  await asUser(c, DU, () => c.query('select driver_update_status($1, 4, $2, null)', [oid54, o54.delivery_code]));
+  const closed = (await c.query('select status from orders where id = $1', [oid54])).rows[0].status;
+  if (closed === 'delivered') ok('driver_update_status closes the delivery with the customer code (0054)');
+  else bad(`order not delivered after the right code: ${closed}`);
+
+  const deliv = (await asUser(c, DU, () => c.query('select * from driver_deliveries()'))).rows;
+  if (deliv.length === 1 && deliv[0].payment_method === 'cod')
+    ok('driver_deliveries reports the payment method — the cash to hand back');
+  else bad(`driver_deliveries wrong: ${JSON.stringify(deliv.map((d) => d.payment_method))}`);
+
+  const incId = (await asUser(c, DU, () => c.query(
+    `select driver_report_incident($1, 'retard', 'haute', 'Client injoignable') as id`, [oid54]))).rows[0].id;
+  const inc = (await c.query('select * from incidents where id = $1', [incId])).rows[0];
+  if (inc && inc.kind === 'retard' && inc.severity === 'haute' && inc.order_id === oid54)
+    ok('driver_report_incident files the incident the gérant sees (0054)');
+  else bad(`incident wrong: ${JSON.stringify(inc)}`);
+  const DU2 = (await c.query(`insert into auth.users (raw_user_meta_data) values ('{"full_name":"Autre livreur"}') returning id`)).rows[0].id;
+  await c.query(`insert into drivers (name, user_id, vehicle) values ('Omar', $1, 'Scooter')`, [DU2]);
+  await expectThrow('driver_report_incident rejects a driver who does not have the order',
+    () => asUser(c, DU2, () => c.query(`select driver_report_incident($1, 'litige', 'basse', 'x')`, [oid54])), 'forbidden');
+  // Plus fort qu'une RLS qui renverrait zéro ligne : la table n'est pas même
+  // lisible par un client — le GRANT s'arrête au staff.
+  await expectThrow('incidents stay unreadable to a customer (table grant)',
+    () => asUser(c, A, () => c.query('select count(*) from incidents')), 'permission denied');
+
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
 } catch (e) {
   console.error('\nFATAL', e);
