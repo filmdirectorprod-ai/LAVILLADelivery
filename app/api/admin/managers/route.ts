@@ -50,8 +50,27 @@ export async function POST(request: NextRequest) {
   }
 
   const svc = createServiceSupabase();
-  // Branch must exist.
-  const { data: branch } = await svc.from('branches').select('id').eq('id', body.branch_id).maybeSingle();
+  // L'agence doit exister. On distingue les deux causes : une requête qui
+  // ÉCHOUE (clé de service absente ou refusée, base injoignable) renvoyait le
+  // même « Agence introuvable » qu'une agence réellement absente — un message
+  // qui accusait la saisie du gérant pour un problème d'installation, et qui a
+  // coûté une soirée de recherche. Chacune dit maintenant ce qu'elle est.
+  const { data: branch, error: branchErr } = await svc
+    .from('branches')
+    .select('id')
+    .eq('id', body.branch_id)
+    .maybeSingle();
+  if (branchErr) {
+    console.error('[api/admin/managers] lecture de branches impossible :', branchErr.message);
+    return NextResponse.json(
+      {
+        error:
+          "La base de données n'a pas répondu. C'est une erreur d'installation, pas de saisie : " +
+          'vérifiez que SUPABASE_SERVICE_ROLE_KEY est bien définie pour cet environnement.',
+      },
+      { status: 500 },
+    );
+  }
   if (!branch) return NextResponse.json({ error: 'Agence introuvable.' }, { status: 400 });
 
   const email = gerantIdentifiantToEmail(body.identifiant);
