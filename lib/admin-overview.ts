@@ -162,3 +162,78 @@ export function computeOverviewDetail(
     statusCounts,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Qui livre quoi, et vers où — la matière du suivi en direct.
+//
+// La carte de la Vue d'ensemble ne montrait que des points : on voyait le
+// livreur bouger, sans savoir où il allait ni quand il arriverait. Depuis 0054
+// la commande porte les coordonnées de sa destination (dest_lat/dest_lng) : en
+// les recoupant avec la position diffusée du livreur et la liaison
+// commande → livreur, on peut tracer le VRAI trajet routier, avec la distance
+// et le temps que Google calcule pour lui.
+//
+// Tout est déjà en mémoire pour l'écran (positions, commandes du jour,
+// liaisons) : cette jointure ne coûte aucune requête supplémentaire.
+
+/** Une course en cours, rattachée au livreur qui la porte. */
+export interface DriverRun {
+  driverId: string;
+  driverName: string;
+  from: { lat: number; lng: number };
+  to: { lat: number; lng: number };
+  orderCode: string;
+  address: string | null;
+}
+
+interface RunOrder {
+  id: string;
+  code: string;
+  status: string;
+  address?: string | null;
+  dest_lat?: number | null;
+  dest_lng?: number | null;
+}
+
+interface RunLink {
+  order_id: string;
+  driver_id: string | null;
+}
+
+/**
+ * Associe chaque livreur localisé à sa course en cours.
+ *
+ * Une course compte si elle est `en_route` (le livreur roule) — les commandes
+ * seulement `ready` sont encore en boutique, le trajet n'a pas commencé. Un
+ * livreur en ligne sans course, ou dont la commande n'a pas de coordonnées
+ * (passée avant 0054), est simplement absent du résultat : il reste sur la
+ * carte comme un point, sans trajet.
+ */
+export function driverRuns(
+  positions: DriverPosition[],
+  links: RunLink[],
+  orders: RunOrder[],
+): DriverRun[] {
+  const orderById = new Map(orders.map((o) => [o.id, o]));
+  const runs: DriverRun[] = [];
+
+  for (const p of positions) {
+    // Une seule course active à la fois ; on prend la première qui colle.
+    for (const link of links) {
+      if (link.driver_id !== p.id) continue;
+      const order = orderById.get(link.order_id);
+      if (!order || order.status !== 'en_route') continue;
+      if (order.dest_lat == null || order.dest_lng == null) continue;
+      runs.push({
+        driverId: p.id,
+        driverName: p.name,
+        from: { lat: p.lat, lng: p.lng },
+        to: { lat: order.dest_lat, lng: order.dest_lng },
+        orderCode: order.code,
+        address: order.address ?? null,
+      });
+      break;
+    }
+  }
+  return runs;
+}

@@ -18,6 +18,7 @@ import {
   computeOverviewDetail,
   computeOverviewKpis,
   driversToPositions,
+  driverRuns,
   startOfTodayISO,
 } from '@/lib/admin-overview';
 import type { AdminOverviewData } from '@/lib/queries';
@@ -124,6 +125,9 @@ export function OverviewScreen({
   // Every online driver with a fresh GPS fix (streamed while online, not only
   // during a delivery). 0049.
   const positions = useMemo(() => driversToPositions(data.drivers), [data.drivers]);
+  // Les courses réellement en route, avec leur destination : la carte peut alors
+  // tracer le trajet routier et donner le temps restant, au lieu d'un point muet.
+  const runs = useMemo(() => driverRuns(positions, data.tracking, data.orders), [positions, data.tracking, data.orders]);
 
   const rows: OrderListRow[] = useMemo(() => {
     const driverNameById = (id: string | null) => data.drivers.find((d) => d.id === id)?.name ?? null;
@@ -248,7 +252,7 @@ export function OverviewScreen({
         </section>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <LiveDriverMap apiKey={mapsKey} positions={positions} />
+          <LiveDriverMap apiKey={mapsKey} positions={positions} runs={runs} />
           <OrdersListCard title={listTitle} emptyText={emptyText} rows={rows} />
         </div>
       </div>
