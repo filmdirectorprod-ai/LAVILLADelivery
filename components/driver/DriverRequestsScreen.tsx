@@ -7,7 +7,7 @@
 // durée par course : on n'invente donc pas « 3,2 km / ~28 min », on montre
 // l'argent réel (gain + total) et, depuis 0054, le créneau demandé et ce qu'il
 // faudra encaisser.
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/lib/toast-store';
@@ -15,7 +15,8 @@ import { formatDH } from '@/lib/format';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import { slotShortLabel } from '@/lib/checkout-slots';
-import { useRealtime } from '@/lib/use-realtime';
+import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
+import { createTrackingGate } from '@/lib/tracking-gate';
 import type { Order, OrderTracking } from '@/lib/types';
 import type { DriverOrder } from '@/lib/queries';
 import { EmptyLine, Figure, GhostAction, Panel, Pill, PrimaryAction, text } from '@/components/driver/ui/DriverUI';
@@ -59,13 +60,26 @@ export function DriverRequestsScreen({ initialBoard, branchId }: { initialBoard:
 
   // Seules les commandes de cette agence atteignent l'appareil ; l'anti-rebond
   // ramène la rafale d'une prise de course à un seul rechargement.
+  // Même précaution que le tableau de bord : order_tracking n'est pas filtrable
+  // par agence, la position de chaque livreur de la ville arrivait ici toutes
+  // les 4 secondes. Seule compte ici la prise de course (`manual`), que la porte
+  // laisse passer.
+  const gate = useRef(createTrackingGate()).current;
+  const onPoolChange = useCallback(
+    (payload: RealtimeChangePayload) => {
+      if (payload.table === 'order_tracking' && !gate(payload)) return;
+      refetch();
+    },
+    [gate, refetch],
+  );
+
   useRealtime(
     'driver-requests',
     [
       { table: 'orders', filter: branchId ? `branch_id=eq.${branchId}` : undefined },
       { table: 'order_tracking' },
     ],
-    refetch,
+    onPoolChange,
   );
 
   const available = useMemo(() => {

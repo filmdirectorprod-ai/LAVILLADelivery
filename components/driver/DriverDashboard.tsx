@@ -9,7 +9,7 @@
 // Corrections : la note ne plante plus quand elle est vide, le point vert est
 // devenu blanc (palette stricte), et la carte de course annonce le créneau
 // demandé et les espèces à encaisser (0054).
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { formatDH } from '@/lib/format';
@@ -21,7 +21,8 @@ import { PhotoSlot } from '@/components/ui/PhotoSlot';
 import { UserNotificationBell } from '@/components/ui/UserNotificationBell';
 import { unreadFromStaff, SUPPORT_SEEN_KEY } from '@/lib/driver-support';
 import { useDriverOnline } from '@/lib/driver-online-store';
-import { useRealtime } from '@/lib/use-realtime';
+import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
+import { createTrackingGate } from '@/lib/tracking-gate';
 import type { Driver, Order, OrderTracking, SupportMessage } from '@/lib/types';
 import type { DriverOrder } from '@/lib/queries';
 import { EmptyLine, Figure, GhostAction, Panel, Pill, PrimaryAction, SectionTitle, Switch, Well, text } from '@/components/driver/ui/DriverUI';
@@ -80,13 +81,27 @@ export function DriverDashboard({
   // Limité à l'agence de ce livreur : un changement dans une autre agence ne
   // réveille plus l'appareil. order_tracking n'a pas de branch_id, donc il reste
   // large — l'anti-rebond ramène une rafale de prises à un seul rechargement.
+  // order_tracking ne peut pas être filtré par agence (la colonne n'y est pas) :
+  // le téléphone recevait donc le point GPS de TOUS les livreurs de la ville,
+  // toutes les 4 secondes chacun, et rechargeait son tableau à ce rythme —
+  // batterie et forfait pour rien. La porte ne laisse passer que ce que ce
+  // tableau montre vraiment : une prise de course, une étape franchie.
+  const gate = useRef(createTrackingGate()).current;
+  const onBoardChange = useCallback(
+    (payload: RealtimeChangePayload) => {
+      if (payload.table === 'order_tracking' && !gate(payload)) return;
+      refetch();
+    },
+    [gate, refetch],
+  );
+
   useRealtime(
     'driver-board',
     [
       { table: 'orders', filter: driver.branch_id ? `branch_id=eq.${driver.branch_id}` : undefined },
       { table: 'order_tracking' },
     ],
-    refetch,
+    onBoardChange,
   );
 
   // Pastille support : les réponses du gérant plus récentes que la dernière visite.

@@ -42,10 +42,15 @@ export interface TrackingScreenProps {
   driver: Driver | null;
 }
 
-export function TrackingScreen({ order: initialOrder, items, tracking, driver }: TrackingScreenProps) {
+export function TrackingScreen({ order: initialOrder, items, tracking, driver: initialDriver }: TrackingScreenProps) {
   const router = useRouter();
   const [order, setOrder] = useState<Order>(initialOrder);
   const [track, setTrack] = useState<OrderTracking | null>(tracking);
+  // Le livreur arrive APRÈS l'ouverture de l'écran : le serveur n'en connaissait
+  // aucun au rendu. order_tracking nous apprend en direct qui a pris la course ;
+  // on va alors chercher sa fiche, sinon le client restait sur « Recherche d'un
+  // livreur… » et sur le bouton d'appel de secours jusqu'à un rechargement.
+  const [driver, setDriver] = useState<Driver | null>(initialDriver);
   // GPS readout for the chip — fed by the real map when present, else the SVG route.
   const [gps, setGps] = useState<{ lat: number; lng: number }>(() => {
     const p = lvPosAt(tracking?.progress ?? 0);
@@ -73,6 +78,27 @@ export function TrackingScreen({ order: initialOrder, items, tracking, driver }:
       supabase.removeChannel(channel);
     };
   }, [order.id]);
+
+  const trackedDriverId = track?.driver_id ?? null;
+  useEffect(() => {
+    if (!trackedDriverId) {
+      setDriver(null); // course relâchée : on ne laisse pas un nom périmé
+      return;
+    }
+    if (driver?.id === trackedDriverId) return;
+    let cancelledFetch = false;
+    createClient()
+      .from('drivers')
+      .select('*')
+      .eq('id', trackedDriverId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelledFetch && data) setDriver(data as Driver);
+      });
+    return () => {
+      cancelledFetch = true;
+    };
+  }, [trackedDriverId, driver?.id]);
 
   const cancelled = order.status === 'cancelled';
   const stage = track?.stage ?? 0;
@@ -288,8 +314,12 @@ export function TrackingScreen({ order: initialOrder, items, tracking, driver }:
               <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
                 {driver ? (
                   <>
-                    {driver.vehicle} · <Icon name="star" size={12} color="var(--gold)" fill />{' '}
-                    {driver.rating.toFixed(1).replace('.', ',')}
+                    {/* `vehicle` et `rating` sont nuls pour un livreur tout neuf :
+                        sans garde, `.toFixed` faisait tomber tout l'écran de suivi.
+                        Même protection que l'app livreur et l'admin. */}
+                    {driver.vehicle && <>{driver.vehicle} · </>}
+                    <Icon name="star" size={12} color="var(--gold)" fill />{' '}
+                    {Number(driver.rating ?? 0).toFixed(1).replace('.', ',')}
                   </>
                 ) : (
                   'Assignation en cours'

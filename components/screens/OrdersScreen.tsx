@@ -8,6 +8,7 @@ import type { Product } from '@/lib/types';
 import type { OrderWithItems } from '@/lib/queries';
 import { formatDH } from '@/lib/format';
 import { isActiveOrderStatus, orderStatusLabel } from '@/lib/order-status';
+import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { defaultOpts, useCart } from '@/lib/cart-store';
 import { useToast } from '@/lib/toast-store';
 import { SAFE_TOP } from '@/lib/layout';
@@ -37,6 +38,13 @@ export function OrdersScreen({ orders, products }: OrdersScreenProps) {
   const list = orders.filter(({ order }) =>
     tab === 'en_cours' ? isActiveOrderStatus(order.status) : !isActiveOrderStatus(order.status),
   );
+
+  // Ces statuts appartiennent aux deux autres applications : la cuisine passe
+  // « prête », le gérant annule, le livreur livre. Sans cela, la liste restait
+  // figée sur l'état d'ouverture jusqu'à un rechargement manuel. On ne surveille
+  // que s'il reste une commande en cours.
+  const hasActive = orders.some(({ order }) => isActiveOrderStatus(order.status));
+  useLiveRefresh(hasActive);
 
   const reorder = (items: OrderWithItems['items']) => {
     items.forEach((it) => {

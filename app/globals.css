@@ -10,6 +10,14 @@
   --muted: #6b7173;
   --line: #eceeef;
   --soft: #f6f7f7;
+
+  /* La palette des trois applications est turquoise / or / blanc. Le rouge n'a
+     qu'un seul emploi autorisé : prévenir d'une action DESTRUCTIVE et sans
+     retour (supprimer une adresse, supprimer son compte). Il ne sert jamais à
+     dire « erreur » — un message d'erreur se lit en or, comme dans l'app
+     livreur et dans l'admin. Un jeton nommé plutôt qu'un code répété : la règle
+     devient relisible, et l'écart se voit. */
+  --danger: #c0392b;
 }
 
 html,

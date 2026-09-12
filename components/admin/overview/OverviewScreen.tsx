@@ -10,7 +10,7 @@
 // Every derived number comes from lib/admin-overview.ts so server and client
 // agree.
 'use client';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isActiveOrderStatus } from '@/lib/order-status';
 import {
@@ -21,13 +21,16 @@ import {
   startOfTodayISO,
 } from '@/lib/admin-overview';
 import type { AdminOverviewData } from '@/lib/queries';
+import type { Order, OrderTracking } from '@/lib/types';
 import { HourlyChart } from './HourlyChart';
 import { StatusBreakdown } from './StatusBreakdown';
 import { ProgressRing } from './ProgressRing';
 import { HeroStat, MiniStat } from './HeroStat';
 import { OrdersListCard, type OrderListRow } from './OrdersListCard';
 import { BranchesInfo } from '@/components/ui/BranchesInfo';
-import { useRealtime } from '@/lib/use-realtime';
+import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
+import { createTrackingGate } from '@/lib/tracking-gate';
+import { fetchAllIn } from '@/lib/fetch-in-chunks';
 import dynamic from 'next/dynamic';
 
 // Loaded on demand — the admin overview renders long before the map matters.
@@ -71,27 +74,46 @@ export function OverviewScreen({
   const refetch = useCallback(async () => {
     const supabase = createClient();
     const since = startOfTodayISO(); // agency-midnight boundary — matches the server paint
-    const [ordersRes, driversRes, reviewsRes, trackingRes] = await Promise.all([
+    const [ordersRes, driversRes, reviewsRes] = await Promise.all([
       supabase.from('orders').select('*').gte('placed_at', since).order('placed_at', { ascending: false }).limit(500),
       supabase.from('drivers').select('*'),
-      supabase.from('reviews').select('rating'),
-      supabase
-        .from('order_tracking')
-        .select('order_id, driver_id, lat, lng, updated_at')
-        .not('driver_id', 'is', null)
-        .not('lat', 'is', null),
+      // Moyenne des 500 avis les plus récents : sans limite ni tri, Supabase en
+      // renvoyait 1000 dans un ordre indéfini et la note bougeait toute seule.
+      supabase.from('reviews').select('rating').order('created_at', { ascending: false }).limit(500),
     ]);
+    const orders = (ordersRes.data ?? []) as Order[];
+    // Bornée aux commandes affichées, et sans exiger de position : la requête
+    // d'avant écartait les lignes sans lat, donc une commande tout juste
+    // attribuée restait « Non assigné » jusqu'au premier point GPS.
+    const tracking = await fetchAllIn<Pick<OrderTracking, 'order_id' | 'driver_id'>>(
+      supabase,
+      'order_tracking',
+      'order_id, driver_id',
+      'order_id',
+      orders.map((o) => o.id),
+    );
     setData({
-      orders: ordersRes.data ?? [],
+      orders,
       drivers: driversRes.data ?? [],
       ratings: (reviewsRes.data ?? []).map((r) => (r as { rating: number }).rating),
-      tracking: trackingRes.data ?? [],
+      tracking: tracking.filter((t) => t.driver_id),
     });
   }, []);
 
-  // The overview aggregates four tables; without the debounce every driver GPS
-  // fix (one per 5 s per driver) re-pulled all four.
-  useRealtime('admin-overview', [{ table: 'orders' }, { table: 'order_tracking' }, { table: 'drivers' }, { table: 'reviews' }], refetch);
+  // La carte lit drivers.lat/lng : cet écran n'a pas besoin des points GPS
+  // écrits dans order_tracking toutes les 4 s par course. La porte les écarte —
+  // sinon les quatre tables étaient re-tirées à ce rythme-là. Les attributions
+  // et les étapes, elles, passent.
+  const gate = useRef(createTrackingGate()).current;
+  const onChange = useCallback(
+    (payload: RealtimeChangePayload) => {
+      if (payload.table === 'order_tracking' && !gate(payload)) return;
+      refetch();
+    },
+    [gate, refetch],
+  );
+
+  useRealtime('admin-overview', [{ table: 'orders' }, { table: 'order_tracking' }, { table: 'drivers' }, { table: 'reviews' }], onChange);
 
   const kpis = useMemo(
     () => computeOverviewKpis({ orders: data.orders, drivers: data.drivers, ratings: data.ratings }),

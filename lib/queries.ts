@@ -355,8 +355,10 @@ export interface AdminOverviewData {
   drivers: Driver[];
   /** Every review's rating (for the average + count KPI). */
   ratings: number[];
-  /** Driver GPS rows with coords, for the live map. */
-  tracking: Pick<OrderTracking, 'order_id' | 'driver_id' | 'lat' | 'lng' | 'updated_at'>[];
+  /** Qui livre quoi : la liaison commande → livreur pour la liste de droite.
+   *  (La carte, elle, lit drivers.lat/lng — la position diffusée tant que le
+   *  livreur est en ligne, 0049 — et non ces lignes-ci.) */
+  tracking: Pick<OrderTracking, 'order_id' | 'driver_id'>[];
 }
 
 /**
@@ -367,21 +369,32 @@ export interface AdminOverviewData {
 export async function getAdminOverviewData(): Promise<AdminOverviewData> {
   const supabase = await createServerSupabase();
   const since = startOfTodayISO();
-  const [ordersRes, driversRes, reviewsRes, trackingRes] = await Promise.all([
+  const [ordersRes, driversRes, reviewsRes] = await Promise.all([
     supabase.from('orders').select('*').gte('placed_at', since).order('placed_at', { ascending: false }).limit(500),
     supabase.from('drivers').select('*'),
-    supabase.from('reviews').select('rating'),
-    supabase
-      .from('order_tracking')
-      .select('order_id, driver_id, lat, lng, updated_at')
-      .not('driver_id', 'is', null)
-      .not('lat', 'is', null),
+    // Bornée ET ordonnée : sans limite, Supabase renvoyait 1000 avis pris dans
+    // un ordre indéfini et la « note moyenne » changeait d'un rafraîchissement à
+    // l'autre. C'est désormais la moyenne des 500 avis les plus récents — une
+    // mesure stable, et qui reflète la période en cours.
+    supabase.from('reviews').select('rating').order('created_at', { ascending: false }).limit(500),
   ]);
+  const orders = (ordersRes.data ?? []) as Order[];
+  // Seulement les commandes du jour affichées, et sans exiger une position :
+  // la requête d'avant écartait les lignes dont lat était nul, si bien qu'une
+  // commande tout juste attribuée s'affichait « Non assigné » jusqu'au premier
+  // point GPS du livreur.
+  const tracking = await fetchAllIn<Pick<OrderTracking, 'order_id' | 'driver_id'>>(
+    supabase,
+    'order_tracking',
+    'order_id, driver_id',
+    'order_id',
+    orders.map((o) => o.id),
+  );
   return {
-    orders: ordersRes.data ?? [],
+    orders,
     drivers: driversRes.data ?? [],
     ratings: (reviewsRes.data ?? []).map((r) => (r as { rating: number }).rating),
-    tracking: trackingRes.data ?? [],
+    tracking: tracking.filter((t) => t.driver_id),
   };
 }
 
@@ -413,7 +426,16 @@ export async function getAdminOrdersData(): Promise<AdminOrdersData> {
     fetchAllIn<OrderItem>(supabase, 'order_items', '*', 'order_id', ids),
     fetchAllIn<OrderTracking>(supabase, 'order_tracking', '*', 'order_id', ids),
     supabase.from('drivers').select('*').order('name'),
-    supabase.from('profiles').select('id, full_name'),
+    // Seulement les clients de ces 200 commandes : « tous les profils » était
+    // tronqué à 1000 lignes, et les commandes des clients suivants s'affichaient
+    // alors sans nom.
+    fetchAllIn<{ id: string; full_name: string | null }>(
+      supabase,
+      'profiles',
+      'id, full_name',
+      'id',
+      Array.from(new Set(list.map((o) => o.user_id).filter(Boolean))) as string[],
+    ),
   ]);
 
   const rows = buildAdminOrderRows(
@@ -421,7 +443,7 @@ export async function getAdminOrdersData(): Promise<AdminOrdersData> {
     itemsRes,
     trackingRes,
     (driversRes.data ?? []) as Driver[],
-    (profilesRes.data ?? []) as { id: string; full_name: string | null }[],
+    profilesRes,
   );
   return { rows, drivers: (driversRes.data ?? []) as Driver[] };
 }
@@ -478,18 +500,33 @@ export async function getAdminReviewsData(): Promise<AdminReviewsData> {
     .limit(200);
   const list = (reviews ?? []) as Review[];
 
-  const [profilesRes, ordersRes, trackingRes, driversRes] = await Promise.all([
-    supabase.from('profiles').select('id, full_name'),
-    supabase.from('orders').select('id, code'),
-    supabase.from('order_tracking').select('order_id, driver_id').not('driver_id', 'is', null),
-    supabase.from('drivers').select('id, name'),
+  // L'écran ne montre que ces 200 avis : on ne va chercher que les lignes
+  // qu'ils citent. Les requêtes ouvertes d'avant (« toutes les commandes »,
+  // « tous les clients ») étaient silencieusement tronquées à 1000 lignes par
+  // Supabase — passé ce cap, un avis récent perdait son code de commande et son
+  // livreur sans qu'aucune erreur ne le signale. Bornées par les identifiants,
+  // elles redeviennent justes, et la charge ne grandit plus avec l'historique.
+  const orderIds = Array.from(new Set(list.map((r) => r.order_id).filter(Boolean)));
+  const userIds = Array.from(new Set(list.map((r) => r.user_id).filter(Boolean)));
+
+  const [profiles, orders, tracking, driversRes] = await Promise.all([
+    fetchAllIn<{ id: string; full_name: string | null }>(supabase, 'profiles', 'id, full_name', 'id', userIds),
+    fetchAllIn<{ id: string; code: string }>(supabase, 'orders', 'id, code', 'id', orderIds),
+    fetchAllIn<{ order_id: string; driver_id: string | null }>(
+      supabase,
+      'order_tracking',
+      'order_id, driver_id',
+      'order_id',
+      orderIds,
+    ),
+    supabase.from('drivers').select('id, name'), // l'effectif : quelques dizaines de lignes
   ]);
 
   const rows = buildReviewRows(
     list,
-    (profilesRes.data ?? []) as { id: string; full_name: string | null }[],
-    (ordersRes.data ?? []) as { id: string; code: string }[],
-    (trackingRes.data ?? []) as { order_id: string; driver_id: string | null }[],
+    profiles,
+    orders,
+    tracking,
     (driversRes.data ?? []) as { id: string; name: string }[],
   );
   return { rows };

@@ -45,18 +45,24 @@ export interface StatusPill {
   fg: string;
 }
 
-/** Pill background/foreground for a status badge. `preparing`/`pending` keep the
- *  gold treatment the Phase 2 overview table already used. */
+/** Pill background/foreground for a status badge.
+ *
+ *  Palette stricte, partagée par les trois applications : turquoise, or, encre
+ *  atténuée. Ni vert ni rouge — « livrée » et « annulée » se distinguent par
+ *  l'intensité, pas par une couleur d'alerte. L'or ne porte jamais de texte en
+ *  aplat : il reste une encre sur un voile très clair. */
 export function orderStatusPill(status: string): StatusPill {
   switch (status) {
     case 'en_route':
-      return { bg: 'rgba(19,124,139,0.12)', fg: 'var(--brand-d)' };
+      return { bg: 'rgba(19,124,139,0.16)', fg: 'var(--brand-d)' };
     case 'ready':
       return { bg: 'rgba(19,124,139,0.10)', fg: 'var(--brand)' };
     case 'delivered':
-      return { bg: 'rgba(46,125,50,0.12)', fg: '#2e7d32' };
+      // Terminée et sans suite : la plus discrète des pastilles turquoise.
+      return { bg: 'rgba(19,124,139,0.06)', fg: 'var(--muted)' };
     case 'cancelled':
-      return { bg: 'rgba(180,35,35,0.10)', fg: '#a23' };
+      // Arrêtée : encre atténuée sur le voile neutre de la carte.
+      return { bg: 'var(--soft)', fg: 'var(--muted)' };
     default:
       return { bg: 'rgba(168,151,35,0.14)', fg: 'var(--gold)' };
   }

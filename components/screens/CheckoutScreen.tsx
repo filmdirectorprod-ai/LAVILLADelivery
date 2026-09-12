@@ -708,7 +708,7 @@ export function CheckoutScreen({ products, zones, addresses, profile, branches }
                   {promoBusy ? '…' : 'Appliquer'}
                 </button>
               </div>
-              {promoMsg && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 7 }}>{promoMsg}</div>}
+              {promoMsg && <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--gold)', fontWeight: 600, marginTop: 7 }}>{promoMsg}</div>}
             </>
           )}
         </section>

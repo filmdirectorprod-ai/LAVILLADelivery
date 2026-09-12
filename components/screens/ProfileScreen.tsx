@@ -144,10 +144,10 @@ export function ProfileScreen({ profile }: ProfileScreenProps) {
             fontFamily: 'var(--ui-font)',
             fontSize: 14.5,
             fontWeight: 600,
-            color: '#C0392B',
+            color: 'var(--ink)',
           }}
         >
-          <Icon name="logout" size={19} color="#C0392B" /> Déconnexion
+          <Icon name="logout" size={19} color="var(--muted)" /> Déconnexion
         </button>
         <div style={{ textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', margin: '16px 0 8px' }}>
           La Villa · Maison de qualité depuis 2007 · v1.0

@@ -233,7 +233,7 @@ export default function AuthPage() {
             style={{
               fontFamily: 'var(--ui-font)',
               fontSize: 12.5,
-              color: '#C0392B',
+              color: 'var(--gold)',
               fontWeight: 600,
               marginTop: 12,
             }}

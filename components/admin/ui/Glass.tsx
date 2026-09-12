@@ -254,8 +254,9 @@ export function Pill({ children, tone = 'outline', title }: { children: ReactNod
   );
 }
 
-/** Order status → pill tone, in the admin palette (the shared orderStatusPill
- *  carries the customer app's green / red, which the admin does not use). */
+/** Order status → pill tone, in the admin palette. Le pendant sur fond clair est
+ *  orderStatusPill (lib/order-status) : même vocabulaire, même palette stricte,
+ *  seul le support change. */
 export function orderStatusTone(status: string): PillTone {
   switch (status) {
     case 'pending':

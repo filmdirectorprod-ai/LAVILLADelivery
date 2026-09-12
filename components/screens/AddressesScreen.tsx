@@ -294,7 +294,7 @@ export function AddressesScreen({ addresses: initial, zones, defaultRecipient = 
           </button>
 
           {error && (
-            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 14 }}>
+            <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--gold)', fontWeight: 600, marginTop: 14 }}>
               {error}
             </div>
           )}
@@ -365,9 +365,9 @@ export function AddressesScreen({ addresses: initial, zones, defaultRecipient = 
                 <button
                   onClick={() => remove(a.id)}
                   disabled={busy}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: '#C0392B' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--ui-font)', fontSize: 12.5, fontWeight: 600, color: 'var(--danger)' }}
                 >
-                  <Icon name="x" size={15} color="#C0392B" /> Supprimer
+                  <Icon name="x" size={15} color="var(--danger)" /> Supprimer
                 </button>
               </div>
             </div>
@@ -375,7 +375,7 @@ export function AddressesScreen({ addresses: initial, zones, defaultRecipient = 
         </div>
 
         {error && !draft && (
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 14 }}>{error}</div>
+          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--gold)', fontWeight: 600, marginTop: 14 }}>{error}</div>
         )}
 
         <div style={{ marginTop: 16 }}>

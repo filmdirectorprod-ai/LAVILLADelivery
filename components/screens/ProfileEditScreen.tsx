@@ -188,7 +188,7 @@ export function ProfileEditScreen({ profile }: ProfileEditScreenProps) {
         </div>
 
         {error && (
-          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: '#C0392B', fontWeight: 600, marginTop: 14 }}>
+          <div style={{ fontFamily: 'var(--ui-font)', fontSize: 12.5, color: 'var(--gold)', fontWeight: 600, marginTop: 14 }}>
             {error}
           </div>
         )}

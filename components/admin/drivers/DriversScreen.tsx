@@ -8,7 +8,7 @@
 // the board in real time. All per-driver stats come from lib/admin-drivers.ts so
 // server and client agree.
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { startOfTodayISO } from '@/lib/admin-overview';
 import { formatAmount } from '@/lib/format';
@@ -18,7 +18,8 @@ import type { Driver } from '@/lib/types';
 import { DriverCard } from './DriverCard';
 import { DriverAccountModal } from './DriverAccountModal';
 import { DriverEditModal } from './DriverEditModal';
-import { useRealtime } from '@/lib/use-realtime';
+import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
+import { createTrackingGate } from '@/lib/tracking-gate';
 import { HeroStat } from '@/components/admin/overview/HeroStat';
 import { Chip, EmptyState, GhostButton, GlassPanel, Notice, PageHeader, PanelTitle, PrimaryButton, SearchField } from '@/components/admin/ui/Glass';
 
@@ -64,7 +65,19 @@ export function DriversScreen({ initial }: { initial: AdminDriversData }) {
 
   // One refetch per burst instead of three: a status change touches orders,
   // order_tracking and drivers within milliseconds of each other.
-  useRealtime('admin-drivers', [{ table: 'drivers' }, { table: 'order_tracking' }, { table: 'orders' }], refetch);
+    // La liste des livreurs ne montre pas de position : on écarte les écritures
+  // GPS (une toutes les 4 s par course en cours), qui rechargeaient l'écran
+  // entier sans rien y changer. Les prises de course et les étapes passent.
+  const gate = useRef(createTrackingGate()).current;
+  const onChange = useCallback(
+    (payload: RealtimeChangePayload) => {
+      if (payload.table === 'order_tracking' && !gate(payload)) return;
+      refetch();
+    },
+    [gate, refetch],
+  );
+
+  useRealtime('admin-drivers', [{ table: 'drivers' }, { table: 'order_tracking' }, { table: 'orders' }], onChange);
 
   // Periodic refetch so a driver whose heartbeat went stale flips to offline
   // even without a new DB event (lib/admin-presence applies the freshness TTL).

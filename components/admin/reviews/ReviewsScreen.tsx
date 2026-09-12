@@ -14,6 +14,7 @@ import type { AdminReviewsData } from '@/lib/queries';
 import type { Review } from '@/lib/types';
 import { ReviewCard } from './ReviewCard';
 import { useRealtime } from '@/lib/use-realtime';
+import { fetchAllIn } from '@/lib/fetch-in-chunks';
 import { HeroStat } from '@/components/admin/overview/HeroStat';
 import { Chip, EmptyState, GlassPanel, PageHeader, PanelTitle } from '@/components/admin/ui/Glass';
 
@@ -29,21 +30,25 @@ export function ReviewsScreen({ initial }: { initial: AdminReviewsData }) {
     const supabase = createClient();
     const { data: reviews } = await supabase.from('reviews').select('*').order('created_at', { ascending: false }).limit(200);
     const list = (reviews ?? []) as Review[];
-    const [profilesRes, ordersRes, trackingRes, driversRes] = await Promise.all([
-      supabase.from('profiles').select('id, full_name'),
-      supabase.from('orders').select('id, code'),
-      supabase.from('order_tracking').select('order_id, driver_id').not('driver_id', 'is', null),
+    // Bornées aux 200 avis affichés. Les requêtes ouvertes d'avant (« toutes les
+    // commandes », « tous les clients ») étaient tronquées en silence à 1000
+    // lignes : passé ce cap, un avis récent perdait son code de commande et son
+    // livreur. Même requête que le serveur (lib/queries.ts).
+    const orderIds = Array.from(new Set(list.map((r) => r.order_id).filter(Boolean)));
+    const userIds = Array.from(new Set(list.map((r) => r.user_id).filter(Boolean)));
+    const [profiles, orders, tracking, driversRes] = await Promise.all([
+      fetchAllIn<{ id: string; full_name: string | null }>(supabase, 'profiles', 'id, full_name', 'id', userIds),
+      fetchAllIn<{ id: string; code: string }>(supabase, 'orders', 'id, code', 'id', orderIds),
+      fetchAllIn<{ order_id: string; driver_id: string | null }>(
+        supabase,
+        'order_tracking',
+        'order_id, driver_id',
+        'order_id',
+        orderIds,
+      ),
       supabase.from('drivers').select('id, name'),
     ]);
-    setRows(
-      buildReviewRows(
-        list,
-        (profilesRes.data ?? []) as { id: string; full_name: string | null }[],
-        (ordersRes.data ?? []) as { id: string; code: string }[],
-        (trackingRes.data ?? []) as { order_id: string; driver_id: string | null }[],
-        (driversRes.data ?? []) as { id: string; name: string }[],
-      ),
-    );
+    setRows(buildReviewRows(list, profiles, orders, tracking, (driversRes.data ?? []) as { id: string; name: string }[]));
   }, []);
 
   useRealtime('admin-reviews', [{ table: 'reviews' }], refetch);

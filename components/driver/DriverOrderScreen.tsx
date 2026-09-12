@@ -17,6 +17,7 @@ import { formatDH } from '@/lib/format';
 import { customerMessage } from '@/lib/order-error-messages';
 import { directionsUrl } from '@/lib/eta';
 import { slotShortLabel } from '@/lib/checkout-slots';
+import { useRealtime } from '@/lib/use-realtime';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import type { OrderDetail, DriverContact } from '@/lib/queries';
@@ -119,6 +120,25 @@ export function DriverOrderScreen({
   useEffect(() => {
     setTracking(detail.tracking);
   }, [detail.tracking]);
+
+  // Cette course appartient aussi aux deux autres applications : le gérant peut
+  // l'annuler depuis l'admin, un autre livreur peut la prendre avant nous. Sans
+  // abonnement, l'écran ne bougeait que sur les actions du livreur lui-même et
+  // le laissait rouler vers une commande déjà annulée.
+  //
+  // order_tracking n'est écouté que TANT QUE LA COURSE N'EST PAS À NOUS : une
+  // fois prise, c'est nous qui écrivons dans cette ligne une position GPS toutes
+  // les 4 s, et s'y abonner ferait recharger l'écran en boucle. Nos propres
+  // étapes passent déjà par l'état optimiste et router.refresh().
+  const refresh = useCallback(() => router.refresh(), [router]);
+  useRealtime(
+    'driver-order',
+    [
+      { table: 'orders', filter: `id=eq.${order.id}` },
+      !mine && { table: 'order_tracking', filter: `order_id=eq.${order.id}` },
+    ],
+    refresh,
+  );
 
   // ── Diffusion GPS (seulement pendant une livraison active) ──────────────────
   const pushPosition = useCallback(

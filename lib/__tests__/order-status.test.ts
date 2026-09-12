@@ -48,10 +48,20 @@ describe('status sets', () => {
 });
 
 describe('orderStatusPill', () => {
-  it('gives en_route and ready distinct teal pills, cancelled a red one', () => {
+  it('distingue les états sans jamais sortir de la palette', () => {
     expect(orderStatusPill('en_route').fg).toBe('var(--brand-d)');
     expect(orderStatusPill('ready').fg).toBe('var(--brand)');
     expect(orderStatusPill('cancelled').fg).not.toBe(orderStatusPill('ready').fg);
     expect(orderStatusPill('preparing').fg).toBe('var(--gold)');
+  });
+
+  // La charte des trois applications : turquoise, or, blanc, encre atténuée.
+  // Ni vert ni rouge — c'est l'intensité qui sépare « livrée » d'« annulée ».
+  it("n'emploie ni vert ni rouge, sur aucun statut", () => {
+    const forbidden = /(2e7d32|1f7a49|#a23|b42|d32f2f|e74c3c|c0392b|\bgreen\b|\bred\b)/i;
+    for (const status of ['pending', 'preparing', 'ready', 'en_route', 'delivered', 'cancelled']) {
+      const pill = orderStatusPill(status);
+      expect(`${pill.bg} ${pill.fg}`).not.toMatch(forbidden);
+    }
   });
 });

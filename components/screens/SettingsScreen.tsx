@@ -183,9 +183,9 @@ export function SettingsScreen({ profile }: SettingsScreenProps) {
             style={{ ...rowStyle, textDecoration: 'none' }}
           >
             <div style={iconBox}>
-              <Icon name="x" size={18} color="#C0392B" />
+              <Icon name="x" size={18} color="var(--danger)" />
             </div>
-            <span style={{ flex: 1, fontFamily: 'var(--ui-font)', fontSize: 14.5, fontWeight: 500, color: '#C0392B' }}>Supprimer mon compte</span>
+            <span style={{ flex: 1, fontFamily: 'var(--ui-font)', fontSize: 14.5, fontWeight: 500, color: 'var(--danger)' }}>Supprimer mon compte</span>
             <Icon name="right" size={18} color="var(--muted)" />
           </a>
         </div>
@@ -207,10 +207,10 @@ export function SettingsScreen({ profile }: SettingsScreenProps) {
             fontFamily: 'var(--ui-font)',
             fontSize: 14.5,
             fontWeight: 600,
-            color: '#C0392B',
+            color: 'var(--ink)',
           }}
         >
-          <Icon name="logout" size={19} color="#C0392B" /> Déconnexion
+          <Icon name="logout" size={19} color="var(--muted)" /> Déconnexion
         </button>
 
         <div style={{ textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 11.5, color: 'var(--muted)', margin: '18px 0 8px' }}>

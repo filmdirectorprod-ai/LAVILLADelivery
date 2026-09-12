@@ -36,7 +36,8 @@ import {
 import type { AdminOrdersData } from '@/lib/queries';
 import type { Driver, Order, OrderItem, OrderTracking } from '@/lib/types';
 import { OrderConfirmPanel } from './OrderConfirmPanel';
-import { useRealtime } from '@/lib/use-realtime';
+import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
+import { createTrackingGate } from '@/lib/tracking-gate';
 import { fetchAllIn } from '@/lib/fetch-in-chunks';
 import { HeroStat } from '@/components/admin/overview/HeroStat';
 import { Chip, EmptyState, GhostButton, GlassPanel, Notice, PageHeader, Pill, PrimaryButton, SearchField, Switch, fieldStyle, orderStatusTone } from '@/components/admin/ui/Glass';
@@ -85,13 +86,34 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
       fetchAllIn<OrderItem>(supabase, 'order_items', '*', 'order_id', ids),
       fetchAllIn<OrderTracking>(supabase, 'order_tracking', '*', 'order_id', ids),
       supabase.from('drivers').select('*').order('name'),
-      supabase.from('profiles').select('id, full_name'),
+      // Bornée aux clients de ces 200 commandes : « tous les profils » était
+      // tronqué en silence à 1000 lignes et les commandes suivantes perdaient
+      // leur nom de client. Même requête que le serveur (lib/queries.ts).
+      fetchAllIn<{ id: string; full_name: string | null }>(
+        supabase,
+        'profiles',
+        'id, full_name',
+        'id',
+        Array.from(new Set(list.map((o) => o.user_id).filter(Boolean))) as string[],
+      ),
     ]);
     setDrivers((driversRes.data ?? []) as Driver[]);
-    setRows(buildAdminOrderRows(list, itemsRes, trackingRes, (driversRes.data ?? []) as Driver[], (profilesRes.data ?? []) as { id: string; full_name: string | null }[]));
+    setRows(buildAdminOrderRows(list, itemsRes, trackingRes, (driversRes.data ?? []) as Driver[], profilesRes));
   }, []);
 
-  useRealtime('admin-orders', [{ table: 'orders' }, { table: 'order_items' }, { table: 'order_tracking' }], refetch);
+  // Cet écran ne montre aucune position : la porte écarte les écritures GPS du
+  // livreur (une toutes les 4 s par course), qui rechargeaient sinon les 200
+  // commandes et toutes leurs lignes au même rythme.
+  const gate = useRef(createTrackingGate()).current;
+  const onChange = useCallback(
+    (payload: RealtimeChangePayload) => {
+      if (payload.table === 'order_tracking' && !gate(payload)) return;
+      refetch();
+    },
+    [gate, refetch],
+  );
+
+  useRealtime('admin-orders', [{ table: 'orders' }, { table: 'order_items' }, { table: 'order_tracking' }], onChange);
 
   const byBranch = useMemo(() => (branchFilter ? rows.filter((r) => r.order.branch_id === branchFilter) : rows), [rows, branchFilter]);
   const counts = useMemo(() => countOrdersByTab(byBranch), [byBranch]);
