@@ -19,6 +19,7 @@ import {
   computeOverviewKpis,
   driversToPositions,
   driverRuns,
+  readyWithoutDriver,
   startOfTodayISO,
 } from '@/lib/admin-overview';
 import type { AdminOverviewData } from '@/lib/queries';
@@ -32,6 +33,8 @@ import { BranchesInfo } from '@/components/ui/BranchesInfo';
 import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
 import { createTrackingGate } from '@/lib/tracking-gate';
 import { fetchAllIn } from '@/lib/fetch-in-chunks';
+import { Notice } from '@/components/admin/ui/Glass';
+import { useBranches } from '@/lib/use-branches';
 import dynamic from 'next/dynamic';
 
 // Loaded on demand — the admin overview renders long before the map matters.
@@ -71,6 +74,7 @@ export function OverviewScreen({
 }) {
   const [data, setData] = useState<AdminOverviewData>(initial);
   const [filter, setFilter] = useState<Filter>('active');
+  const branches = useBranches(); // pour nommer l'agence dans l'alerte ci-dessous
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
@@ -128,6 +132,13 @@ export function OverviewScreen({
   // Les courses réellement en route, avec leur destination : la carte peut alors
   // tracer le trajet routier et donner le temps restant, au lieu d'un point muet.
   const runs = useMemo(() => driverRuns(positions, data.tracking, data.orders), [positions, data.tracking, data.orders]);
+  // Les agences sont cloisonnées : un livreur de Riad ne voit jamais une
+  // commande de Badie. Une commande prête pouvait donc attendre toute la soirée
+  // sans que rien ne le signale. Elle le dit maintenant.
+  const stranded = useMemo(
+    () => readyWithoutDriver(data.orders, data.drivers, branches),
+    [data.orders, data.drivers, branches],
+  );
 
   const rows: OrderListRow[] = useMemo(() => {
     const driverNameById = (id: string | null) => data.drivers.find((d) => d.id === id)?.name ?? null;
@@ -252,6 +263,12 @@ export function OverviewScreen({
         </section>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {stranded.map((bloc) => (
+            <Notice key={bloc.branchId ?? 'sans-agence'} icon="scooter">
+              {bloc.count} commande{bloc.count > 1 ? 's' : ''} prête{bloc.count > 1 ? 's' : ''} à {bloc.branchName} —
+              aucun livreur de cette agence n’est en ligne. Personne ne peut la prendre.
+            </Notice>
+          ))}
           <LiveDriverMap apiKey={mapsKey} positions={positions} runs={runs} />
           <OrdersListCard title={listTitle} emptyText={emptyText} rows={rows} />
         </div>

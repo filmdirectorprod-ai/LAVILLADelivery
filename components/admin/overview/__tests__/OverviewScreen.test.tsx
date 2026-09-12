@@ -8,6 +8,11 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({}) }));
 vi.mock('@/lib/use-realtime', () => ({ useRealtime: () => {} }));
+// L'écran nomme l'agence dans son alerte « commande prête sans livreur » ; le
+// hook interroge Supabase, neutralisé ici comme le reste.
+vi.mock('@/lib/use-branches', () => ({
+  useBranches: () => [{ id: 'riad', name: 'La Villa Riad — Ville Nouvelle' }],
+}));
 vi.mock('next/dynamic', () => ({
   default: () =>
     function LiveDriverMapStub() {

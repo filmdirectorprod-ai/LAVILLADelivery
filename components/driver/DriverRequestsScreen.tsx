@@ -16,6 +16,7 @@ import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { DRIVER_POOL_STATUSES } from '@/lib/order-status';
 import { slotShortLabel } from '@/lib/checkout-slots';
 import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
+import { useBranches } from '@/lib/use-branches';
 import { createTrackingGate } from '@/lib/tracking-gate';
 import type { Order, OrderTracking } from '@/lib/types';
 import type { DriverOrder } from '@/lib/queries';
@@ -93,6 +94,14 @@ export function DriverRequestsScreen({ initialBoard, branchId }: { initialBoard:
 
   const gainTotal = available.reduce((n, b) => n + (b.order.delivery_fee_dh ?? 0), 0);
 
+  // Un écran vide ne disait pas pourquoi il l'était. Or deux règles, invisibles
+  // depuis ici, décident de ce qui arrive : la cuisine doit avoir marqué la
+  // commande « prête », et la commande doit partir de CETTE agence — les règles
+  // de lecture de la base empêchent même le livreur de voir les autres. Sans
+  // cette phrase, un livreur qui attend croit l'application cassée.
+  const branches = useBranches();
+  const myBranch = branches.find((b) => b.id === branchId)?.name ?? null;
+
   const accept = async (orderId: string) => {
     setBusy(orderId);
     const { error } = await createClient().rpc('driver_accept_order', { p_order: orderId });
@@ -130,7 +139,14 @@ export function DriverRequestsScreen({ initialBoard, branchId }: { initialBoard:
 
       <div style={{ padding: `16px 16px ${SAFE_BOTTOM + 16}px`, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {available.length === 0 ? (
-          <EmptyLine title="Aucune course à récupérer." hint="Les nouvelles commandes prêtes apparaissent ici, en direct." />
+          <EmptyLine
+            title="Aucune course à récupérer."
+            hint={
+              myBranch
+                ? `Une commande arrive ici dès que la cuisine l’a marquée « prête », et seulement si elle part de votre agence — ${myBranch}.`
+                : 'Une commande arrive ici, en direct, dès que la cuisine l’a marquée « prête ».'
+            }
+          />
         ) : (
           available.map((b) => (
             <RequestCard

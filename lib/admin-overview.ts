@@ -237,3 +237,75 @@ export function driverRuns(
   }
   return runs;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Commandes prêtes qu'aucun livreur ne peut prendre.
+//
+// Chaque agence est cloisonnée : un livreur de Riad ne voit JAMAIS une commande
+// de Badie — ni dans son vivier, ni même au niveau des règles de lecture de la
+// base. C'est voulu. Mais rien ne le disait au gérant : une commande pouvait
+// rester « prête » toute la soirée parce que la seule personne autorisée à la
+// prendre appartenait à l'autre agence, et l'écran restait muet.
+//
+// Ce calcul repère ces commandes, et nomme l'agence en cause.
+
+export interface StrandedOrders {
+  branchId: string | null;
+  branchName: string;
+  count: number;
+}
+
+interface StrandableOrder {
+  status: string;
+  branch_id?: string | null;
+}
+
+interface BranchDriver {
+  is_online?: boolean;
+  branch_id?: string | null;
+}
+
+interface NamedBranch {
+  id: string;
+  name: string;
+}
+
+/**
+ * Les commandes prêtes dont l'agence n'a aucun livreur en ligne, groupées par
+ * agence. Une liste vide signifie que chaque commande prête a quelqu'un pour la
+ * prendre.
+ *
+ * `en_route` est exclu : la course est déjà partie, elle a son livreur.
+ */
+export function readyWithoutDriver(
+  orders: StrandableOrder[],
+  drivers: BranchDriver[],
+  branches: NamedBranch[] = [],
+): StrandedOrders[] {
+  const covered = new Set<string>();
+  for (const d of drivers) {
+    if (d.is_online && d.branch_id) covered.add(d.branch_id);
+  }
+  const nameById = new Map(branches.map((b) => [b.id, b.name]));
+
+  const counts = new Map<string | null, number>();
+  for (const o of orders) {
+    if (o.status !== 'ready') continue;
+    const branch = o.branch_id ?? null;
+    // Une commande sans agence est prenable par n'importe quel livreur en ligne.
+    if (branch === null) {
+      if (drivers.some((d) => d.is_online)) continue;
+    } else if (covered.has(branch)) {
+      continue;
+    }
+    counts.set(branch, (counts.get(branch) ?? 0) + 1);
+  }
+
+  return Array.from(counts.entries())
+    .map(([branchId, count]) => ({
+      branchId,
+      branchName: branchId ? nameById.get(branchId) ?? 'Agence inconnue' : 'Sans agence',
+      count,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
