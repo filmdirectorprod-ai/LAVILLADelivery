@@ -28,14 +28,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Requête invalide' }, { status: 400 });
   }
 
-  const idErr = validateIdentifiant(body.identifiant);
-  if (idErr) return NextResponse.json({ error: idErr }, { status: 400 });
-  const pwErr = validateDriverPassword(body.password);
-  if (pwErr) return NextResponse.json({ error: pwErr }, { status: 400 });
-  const name = (body.name ?? '').trim();
-  if (!name) return NextResponse.json({ error: 'Le nom du gérant est requis.' }, { status: 400 });
-  if (!body.branch_id) return NextResponse.json({ error: 'Choisissez une agence.' }, { status: 400 });
-
+  // ── Qui appelle, AVANT quoi que ce soit d'autre ──
+  // La validation passait en premier : un inconnu obtenait un message de validation au lieu d'un refus. Tant que le middleware redirigeait les routes
+  // d'API, personne d'anonyme n'arrivait jusqu'ici ; maintenant qu'elles
+  // répondent elles-mêmes, l'identité se vérifie d'abord.
   // Authorization: caller must be a SUPER-ADMIN (staff with no branch).
   const supabase = await createServerSupabase();
   const {
@@ -48,6 +44,14 @@ export async function POST(request: NextRequest) {
   if (callerBranch) {
     return NextResponse.json({ error: 'Réservé au super-admin.' }, { status: 403 });
   }
+
+  const idErr = validateIdentifiant(body.identifiant);
+  if (idErr) return NextResponse.json({ error: idErr }, { status: 400 });
+  const pwErr = validateDriverPassword(body.password);
+  if (pwErr) return NextResponse.json({ error: pwErr }, { status: 400 });
+  const name = (body.name ?? '').trim();
+  if (!name) return NextResponse.json({ error: 'Le nom du gérant est requis.' }, { status: 400 });
+  if (!body.branch_id) return NextResponse.json({ error: 'Choisissez une agence.' }, { status: 400 });
 
   const svc = createServiceSupabase();
   // L'agence doit exister. On distingue les deux causes : une requête qui

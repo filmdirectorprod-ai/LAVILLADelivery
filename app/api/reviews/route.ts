@@ -21,19 +21,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  if (!body.order_id) {
-    return NextResponse.json({ error: 'Commande manquante' }, { status: 400 });
-  }
-  if (!Number.isInteger(body.rating) || body.rating < 1 || body.rating > 5) {
-    return NextResponse.json({ error: 'Note invalide' }, { status: 400 });
-  }
-
+  // L'identité d'abord : depuis que les routes d'API ne sont plus redirigées par
+  // le middleware, un appel anonyme arrive jusqu'ici. Il doit se voir refuser
+  // l'accès, pas recevoir un cours sur le format attendu.
   const supabase = await createServerSupabase();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+  }
+
+  if (!body.order_id) {
+    return NextResponse.json({ error: 'Commande manquante' }, { status: 400 });
+  }
+  if (!Number.isInteger(body.rating) || body.rating < 1 || body.rating > 5) {
+    return NextResponse.json({ error: 'Note invalide' }, { status: 400 });
   }
 
   const { data, error } = await supabase.rpc('submit_review', {

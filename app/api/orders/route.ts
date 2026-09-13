@@ -47,19 +47,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  if (!Array.isArray(body.items) || body.items.length === 0) {
-    return NextResponse.json({ error: 'Panier vide' }, { status: 400 });
-  }
-  if (body.mode !== 'livraison' && body.mode !== 'retrait') {
-    return NextResponse.json({ error: 'Mode invalide' }, { status: 400 });
-  }
-
+  // L'identité d'abord : depuis que les routes d'API ne sont plus redirigées par
+  // le middleware, un appel anonyme arrive jusqu'ici. Il doit se voir refuser
+  // l'accès, pas recevoir un cours sur le format attendu.
   const supabase = await createServerSupabase();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+  }
+
+  if (!Array.isArray(body.items) || body.items.length === 0) {
+    return NextResponse.json({ error: 'Panier vide' }, { status: 400 });
+  }
+  if (body.mode !== 'livraison' && body.mode !== 'retrait') {
+    return NextResponse.json({ error: 'Mode invalide' }, { status: 400 });
   }
 
   // Moyen de paiement : validé ici, revalidé par la RPC. Une valeur inconnue

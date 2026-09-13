@@ -31,6 +31,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Requête invalide' }, { status: 400 });
   }
 
+  // ── Qui appelle, AVANT quoi que ce soit d'autre ──
+  // La validation passait en premier : un inconnu obtenait « L'identifiant est
+  // requis. » au lieu d'un refus. Tant que le middleware redirigeait les routes
+  // d'API, personne d'anonyme n'arrivait jusqu'ici ; maintenant qu'elles
+  // répondent elles-mêmes, l'identité se vérifie d'abord.
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+  const { data: isStaff } = await supabase.rpc('lv_is_staff');
+  if (!isStaff) return NextResponse.json({ error: 'Accès réservé au staff.' }, { status: 403 });
+
   // ── Validation ──
   const idErr = validateIdentifiant(body.identifiant);
   if (idErr) return NextResponse.json({ error: idErr }, { status: 400 });
@@ -42,15 +55,6 @@ export async function POST(request: NextRequest) {
   if (!linking && !name) {
     return NextResponse.json({ error: 'Le nom du livreur est requis.' }, { status: 400 });
   }
-
-  // ── Authorization: caller must be staff ──
-  const supabase = await createServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
-  const { data: isStaff } = await supabase.rpc('lv_is_staff');
-  if (!isStaff) return NextResponse.json({ error: 'Accès réservé au staff.' }, { status: 403 });
 
   // Multi-agences: a new driver must belong to exactly one branch so they only ever
   // see that agency's orders. A branch gérant can only create drivers for their own
