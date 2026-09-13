@@ -5,7 +5,7 @@
 // notification. Audio is unlocked on the first bell tap (autoplay policy). Opening
 // the dropdown marks everything read.
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/ui/Icon';
 import { isKindVisibleTo, type NotifAudience } from '@/lib/notifications';
@@ -19,6 +19,64 @@ function relative(iso: string): string {
   if (h < 24) return `il y a ${h} h`;
   return `il y a ${Math.floor(h / 24)} j`;
 }
+
+/**
+ * Le panneau des notifications est une surface BLANCHE posée sur trois
+ * applications dont deux ont l'encre blanche (`--ink: #ffffff` sous
+ * .lv-driver-root et .lv-admin-root). Il héritait de ces jetons : dans
+ * l'application livreur, le titre, les messages et les dates s'écrivaient en
+ * blanc sur blanc. Le panneau s'ouvrait, occupait l'écran, recouvrait les
+ * boutons Planning et Support — et paraissait vide. Deux pannes en une.
+ *
+ * Il redéfinit donc ses propres jetons, comme la carte claire de la Vue
+ * d'ensemble (OrdersListCard) : une surface blanche porte une encre turquoise
+ * foncé, quel que soit le thème autour d'elle.
+ */
+const PANEL: CSSProperties = {
+  position: 'absolute',
+  top: 'calc(100% + 8px)',
+  right: 0,
+  width: 320,
+  maxWidth: 'calc(100vw - 32px)', // jamais hors de l'écran sur un petit téléphone
+  maxHeight: 420,
+  overflow: 'auto',
+  zIndex: 90,
+  background: '#ffffff',
+  borderRadius: 16,
+  boxShadow: '0 20px 50px -20px rgba(0,0,0,0.4)',
+  color: '#0f606b',
+  '--ink': '#0f606b',
+  '--muted': 'rgba(15, 96, 107, 0.72)',
+  '--line': 'rgba(15, 96, 107, 0.12)',
+  '--soft': 'rgba(19, 124, 139, 0.08)',
+  border: '1px solid rgba(15, 96, 107, 0.12)',
+} as CSSProperties;
+
+/**
+ * La pastille du compteur portait un rouge (#e0483d) absent de la charte, et
+ * elle doit rester lisible sur deux fonds opposés : l'en-tête clair du client
+ * et le turquoise foncé du livreur. Turquoise foncé plein, texte blanc, cerné
+ * de blanc — le cerne la détache du fond sombre, le fond la détache du clair.
+ */
+const BADGE: CSSProperties = {
+  position: 'absolute',
+  top: 4,
+  right: 4,
+  minWidth: 18,
+  height: 18,
+  padding: '0 4px',
+  borderRadius: 999,
+  background: '#0f606b',
+  color: '#ffffff',
+  border: '2px solid #ffffff',
+  fontSize: 10.5,
+  fontWeight: 700,
+  fontFamily: 'var(--ui-font)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  lineHeight: 1,
+};
 
 export function UserNotificationBell({ color = 'var(--ink)', audience = 'client' }: { color?: string; audience?: NotifAudience }) {
   const [items, setItems] = useState<Notification[]>([]);
@@ -133,7 +191,7 @@ export function UserNotificationBell({ color = 'var(--ink)', audience = 'client'
       >
         <Icon name="bell" size={21} color={color} />
         {unread > 0 && (
-          <span style={{ position: 'absolute', top: 6, right: 6, minWidth: 17, height: 17, padding: '0 4px', borderRadius: 999, background: '#e0483d', color: '#fff', fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--ui-font)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={BADGE}>
             {unread > 9 ? '9+' : unread}
           </span>
         )}
@@ -142,7 +200,7 @@ export function UserNotificationBell({ color = 'var(--ink)', audience = 'client'
       {open && (
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 80 }} />
-          <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 320, maxHeight: 420, overflow: 'auto', zIndex: 90, background: '#fff', border: '1px solid var(--line)', borderRadius: 16, boxShadow: '0 20px 50px -20px rgba(0,0,0,0.4)' }}>
+          <div style={PANEL}>
             <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--line)', fontFamily: 'var(--ui-font)', fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>Notifications</div>
             {items.length === 0 ? (
               <div style={{ padding: '28px 16px', textAlign: 'center', fontFamily: 'var(--ui-font)', fontSize: 13, color: 'var(--muted)' }}>Aucune notification.</div>
