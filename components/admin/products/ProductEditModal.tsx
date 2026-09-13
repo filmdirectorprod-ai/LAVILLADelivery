@@ -6,6 +6,8 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/lib/toast-store';
+import { staffMessage } from '@/lib/order-error-messages';
 import { Icon } from '@/components/ui/Icon';
 import { useBranches } from '@/lib/use-branches';
 import type { Category, Product, Universe } from '@/lib/types';
@@ -15,6 +17,7 @@ import { FormError, GhostButton, Modal, PrimaryButton, Switch, fieldStyle, label
 const text = { fontFamily: 'var(--ui-font)' } as const;
 
 export function ProductEditModal({ product, categories, onClose, onDone }: { product: Product; categories: Category[]; onClose: () => void; onDone: () => void }) {
+  const toast = useToast((t) => t.show);
   const [name, setName] = useState(product.name);
   const [universe, setUniverse] = useState<Universe>(product.universe);
   const [category, setCategory] = useState(product.category);
@@ -47,8 +50,15 @@ export function ProductEditModal({ product, categories, onClose, onDone }: { pro
 
   async function toggleBranchStock(branchId: string, next: boolean) {
     setBranchStock((p) => ({ ...p, [branchId]: next }));
-    await createClient().rpc('admin_set_product_branch_stock', { p_product: product.id, p_branch: branchId, p_in_stock: next });
-    revalidateCatalogue(); // the "Rupture" badge is served from the cached catalogue
+    // L'interrupteur bougeait quoi qu'il arrive : le gérant croyait avoir mis
+    // le produit en rupture, et les clients continuaient de le commander.
+    const { error } = await createClient().rpc('admin_set_product_branch_stock', { p_product: product.id, p_branch: branchId, p_in_stock: next });
+    if (error) {
+      setBranchStock((p) => ({ ...p, [branchId]: !next })); // on remet l'interrupteur où il était
+      toast(staffMessage(error.message), 'alert');
+      return;
+    }
+    revalidateCatalogue(); // la pastille « Rupture » vient du catalogue en cache
   }
 
   const cats = useMemo(() => categories.filter((c) => c.universe === universe || c.universe === 'all'), [categories, universe]);

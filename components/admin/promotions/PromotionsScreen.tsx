@@ -7,6 +7,8 @@
 // branch gérant only sees and manages their own agency's codes (RLS + RPC).
 import { useCallback, useMemo, useState, type CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/lib/toast-store';
+import { staffMessage } from '@/lib/order-error-messages';
 import { formatAmount, formatDH } from '@/lib/format';
 import { Icon } from '@/components/ui/Icon';
 import type { Branch, Promotion } from '@/lib/types';
@@ -80,6 +82,7 @@ function period(p: Promotion): string {
 }
 
 export function PromotionsScreen({ initial, branches, redemptions: initialRedemptions }: { initial: Promotion[]; branches: Branch[]; redemptions: Redemption[] }) {
+  const toast = useToast((t) => t.show);
   const [promos, setPromos] = useState<Promotion[]>(initial);
   const [redemptions, setRedemptions] = useState<Redemption[]>(initialRedemptions);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -158,7 +161,8 @@ export function PromotionsScreen({ initial, branches, redemptions: initialRedemp
 
   async function remove(p: Promotion) {
     if (!confirm(`Supprimer le code ${p.code} ?`)) return;
-    await createClient().rpc('admin_delete_promo', { p_id: p.id });
+    const { error } = await createClient().rpc('admin_delete_promo', { p_id: p.id });
+    if (error) toast(staffMessage(error.message), 'alert');
     refetch();
   }
 

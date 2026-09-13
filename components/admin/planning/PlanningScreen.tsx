@@ -10,6 +10,8 @@
 'use client';
 import { Fragment, useCallback, useMemo, useState, type CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/lib/toast-store';
+import { staffMessage } from '@/lib/order-error-messages';
 import { buildShiftWeek, formatHours, isoDate, mondayOf, rowHours, weekTotals, type ShiftRow } from '@/lib/admin-planning';
 import type { AdminPlanningData } from '@/lib/queries';
 import type { DriverShift } from '@/lib/types';
@@ -32,6 +34,7 @@ function timeRange(s: DriverShift): string {
 }
 
 export function PlanningScreen({ initial }: { initial: AdminPlanningData }) {
+  const toast = useToast((t) => t.show);
   const [week, setWeek] = useState(initial.week);
   const [drivers] = useState(initial.drivers);
   const [weekStart, setWeekStart] = useState(initial.weekStart);
@@ -63,22 +66,29 @@ export function PlanningScreen({ initial }: { initial: AdminPlanningData }) {
   const onAdd = useCallback(
     async (draft: ShiftDraft) => {
       setBusy(true);
-      await createClient().from('driver_shifts').insert(draft);
+      // L'erreur était ignorée et le formulaire se fermait quand même : le
+      // créneau n'existait pas, la saisie était perdue, et rien ne le disait.
+      const { error } = await createClient().from('driver_shifts').insert(draft);
       setBusy(false);
+      if (error) {
+        toast(staffMessage(error.message), 'alert');
+        return; // on garde le formulaire ouvert, avec la saisie
+      }
       setShowForm(false);
       refetch(weekStart);
     },
-    [refetch, weekStart],
+    [refetch, weekStart, toast],
   );
 
   const onDelete = useCallback(
     async (id: string) => {
       setBusy(true);
-      await createClient().from('driver_shifts').delete().eq('id', id);
+      const { error } = await createClient().from('driver_shifts').delete().eq('id', id);
       setBusy(false);
+      if (error) toast(staffMessage(error.message), 'alert');
       refetch(weekStart);
     },
-    [refetch, weekStart],
+    [refetch, weekStart, toast],
   );
 
   const totals = useMemo(() => weekTotals(week), [week]);

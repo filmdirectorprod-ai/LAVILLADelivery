@@ -10,6 +10,8 @@
 // agencies, so only the super-admin can switch a reward (admin_set_reward_active).
 import { useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/lib/toast-store';
+import { staffMessage } from '@/lib/order-error-messages';
 import { formatAmount } from '@/lib/format';
 import {
   LOYALTY_TIERS,
@@ -61,6 +63,7 @@ function Swatch({ color }: { color: string }) {
 }
 
 export function LoyaltyAdminScreen({ members: initialMembers, activity: initialActivity, flow: initialFlow, rewards: initialRewards, ledgerReady, canEditRewards }: LoyaltyAdminScreenProps) {
+  const toast = useToast((t) => t.show);
   const [members, setMembers] = useState<LoyaltyMember[]>(initialMembers);
   const [activity, setActivity] = useState<LedgerEntry[]>(initialActivity);
   const [flow, setFlow] = useState<FlowDay[]>(initialFlow);
@@ -104,8 +107,14 @@ export function LoyaltyAdminScreen({ members: initialMembers, activity: initialA
     const d = parseInt(delta, 10);
     if (!Number.isFinite(d) || d === 0) return;
     setBusy(true);
-    await createClient().rpc('admin_adjust_points', { p_user: userId, p_delta: d, p_reason: reason });
+    // Un ajustement de points qui échoue en silence laisse le gérant croire
+    // qu'il a crédité un client. Le panneau reste ouvert en cas d'échec.
+    const { error } = await createClient().rpc('admin_adjust_points', { p_user: userId, p_delta: d, p_reason: reason });
     setBusy(false);
+    if (error) {
+      toast(staffMessage(error.message), 'alert');
+      return;
+    }
     setAdjusting(null);
     setDelta('');
     setReason('');

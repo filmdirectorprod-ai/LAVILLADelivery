@@ -10,6 +10,8 @@
 'use client';
 import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/lib/toast-store';
+import { staffMessage } from '@/lib/order-error-messages';
 import { formatDH } from '@/lib/format';
 import { sortZones, zoneTotals, type ZoneDraft } from '@/lib/admin-zones';
 import { useBranches } from '@/lib/use-branches';
@@ -26,6 +28,7 @@ type EditState = { mode: 'new' } | { mode: 'edit'; zone: Zone } | null;
 const text = { fontFamily: 'var(--ui-font)' } as const;
 
 export function ZonesScreen({ initial }: { initial: AdminZonesData }) {
+  const toast = useToast((t) => t.show);
   const [zones, setZones] = useState<Zone[]>(initial.zones);
   const [edit, setEdit] = useState<EditState>(null);
   const [busy, setBusy] = useState(false);
@@ -41,25 +44,32 @@ export function ZonesScreen({ initial }: { initial: AdminZonesData }) {
   const onSave = useCallback(
     async (draft: ZoneDraft, id: string | null) => {
       setBusy(true);
-      await createClient().rpc('admin_upsert_zone', { p_id: id, p_name: draft.name, p_fee_dh: draft.fee_dh, p_eta_min: draft.eta_min, p_eta_max: draft.eta_max });
+      // L'éditeur se fermait même quand l'enregistrement échouait : la zone
+      // restait inchangée et la saisie était perdue.
+      const { error } = await createClient().rpc('admin_upsert_zone', { p_id: id, p_name: draft.name, p_fee_dh: draft.fee_dh, p_eta_min: draft.eta_min, p_eta_max: draft.eta_max });
       setBusy(false);
+      if (error) {
+        toast(staffMessage(error.message), 'alert');
+        return;
+      }
       setEdit(null);
       revalidateCatalogue();
       refetch();
     },
-    [refetch],
+    [refetch, toast],
   );
 
   const onDelete = useCallback(
     async (zone: Zone) => {
       if (!window.confirm(`Supprimer la zone « ${zone.name} » ? Les clients de ce quartier ne pourront plus être livrés.`)) return;
       setBusy(true);
-      await createClient().rpc('admin_delete_zone', { p_id: zone.id });
+      const { error } = await createClient().rpc('admin_delete_zone', { p_id: zone.id });
       setBusy(false);
+      if (error) toast(staffMessage(error.message), 'alert');
       revalidateCatalogue();
       refetch();
     },
-    [refetch],
+    [refetch, toast],
   );
 
   const sorted = useMemo(() => sortZones(zones), [zones]);

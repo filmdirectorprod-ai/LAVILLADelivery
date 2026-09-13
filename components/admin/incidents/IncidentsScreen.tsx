@@ -9,6 +9,8 @@
 'use client';
 import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/lib/toast-store';
+import { staffMessage } from '@/lib/order-error-messages';
 import { INCIDENT_KIND_LABEL, SEVERITY_LABEL, buildIncidentRows, filterIncidentRows, incidentTotals, partitionIncidentRows } from '@/lib/admin-incidents';
 import type { AdminIncidentsData } from '@/lib/queries';
 import type { Incident, IncidentSeverity } from '@/lib/types';
@@ -22,6 +24,7 @@ const SEVERITIES: IncidentSeverity[] = ['haute', 'moyenne', 'basse'];
 const oneDecimal = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
 
 export function IncidentsScreen({ initial }: { initial: AdminIncidentsData }) {
+  const toast = useToast((t) => t.show);
   const [rows, setRows] = useState<AdminIncidentsData['rows']>(initial.rows);
   const [drivers, setDrivers] = useState(initial.drivers);
   const [orders, setOrders] = useState(initial.orders);
@@ -51,7 +54,7 @@ export function IncidentsScreen({ initial }: { initial: AdminIncidentsData }) {
       setBusy(true);
       const supabase = createClient();
       const { data: auth } = await supabase.auth.getUser();
-      await supabase.from('incidents').insert({
+      const { error } = await supabase.from('incidents').insert({
         title: draft.title,
         kind: draft.kind,
         severity: draft.severity,
@@ -61,20 +64,30 @@ export function IncidentsScreen({ initial }: { initial: AdminIncidentsData }) {
         created_by: auth.user?.id ?? null,
       });
       setBusy(false);
+      // Le formulaire se fermait même en cas d'échec : l'incident n'était nulle
+      // part, et le texte saisi était perdu.
+      if (error) {
+        toast(staffMessage(error.message), 'alert');
+        return;
+      }
       setShowForm(false);
       refetch();
     },
-    [refetch],
+    [refetch, toast],
   );
 
   const onResolve = useCallback(
     async (id: string) => {
       setBusy(true);
-      await createClient().from('incidents').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', id);
+      const { error } = await createClient()
+        .from('incidents')
+        .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+        .eq('id', id);
       setBusy(false);
+      if (error) toast(staffMessage(error.message), 'alert');
       refetch();
     },
-    [refetch],
+    [refetch, toast],
   );
 
   const totals = useMemo(() => incidentTotals(rows), [rows]);

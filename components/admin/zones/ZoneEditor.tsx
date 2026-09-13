@@ -5,6 +5,8 @@
 'use client';
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/lib/toast-store';
+import { staffMessage } from '@/lib/order-error-messages';
 import { useBranches } from '@/lib/use-branches';
 import { validateZoneDraft, type ZoneDraft } from '@/lib/admin-zones';
 import type { Zone } from '@/lib/types';
@@ -19,6 +21,7 @@ export interface ZoneEditorProps {
 }
 
 export function ZoneEditor({ zone, busy, onSave, onCancel }: ZoneEditorProps) {
+  const toast = useToast((t) => t.show);
   const [name, setName] = useState(zone?.name ?? '');
   const [fee, setFee] = useState(String(zone?.fee_dh ?? ''));
   const [etaMin, setEtaMin] = useState(String(zone?.eta_min ?? ''));
@@ -27,11 +30,21 @@ export function ZoneEditor({ zone, busy, onSave, onCancel }: ZoneEditorProps) {
   const [touched, setTouched] = useState(false);
   const branches = useBranches();
 
-  // Branch assignment is applied immediately (separate from the zone draft save).
+  // Appliqué immédiatement, séparément du brouillon de la zone.
+  //
+  // C'est la colonne la plus lourde de conséquences de toute l'administration :
+  // elle décide quelle agence reçoit les commandes de ce quartier, donc quels
+  // livreurs les verront. Un échec silencieux ici envoyait les commandes à la
+  // mauvaise agence pendant que la liste affichait la bonne — et personne ne
+  // pouvait le deviner.
   async function changeBranch(next: string) {
+    const avant = branchId;
     setBranchId(next);
-    if (zone?.id && next) {
-      await createClient().rpc('admin_set_zone_branch', { p_zone: zone.id, p_branch: next });
+    if (!zone?.id || !next) return;
+    const { error } = await createClient().rpc('admin_set_zone_branch', { p_zone: zone.id, p_branch: next });
+    if (error) {
+      setBranchId(avant); // la liste doit montrer ce qui est vraiment enregistré
+      toast(staffMessage(error.message), 'alert');
     }
   }
 

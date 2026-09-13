@@ -10,6 +10,8 @@
 'use client';
 import { useCallback, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/lib/toast-store';
+import { staffMessage } from '@/lib/order-error-messages';
 import { formatAmount } from '@/lib/format';
 import { PRODUCT_FILTER_LABEL, averagePrice, buildProductGroups, filterProducts, productFilterCounts, type ProductFilter } from '@/lib/admin-products';
 import type { AdminProductsData } from '@/lib/queries';
@@ -30,6 +32,7 @@ const UNIVERSES: { value: Universe | 'all'; label: string }[] = [
 ];
 
 export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
+  const toast = useToast((t) => t.show);
   const [products, setProducts] = useState<Product[]>(initial.products);
   const [categories, setCategories] = useState<Category[]>(initial.categories);
   const [busy, setBusy] = useState(false);
@@ -55,7 +58,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
       setBusy(true);
       // Optimistic: the switch moves at once, the refetch settles it.
       setProducts((list) => list.map((p) => (p.id === product.id ? { ...p, ...patch } : p)));
-      await createClient().rpc('admin_update_product', {
+      const { error } = await createClient().rpc('admin_update_product', {
         p_product: product.id,
         p_active: patch.active ?? product.active,
         p_price_dh: patch.price_dh ?? product.price_dh,
@@ -63,10 +66,13 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
         p_in_stock: patch.in_stock ?? product.in_stock,
       });
       setBusy(false);
+      // L'affichage optimiste se corrigeait au rechargement, mais sans un mot :
+      // l'interrupteur revenait en arrière tout seul, ce qui passe pour un bug.
+      if (error) toast(staffMessage(error.message), 'alert');
       revalidateCatalogue();
       refetch();
     },
-    [refetch],
+    [refetch, toast],
   );
 
   const onDelete = useCallback(
@@ -88,7 +94,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
     async (draft: ProductDraft) => {
       setBusy(true);
       const supabase = createClient();
-      const { data: newId } = await supabase.rpc('admin_create_product', {
+      const { data: newId, error: createErr } = await supabase.rpc('admin_create_product', {
         p_name: draft.name,
         p_universe: draft.universe,
         p_category: draft.category,
@@ -97,15 +103,26 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
         p_is_signature: draft.is_signature,
         p_active: draft.active,
       });
-      // Upload the chosen photo (if any) now that we have the product id.
+      // Création échouée : on garde le formulaire ouvert avec la saisie.
+      if (createErr) {
+        setBusy(false);
+        toast(staffMessage(createErr.message), 'alert');
+        return;
+      }
+      // Photo, maintenant que l'identifiant du produit existe.
       if (draft.imageFile && typeof newId === 'string') {
         const file = draft.imageFile;
         const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
         const path = `${newId}/${Date.now()}.${ext}`;
         const { error: upErr } = await supabase.storage.from('product-images').upload(path, file, { upsert: true, contentType: file.type });
-        if (!upErr) {
+        if (upErr) {
+          // Le produit existe, sa photo non : à dire, sinon le gérant croit à
+          // un simple retard d'affichage et attend une image qui ne viendra pas.
+          toast('Produit créé, mais la photo n’a pas pu être envoyée.', 'alert');
+        } else {
           const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-          await supabase.rpc('admin_set_product_image', { p_product: newId, p_image_url: data.publicUrl });
+          const { error: imgErr } = await supabase.rpc('admin_set_product_image', { p_product: newId, p_image_url: data.publicUrl });
+          if (imgErr) toast('Produit créé, mais la photo n’a pas pu lui être associée.', 'alert');
         }
       }
       setBusy(false);
@@ -113,7 +130,7 @@ export function ProductsScreen({ initial }: { initial: AdminProductsData }) {
       revalidateCatalogue();
       refetch();
     },
-    [refetch],
+    [refetch, toast],
   );
 
   const onToggleActive = useCallback((p: Product) => update(p, { active: !p.active }), [update]);

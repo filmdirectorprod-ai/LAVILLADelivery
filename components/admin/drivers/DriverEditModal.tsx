@@ -4,6 +4,7 @@
 'use client';
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { staffMessage } from '@/lib/order-error-messages';
 import { useBranches } from '@/lib/use-branches';
 import type { Driver } from '@/lib/types';
 import { FormError, GhostButton, Modal, PrimaryButton, fieldStyle, labelStyle } from '@/components/admin/ui/Glass';
@@ -23,11 +24,20 @@ export function DriverEditModal({ driver, onClose, onDone }: { driver: Driver; o
     setBusy(true);
     const supabase = createClient();
     const { error: e } = await supabase.rpc('admin_update_driver', { p_id: driver.id, p_name: name, p_phone: phone, p_vehicle: vehicle });
+    // Le changement d'agence ne regardait pas son erreur : la fiche se fermait
+    // en annonçant un succès, et le livreur restait rattaché à l'ancienne. Or
+    // c'est cette colonne qui décide des commandes qu'il verra — une panne
+    // silencieuse ici le rend aveugle sans que personne comprenne pourquoi.
+    let branchErr: string | null = null;
     if (!e && branchId && branchId !== driver.branch_id) {
-      await supabase.rpc('admin_set_driver_branch', { p_driver: driver.id, p_branch: branchId });
+      const { error: be } = await supabase.rpc('admin_set_driver_branch', { p_driver: driver.id, p_branch: branchId });
+      if (be) branchErr = be.message;
     }
     setBusy(false);
-    if (e) return setError(e.message);
+    if (e) return setError(staffMessage(e.message));
+    if (branchErr) {
+      return setError(`Le nom a été enregistré, mais pas l’agence. ${staffMessage(branchErr)}`);
+    }
     onDone();
   }
 
