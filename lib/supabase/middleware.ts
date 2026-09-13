@@ -1,19 +1,22 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-
-/** Routes reachable without a session. Everything else requires sign-in. */
-const PUBLIC_PATHS = ['/onboarding', '/auth', '/parrain'];
-
-function isPublic(pathname: string): boolean {
-  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
-}
+import { hasAuthCookie, isApiPath, isPublicPath, landingPathFor, signInPathFor } from '@/lib/auth-routing';
 
 /**
- * Refreshes the Supabase auth session on every request (so Server Components
- * read a fresh token) and gates protected routes behind authentication.
+ * Rafraîchit la session Supabase (pour que les Server Components lisent un
+ * jeton valide) et garde les routes protégées derrière la connexion.
+ *
+ * Les décisions d'aiguillage vivent dans lib/auth-routing.ts, où elles sont
+ * testées : ce fichier ne fait que les appliquer.
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const { pathname } = request.nextUrl;
+
+  // Une route d'API ne se redirige pas : elle répond elle-même, avec le bon
+  // code et du JSON. La rediriger renvoyait du HTML à du code qui attend des
+  // données.
+  if (isApiPath(pathname)) return response;
 
   // When Supabase isn't configured (e.g. CI / a fresh checkout without
   // .env.local), there's no session to refresh and no way to gate routes —
@@ -43,32 +46,23 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // IMPORTANT: getUser() must be called to refresh the session token.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getUser() part sur le RÉSEAU valider le jeton auprès de Supabase. Sans
+  // cookie de session, cet aller-retour ne peut rien apprendre — il n'y a pas
+  // de jeton à valider — et il s'ajoutait pourtant à chaque page ouverte par un
+  // visiteur non connecté. On le saute.
+  const user = hasAuthCookie(request.cookies.getAll().map((c) => c.name))
+    ? (await supabase.auth.getUser()).data.user
+    : null;
 
-  const { pathname } = request.nextUrl;
-
-  if (!user && !isPublic(pathname)) {
+  if (!user && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone();
-    // Each surface has its own sign-in: admin, driver, else the customer onboarding.
-    url.pathname = pathname.startsWith('/admin')
-      ? '/auth/admin'
-      : pathname.startsWith('/driver')
-        ? '/auth/livreur'
-        : '/onboarding';
+    url.pathname = signInPathFor(pathname);
     return NextResponse.redirect(url);
   }
 
-  if (user && isPublic(pathname)) {
+  if (user && isPublicPath(pathname)) {
     const url = request.nextUrl.clone();
-    // Send a signed-in user from a surface's sign-in to that surface.
-    url.pathname = pathname.startsWith('/auth/admin')
-      ? '/admin'
-      : pathname.startsWith('/auth/livreur')
-        ? '/driver'
-        : '/';
+    url.pathname = landingPathFor(pathname);
     return NextResponse.redirect(url);
   }
 
