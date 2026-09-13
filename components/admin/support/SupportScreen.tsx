@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/lib/toast-store';
 import { QUICK_REPLIES, buildSupportThreads, driverInitials, filterThreads, supportTotals, threadPreview, type SupportDriver } from '@/lib/admin-support';
 import type { AdminSupportData } from '@/lib/queries';
 import type { RawSupportDriver } from '@/lib/admin-support';
@@ -70,6 +71,7 @@ function Avatar({ driver, size }: { driver: SupportDriver; size: number }) {
 }
 
 export function SupportScreen({ initial }: { initial: AdminSupportData }) {
+  const toast = useToast((t) => t.show);
   const [threads, setThreads] = useState<AdminSupportData['threads']>(initial.threads);
   const [selected, setSelected] = useState<string | null>(initial.threads[0]?.driver.id ?? null);
   const [reply, setReply] = useState('');
@@ -122,11 +124,21 @@ export function SupportScreen({ initial }: { initial: AdminSupportData }) {
   const sendReply = useCallback(async () => {
     if (selected === null || reply.trim() === '') return;
     setBusy(true);
-    await createClient().from('support_messages').insert({ driver_id: selected, sender: 'staff', body: reply.trim(), read_by_staff: true });
-    setReply('');
+    // L'erreur était ignorée : la réponse du gérant disparaissait en silence et
+    // le livreur attendait une aide qui n'arriverait jamais.
+    const body = reply.trim();
+    const { error } = await createClient()
+      .from('support_messages')
+      .insert({ driver_id: selected, sender: 'staff', body, read_by_staff: true });
     setBusy(false);
+    if (error) {
+      setReply(body); // on rend le texte plutôt que de le perdre
+      toast('Réponse non envoyée. Vérifiez votre connexion.', 'alert');
+      return;
+    }
+    setReply('');
     refetch();
-  }, [selected, reply, refetch]);
+  }, [selected, reply, refetch, toast]);
 
   const totals = useMemo(() => supportTotals(threads), [threads]);
   const list = useMemo(() => filterThreads(threads, query, onlyAwaiting), [threads, query, onlyAwaiting]);

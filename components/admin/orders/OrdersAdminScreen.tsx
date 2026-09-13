@@ -38,6 +38,8 @@ import type { Driver, Order, OrderItem, OrderTracking } from '@/lib/types';
 import { OrderConfirmPanel } from './OrderConfirmPanel';
 import { useRealtime, type RealtimeChangePayload } from '@/lib/use-realtime';
 import { createTrackingGate } from '@/lib/tracking-gate';
+import { useToast } from '@/lib/toast-store';
+import { staffMessage } from '@/lib/order-error-messages';
 import { fetchAllIn } from '@/lib/fetch-in-chunks';
 import { HeroStat } from '@/components/admin/overview/HeroStat';
 import { Chip, EmptyState, GhostButton, GlassPanel, Notice, PageHeader, Pill, PrimaryButton, SearchField, Switch, fieldStyle, orderStatusTone } from '@/components/admin/ui/Glass';
@@ -60,6 +62,7 @@ const TH: CSSProperties = { textAlign: 'left', padding: '12px 18px', fontFamily:
 const TD: CSSProperties = { padding: '13px 18px', fontFamily: 'var(--ui-font)', verticalAlign: 'middle' };
 
 export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
+  const toast = useToast((t) => t.show);
   const [rows, setRows] = useState<AdminOrderRow[]>(initial.rows);
   const [drivers, setDrivers] = useState<Driver[]>(initial.drivers);
   const [tab, setTab] = useState<OrderTab>('toconfirm');
@@ -123,14 +126,17 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
     return byBranch.filter((r) => orderMatchesTab(r, tab) && (!q || r.order.code.toLowerCase().includes(q) || (r.customerName ?? '').toLowerCase().includes(q)));
   }, [byBranch, tab, query]);
 
+  // L'erreur était ignorée : confirmer, annuler ou assigner un livreur pouvait
+  // échouer sans un mot, et l'écran se rechargeait comme si tout allait bien.
   const runRpc = useCallback(
     async (fn: string, params: Record<string, unknown>) => {
       setBusy(true);
-      await createClient().rpc(fn, params);
+      const { error } = await createClient().rpc(fn, params);
       setBusy(false);
+      if (error) toast(staffMessage(error.message), 'alert');
       refetch();
     },
-    [refetch],
+    [refetch, toast],
   );
 
   const onMarkReady = (orderId: string) => runRpc('admin_mark_order_ready', { p_order: orderId });
@@ -152,13 +158,23 @@ export function OrdersAdminScreen({ initial }: { initial: AdminOrdersData }) {
     plan.forEach((a) => inFlight.current.add(a.orderId));
     (async () => {
       const supabase = createClient();
+      let failed = 0;
       for (const a of plan) {
-        await supabase.rpc('admin_assign_driver', { p_order: a.orderId, p_driver: a.driverId });
+        const { error } = await supabase.rpc('admin_assign_driver', { p_order: a.orderId, p_driver: a.driverId });
+        if (error) failed += 1;
       }
       plan.forEach((a) => inFlight.current.delete(a.orderId));
+      // L'attribution automatique travaillait en silence : quand elle échouait,
+      // les commandes restaient simplement non assignées, sans explication.
+      if (failed > 0) {
+        toast(
+          `Attribution automatique : ${failed} commande${failed > 1 ? 's' : ''} n’a pas pu être confiée à un livreur.`,
+          'alert',
+        );
+      }
       refetch();
     })();
-  }, [autoAssign, busy, rows, drivers, refetch]);
+  }, [autoAssign, busy, rows, drivers, refetch, toast]);
 
   const exportSales = useCallback(() => {
     const csv = ordersToCsv(visible);

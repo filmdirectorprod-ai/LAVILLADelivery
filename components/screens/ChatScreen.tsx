@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ChatMessage, Driver, Order } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/lib/toast-store';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
@@ -28,6 +29,7 @@ function timeLabel(iso: string): string {
 
 export function ChatScreen({ order, driver, initialMessages }: ChatScreenProps) {
   const router = useRouter();
+  const toast = useToast((t) => t.show);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState('');
   const scroller = useRef<HTMLDivElement>(null);
@@ -58,8 +60,16 @@ export function ChatScreen({ order, driver, initialMessages }: ChatScreenProps) 
     const body = text.trim();
     if (!body) return;
     setDraft('');
-    const supabase = createClient();
-    await supabase.from('chat_messages').insert({ order_id: order.id, sender: 'customer', body });
+    // L'erreur était ignorée, et le brouillon déjà effacé : un message qui
+    // n'arrivait pas disparaissait sans laisser de trace, et le client croyait
+    // avoir écrit au livreur. Même correction que l'écran du livreur.
+    const { error } = await createClient()
+      .from('chat_messages')
+      .insert({ order_id: order.id, sender: 'customer', body });
+    if (error) {
+      setDraft(body); // on rend le texte plutôt que de le perdre
+      toast('Message non envoyé. Vérifiez votre connexion.', 'alert');
+    }
   };
 
   return (

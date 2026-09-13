@@ -6,7 +6,9 @@ import { Icon } from './ui/Icon';
 
 export function ToastViewport() {
   const message = useToast((s) => s.message);
+  const tone = useToast((s) => s.tone);
   if (!message) return null;
+  const alert = tone === 'alert';
   return (
     <div
       style={{
@@ -26,10 +28,13 @@ export function ToastViewport() {
         alignItems: 'center',
         gap: 8,
         boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-        whiteSpace: 'nowrap',
+        whiteSpace: 'normal',
+        maxWidth: 'min(92vw, 420px)',
+        textAlign: 'left',
+        lineHeight: 1.4,
       }}
     >
-      <Icon name="check" size={16} color="var(--gold)" strokeWidth={2.6} /> {message}
+      <Icon name={alert ? 'info' : 'check'} size={16} color="var(--gold)" strokeWidth={2.6} style={{ flexShrink: 0 }} /> {message}
     </div>
   );
 }

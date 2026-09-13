@@ -16,6 +16,8 @@ import { STATION_LABEL, productionList, type KitchenBoard, type KitchenTicket } 
 import { StationLoadCard } from './StationLoadCard';
 import { KitchenTicketCard, type KitchenAction } from './KitchenTicketCard';
 import { useRealtime } from '@/lib/use-realtime';
+import { useToast } from '@/lib/toast-store';
+import { staffMessage } from '@/lib/order-error-messages';
 import { HeroStat } from '@/components/admin/overview/HeroStat';
 import { EmptyState, GlassPanel, LiveBadge, Notice, PageHeader, PanelTitle } from '@/components/admin/ui/Glass';
 
@@ -27,6 +29,7 @@ function todayLabel(): string {
 }
 
 export function KitchenScreen({ initial }: { initial: KitchenBoard }) {
+  const toast = useToast((t) => t.show);
   const [board, setBoard] = useState<KitchenBoard>(initial ?? EMPTY);
   const [busy, setBusy] = useState(false);
 
@@ -38,14 +41,18 @@ export function KitchenScreen({ initial }: { initial: KitchenBoard }) {
   // a single board refetch instead of N+1.
   useRealtime('admin-kitchen', [{ table: 'orders' }, { table: 'order_items' }], refetch);
 
+  // L'erreur était ignorée : « Marquer prête » pouvait ne rien faire et l'écran
+  // se rechargeait comme si c'était fait. La commande n'entrait jamais dans le
+  // vivier des livreurs, et personne ne savait pourquoi.
   const callRpc = useCallback(
     (fn: string) => async (orderId: string) => {
       setBusy(true);
-      await createClient().rpc(fn, { p_order: orderId });
+      const { error } = await createClient().rpc(fn, { p_order: orderId });
       setBusy(false);
+      if (error) toast(staffMessage(error.message), 'alert');
       refetch();
     },
-    [refetch],
+    [refetch, toast],
   );
 
   const readyAction: KitchenAction = { label: 'Marquer prête', onClick: callRpc('admin_mark_order_ready') };
