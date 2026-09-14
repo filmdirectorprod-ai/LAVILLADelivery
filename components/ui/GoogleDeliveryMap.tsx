@@ -4,8 +4,9 @@
 // (geocoded from order.address), and animates the driver marker along that route
 // as `progress` (0..1) advances from Supabase Realtime. Used by TrackingScreen
 // only when NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is set; otherwise the SVG map shows.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
+import { mapsErrorMessage } from '@/lib/maps-status';
 
 // La Villa — 117 Av. Mohammed Bahnini, Ville Nouvelle, Fès (delivery origin).
 const ORIGIN = { lat: 34.0261, lng: -5.014 };
@@ -56,6 +57,22 @@ function pointAtFraction(
 }
 
 export function GoogleDeliveryMap({ apiKey, progress, destinationAddress, delivered, driverPos, onPos }: GoogleDeliveryMapProps) {
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Google n'échoue pas toujours par une promesse rejetée : quand la clé est
+  // refusée (domaine, API, facturation), le script se charge puis appelle
+  // window.gm_authFailure. Sans ce crochet, la carte restait grise et muette.
+  useEffect(() => {
+    const w = window as unknown as { gm_authFailure?: () => void };
+    const precedent = w.gm_authFailure;
+    w.gm_authFailure = () => {
+      setLoadError(mapsErrorMessage('InvalidKeyMapError'));
+      precedent?.();
+    };
+    return () => {
+      w.gm_authFailure = precedent;
+    };
+  }, []);
   const divRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const driverRef = useRef<google.maps.Marker | null>(null);
@@ -191,8 +208,10 @@ export function GoogleDeliveryMap({ apiKey, progress, destinationAddress, delive
         lastPosRef.current = p0;
         onPos?.(p0.lat(), p0.lng());
       })
-      .catch(() => {
-        /* load failed — TrackingScreen still shows overlays; map stays blank */
+      .catch((e: unknown) => {
+        // Le silence d'avant laissait une carte blanche sans explication. Google
+        // refuse presque toujours pour une raison précise et réparable.
+        if (!cancelled) setLoadError(mapsErrorMessage(e instanceof Error ? e.message : String(e ?? '')));
       });
 
     return () => {
@@ -266,5 +285,30 @@ export function GoogleDeliveryMap({ apiKey, progress, destinationAddress, delive
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [driverPos?.lat, driverPos?.lng]);
 
-  return <div ref={divRef} style={{ position: 'absolute', inset: 0 }} />;
+  return (
+    <>
+      <div ref={divRef} style={{ position: 'absolute', inset: 0 }} />
+      {loadError && (
+        <div
+          role="status"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '18px 22px',
+            background: 'rgba(15, 96, 107, 0.94)',
+            color: '#ffffff',
+            fontFamily: 'var(--ui-font)',
+            fontSize: 13,
+            lineHeight: 1.5,
+            textAlign: 'center',
+          }}
+        >
+          {loadError}
+        </div>
+      )}
+    </>
+  );
 }

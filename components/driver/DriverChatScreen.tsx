@@ -7,9 +7,10 @@
 // Style de l'admin : fond turquoise foncé, bulles blanches à texte turquoise
 // pour le livreur, bulles de verre pour le client. L'échec d'envoi est
 // désormais signalé au lieu de disparaître en silence.
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { mergeMessages } from '@/lib/merge-messages';
 import { useToast } from '@/lib/toast-store';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
@@ -41,6 +42,18 @@ export function DriverChatScreen({
   const [draft, setDraft] = useState('');
   const scroller = useRef<HTMLDivElement>(null);
 
+  // Même traitement que l'écran du client : envoi, temps réel, et relecture de
+  // sécurité toutes les 5 s. Les doublons sont écartés par identifiant.
+  const relire = useCallback(async () => {
+    const { data } = await createClient()
+      .from('chat_messages')
+      .select('*')
+      .eq('order_id', order.id)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (data) setMessages((prev) => mergeMessages(prev, (data as ChatMessage[]).slice().reverse()));
+  }, [order.id]);
+
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
@@ -50,14 +63,20 @@ export function DriverChatScreen({
         { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `order_id=eq.${order.id}` },
         (payload) => {
           const msg = payload.new as ChatMessage;
-          setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+          setMessages((prev) => mergeMessages(prev, [msg]));
         },
       )
       .subscribe();
+
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') relire();
+    }, 5000);
+
     return () => {
+      clearInterval(timer);
       supabase.removeChannel(channel);
     };
-  }, [order.id]);
+  }, [order.id, relire]);
 
   useEffect(() => {
     if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
@@ -67,11 +86,17 @@ export function DriverChatScreen({
     const body = textToSend.trim();
     if (!body) return;
     setDraft('');
-    const { error } = await createClient().from('chat_messages').insert({ order_id: order.id, sender: 'driver', body });
+    const { data, error } = await createClient()
+      .from('chat_messages')
+      .insert({ order_id: order.id, sender: 'driver', body })
+      .select()
+      .single();
     if (error) {
       setDraft(body); // on rend le texte au livreur plutôt que de le perdre
-      toast("Message non envoyé. Vérifiez votre connexion.");
+      toast('Message non envoyé. Vérifiez votre connexion.', 'alert');
+      return;
     }
+    if (data) setMessages((prev) => mergeMessages(prev, [data as ChatMessage]));
   };
 
   const customerName = contact?.full_name || 'Client';

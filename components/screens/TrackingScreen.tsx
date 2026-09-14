@@ -17,6 +17,7 @@ import { TRACK_STEPS } from '@/lib/constants';
 import { LV_ROUTE, lvPosAt } from '@/lib/route';
 import { liveEta, minutesUntil } from '@/lib/eta';
 import { slotShortLabel } from '@/lib/checkout-slots';
+import { MAPS_KEY_ABSENTE, hasMapsKey } from '@/lib/maps-status';
 import { createClient } from '@/lib/supabase/client';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
@@ -33,7 +34,10 @@ const GoogleDeliveryMap = dynamic(
 
 // Real map renders only when a browser Maps key is configured; otherwise the
 // built-in SVG map is used (graceful fallback, no key required).
-const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+// hasMapsKey : une variable définie mais vide n'est pas une clé.
+const MAPS_KEY = hasMapsKey(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY)
+  ? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+  : undefined;
 
 export interface TrackingScreenProps {
   order: Order;
@@ -183,6 +187,27 @@ export function TrackingScreen({ order: initialOrder, items, tracking, driver: i
             GPS {gpsShown.lat.toFixed(4)}, {gpsShown.lng.toFixed(4)}
           </span>
         </div>
+        {!MAPS_KEY && (
+          <div
+            role="status"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 3,
+              padding: '8px 12px',
+              background: 'rgba(15, 96, 107, 0.94)',
+              color: '#ffffff',
+              fontFamily: 'var(--ui-font)',
+              fontSize: 11,
+              lineHeight: 1.4,
+              textAlign: 'center',
+            }}
+          >
+            Carte simplifiée — {MAPS_KEY_ABSENTE}
+          </div>
+        )}
         {!MAPS_KEY && (
         <div
           style={{

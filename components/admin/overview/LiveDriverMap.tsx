@@ -21,6 +21,7 @@ import { Loader } from '@googlemaps/js-api-loader';
 import type { DriverPosition, DriverRun } from '@/lib/admin-overview';
 import { LA_VILLA_BRANCHES, DEFAULT_BRANCH } from '@/lib/branches';
 import { distanceKm } from '@/lib/eta';
+import { MAPS_KEY_ABSENTE, mapsErrorMessage } from '@/lib/maps-status';
 
 const CENTER = { lat: DEFAULT_BRANCH.lat, lng: DEFAULT_BRANCH.lng };
 
@@ -67,6 +68,7 @@ export function LiveDriverMap({ apiKey, positions, runs = [] }: LiveDriverMapPro
   const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const routesRef = useRef<Map<string, CachedRoute>>(new Map());
   const [infos, setInfos] = useState<RouteInfo[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   // Miroir des infos courantes, lisible depuis l'effet sans le relancer.
   const infosRef = useRef<RouteInfo[]>([]);
   infosRef.current = infos;
@@ -108,8 +110,9 @@ export function LiveDriverMap({ apiKey, positions, runs = [] }: LiveDriverMapPro
         }
         setMap(mapInstance);
       })
-      .catch(() => {
-        /* chargement raté — le panneau de repli prend le relais */
+      .catch((e: unknown) => {
+        // Google refuse presque toujours pour une raison précise et réparable.
+        if (!cancelled) setLoadError(mapsErrorMessage(e instanceof Error ? e.message : String(e ?? '')));
       });
     return () => {
       cancelled = true;
@@ -288,8 +291,8 @@ export function LiveDriverMap({ apiKey, positions, runs = [] }: LiveDriverMapPro
           <h2 style={{ ...text, fontWeight: 600, fontSize: 16, color: 'var(--ink)', margin: 0 }}>
             Suivi des livreurs · en direct
           </h2>
-          <div style={{ ...text, fontSize: 12, color: 'var(--a-accent)', marginTop: 4 }}>
-            Carte indisponible : aucune clé Google Maps configurée.
+          <div style={{ ...text, fontSize: 11.5, color: 'var(--a-accent)', marginTop: 5, lineHeight: 1.45 }}>
+            {MAPS_KEY_ABSENTE}
           </div>
         </div>
         <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 10, overflow: 'auto' }}>
@@ -333,6 +336,28 @@ export function LiveDriverMap({ apiKey, positions, runs = [] }: LiveDriverMapPro
           </h2>
         </div>
         <div ref={divRef} style={{ position: 'absolute', inset: 0 }} />
+        {loadError && (
+          <div
+            role="status"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '18px 24px',
+              background: 'rgba(15, 96, 107, 0.94)',
+              color: '#ffffff',
+              ...text,
+              fontSize: 13,
+              lineHeight: 1.5,
+              textAlign: 'center',
+            }}
+          >
+            {loadError}
+          </div>
+        )}
       </div>
 
       {/* Une ligne par course : le temps et la distance que Google donne au livreur. */}

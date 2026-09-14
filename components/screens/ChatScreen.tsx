@@ -4,11 +4,12 @@
 // `chat_messages` (sender 'customer' | 'driver'); we subscribe to INSERTs via
 // Supabase Realtime and insert the customer's outgoing messages via the browser
 // client (RLS: chat_customer_insert — sender='customer' + order owned by user).
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ChatMessage, Driver, Order } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/lib/toast-store';
+import { mergeMessages } from '@/lib/merge-messages';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
 import { Icon } from '@/components/ui/Icon';
 import { PhotoSlot } from '@/components/ui/PhotoSlot';
@@ -34,6 +35,20 @@ export function ChatScreen({ order, driver, initialMessages }: ChatScreenProps) 
   const [draft, setDraft] = useState('');
   const scroller = useRef<HTMLDivElement>(null);
 
+  // Un fil de discussion ne peut pas dépendre du seul temps réel. Il se remplit
+  // de trois côtés : la ligne renvoyée par l'envoi, les événements Realtime, et
+  // une relecture toutes les 5 s tant que l'écran est ouvert. Les doublons sont
+  // écartés par identifiant (lib/merge-messages).
+  const relire = useCallback(async () => {
+    const { data } = await createClient()
+      .from('chat_messages')
+      .select('*')
+      .eq('order_id', order.id)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (data) setMessages((prev) => mergeMessages(prev, (data as ChatMessage[]).slice().reverse()));
+  }, [order.id]);
+
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
@@ -43,14 +58,21 @@ export function ChatScreen({ order, driver, initialMessages }: ChatScreenProps) 
         { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `order_id=eq.${order.id}` },
         (payload) => {
           const msg = payload.new as ChatMessage;
-          setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+          setMessages((prev) => mergeMessages(prev, [msg]));
         },
       )
       .subscribe();
+
+    // Le filet : si le canal dort ou n'est pas authentifié, on ne perd rien.
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') relire();
+    }, 5000);
+
     return () => {
+      clearInterval(timer);
       supabase.removeChannel(channel);
     };
-  }, [order.id]);
+  }, [order.id, relire]);
 
   useEffect(() => {
     if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
@@ -63,13 +85,20 @@ export function ChatScreen({ order, driver, initialMessages }: ChatScreenProps) 
     // L'erreur était ignorée, et le brouillon déjà effacé : un message qui
     // n'arrivait pas disparaissait sans laisser de trace, et le client croyait
     // avoir écrit au livreur. Même correction que l'écran du livreur.
-    const { error } = await createClient()
+    // `.select()` renvoie la ligne telle que la base l'a écrite : on l'affiche
+    // aussitôt, sans attendre le temps réel. C'est ce qui manquait — l'écran
+    // restait muet et l'on renvoyait le même message encore et encore.
+    const { data, error } = await createClient()
       .from('chat_messages')
-      .insert({ order_id: order.id, sender: 'customer', body });
+      .insert({ order_id: order.id, sender: 'customer', body })
+      .select()
+      .single();
     if (error) {
       setDraft(body); // on rend le texte plutôt que de le perdre
       toast('Message non envoyé. Vérifiez votre connexion.', 'alert');
+      return;
     }
+    if (data) setMessages((prev) => mergeMessages(prev, [data as ChatMessage]));
   };
 
   return (

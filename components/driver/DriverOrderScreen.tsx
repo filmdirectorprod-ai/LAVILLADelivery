@@ -16,6 +16,7 @@ import { useToast } from '@/lib/toast-store';
 import { formatDH } from '@/lib/format';
 import { customerMessage } from '@/lib/order-error-messages';
 import { directionsUrl } from '@/lib/eta';
+import { MAPS_KEY_ABSENTE, hasMapsKey } from '@/lib/maps-status';
 import { slotShortLabel } from '@/lib/checkout-slots';
 import { useRealtime } from '@/lib/use-realtime';
 import { SAFE_TOP, SAFE_BOTTOM } from '@/lib/layout';
@@ -44,7 +45,9 @@ const GoogleDeliveryMap = dynamic(
   { ssr: false },
 );
 
-const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+const MAPS_KEY = hasMapsKey(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY)
+  ? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+  : undefined;
 
 const STAGE_LABEL: Record<number, string> = {
   0: 'Confirmée',
@@ -306,9 +309,12 @@ export function DriverOrderScreen({
               driverPos={driverPos}
             />
           ) : (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, background: 'var(--a-card)' }}>
-              <Icon name="pin" size={26} color="var(--muted)" />
-              <span style={{ ...text, fontSize: 12.5, color: 'var(--muted)' }}>Carte indisponible</span>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, padding: '14px 18px', background: 'var(--a-card)' }}>
+              <Icon name="pin" size={26} color="var(--a-accent)" />
+              {/* « Carte indisponible » n'aidait personne : on nomme la cause. */}
+              <span style={{ ...text, fontSize: 11.5, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.45 }}>
+                {MAPS_KEY_ABSENTE}
+              </span>
             </div>
           )}
         </div>
