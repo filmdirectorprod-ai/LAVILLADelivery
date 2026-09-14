@@ -40,6 +40,7 @@ export function DriverChatScreen({
   const toast = useToast((s) => s.show);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false); // pas deux fois le même message
   const scroller = useRef<HTMLDivElement>(null);
 
   // Même traitement que l'écran du client : envoi, temps réel, et relecture de
@@ -84,13 +85,15 @@ export function DriverChatScreen({
 
   const send = async (textToSend: string) => {
     const body = textToSend.trim();
-    if (!body) return;
+    if (!body || sending) return;
+    setSending(true);
     setDraft('');
     const { data, error } = await createClient()
       .from('chat_messages')
       .insert({ order_id: order.id, sender: 'driver', body })
       .select()
       .single();
+    setSending(false);
     if (error) {
       setDraft(body); // on rend le texte au livreur plutôt que de le perdre
       toast('Message non envoyé. Vérifiez votre connexion.', 'alert');
@@ -192,6 +195,7 @@ export function DriverChatScreen({
           <button
             key={q}
             onClick={() => send(q)}
+            disabled={sending}
             style={{ ...text, flexShrink: 0, padding: '9px 15px', borderRadius: 999, border: '1px solid var(--a-glass-line)', background: 'transparent', color: 'var(--ink)', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             {q}
@@ -212,7 +216,7 @@ export function DriverChatScreen({
         <button
           onClick={() => send(draft)}
           aria-label="Envoyer"
-          disabled={draft.trim() === ''}
+          disabled={sending || draft.trim() === ''}
           style={{ width: 48, height: 48, borderRadius: 999, background: '#ffffff', border: 'none', cursor: draft.trim() ? 'pointer' : 'default', opacity: draft.trim() ? 1 : 0.45, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
         >
           <Icon name="right" size={21} color="var(--a-on-white)" strokeWidth={2.4} />

@@ -156,6 +156,12 @@ export function AddressesScreen({ addresses: initial, zones, defaultRecipient = 
   }
 
   async function remove(id: string) {
+    // Une adresse supprimée ne revient pas, et le bouton est à un pouce de
+    // « Modifier ». L'admin demande confirmation pour chaque suppression
+    // définitive ; l'application du client le doit aussi.
+    const adresse = list.find((a) => a.id === id);
+    const quoi = adresse?.label ? `« ${adresse.label} »` : 'cette adresse';
+    if (!window.confirm(`Supprimer ${quoi} ? Cette action est définitive.`)) return;
     setBusy(true);
     const { error: e } = await supabase.from('addresses').delete().eq('id', id);
     if (e) setError(e.message);

@@ -33,6 +33,9 @@ export function ChatScreen({ order, driver, initialMessages }: ChatScreenProps) 
   const toast = useToast((t) => t.show);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState('');
+  // Une garde d'envoi : sans elle, cinq appuis sur une réponse rapide
+  // envoyaient cinq messages. C'est arrivé — sept fois en sept secondes.
+  const [sending, setSending] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
 
   // Un fil de discussion ne peut pas dépendre du seul temps réel. Il se remplit
@@ -80,7 +83,8 @@ export function ChatScreen({ order, driver, initialMessages }: ChatScreenProps) 
 
   const send = async (text: string) => {
     const body = text.trim();
-    if (!body) return;
+    if (!body || sending) return;
+    setSending(true);
     setDraft('');
     // L'erreur était ignorée, et le brouillon déjà effacé : un message qui
     // n'arrivait pas disparaissait sans laisser de trace, et le client croyait
@@ -93,6 +97,7 @@ export function ChatScreen({ order, driver, initialMessages }: ChatScreenProps) 
       .insert({ order_id: order.id, sender: 'customer', body })
       .select()
       .single();
+    setSending(false);
     if (error) {
       setDraft(body); // on rend le texte plutôt que de le perdre
       toast('Message non envoyé. Vérifiez votre connexion.', 'alert');
@@ -199,6 +204,7 @@ export function ChatScreen({ order, driver, initialMessages }: ChatScreenProps) 
           <button
             key={q}
             onClick={() => send(q)}
+            disabled={sending}
             style={{
               flexShrink: 0,
               padding: '8px 14px',
@@ -209,7 +215,8 @@ export function ChatScreen({ order, driver, initialMessages }: ChatScreenProps) 
               fontFamily: 'var(--ui-font)',
               fontSize: 12.5,
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: sending ? 'default' : 'pointer',
+              opacity: sending ? 0.5 : 1,
               whiteSpace: 'nowrap',
             }}
           >
@@ -241,13 +248,16 @@ export function ChatScreen({ order, driver, initialMessages }: ChatScreenProps) 
         </div>
         <button
           onClick={() => send(draft)}
+          disabled={sending || draft.trim() === ''}
+          aria-label="Envoyer"
           style={{
             width: 46,
             height: 46,
             borderRadius: 999,
             background: 'var(--brand)',
             border: 'none',
-            cursor: 'pointer',
+            opacity: sending || draft.trim() === '' ? 0.5 : 1,
+            cursor: sending || draft.trim() === '' ? 'default' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
